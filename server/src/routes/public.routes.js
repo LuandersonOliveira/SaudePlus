@@ -29,4 +29,14 @@ router.get('/stats', async (req, res, next) => {
   }
 });
 
+// GET /public/dpo — canal do Encarregado (LGPD art. 41). Público de propósito:
+// o titular precisa achar o contato sem precisar de login.
+router.get('/dpo', (req, res) => {
+  res.json({
+    name: process.env.DPO_NAME || null,
+    email: process.env.DPO_EMAIL || null,
+    configured: !!(process.env.DPO_NAME && process.env.DPO_EMAIL),
+  });
+});
+
 module.exports = router;

@@ -1,22 +1,30 @@
 const express = require('express');
 const crypto = require('crypto');
 const pool = require('../db');
-const { verifyToken, requireAdmin, requireCapability } = require('../middleware/auth');
-const { logAction } = require('../utils/audit');
-const { validateBooking, validateScheduleWindow } = require('../utils/booking');
+const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { requireCapability } = require('../middleware/capabilities');
+const { verifyChain } = require('../utils/audit');
+const { applyBookingChange } = require('../utils/booking');
+const { parsePagination } = require('../utils/validators');
+
+// Listagem paginável sem quebra: com ?page/?pageSize responde
+// envelope {data,page,pageSize,total}; sem query mantém o array legado.
+async function pagedList(res, next, { baseSql, countSql, params, page, pageSize, offset, wantsPaged }) {
+  try {
+    const [rows] = await pool.query(`${baseSql} LIMIT ? OFFSET ?`, [...params, pageSize, offset]);
+    if (!wantsPaged) return res.json(rows);
+    const [[countRow]] = await pool.query(countSql, params);
+    return res.json({ data: rows, page, pageSize, total: Number(countRow.total) });
+  } catch (err) {
+    next(err);
+  }
+}
 
 const router = express.Router();
 // Toda rota abaixo exige login E papel de admin — é a fronteira de
 // privilégio mais sensível do app, então fica isolada num único arquivo.
 router.use(verifyToken, requireAdmin);
 
-
-const VALID_STATUS = ['pendente', 'confirmado', 'cancelado', 'concluido'];
-// kind (rota/JSON) -> { table, entityType (p/ log) }
-const ENTITY_MAP = {
-  appointments: { table: 'appointments', entityType: 'appointment' },
-  exams: { table: 'exams', entityType: 'exam' },
-};
 
 router.get('/stats', async (req, res, next) => {
   try {
@@ -27,7 +35,7 @@ router.get('/stats', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/export/summary.csv', async (req, res, next) => {
+router.get('/export/summary.csv', requireCapability('reports'), async (req, res, next) => {
   try {
     const [[users]] = await pool.query(`SELECT
       COUNT(*) AS total,
@@ -69,12 +77,20 @@ router.get('/export/summary.csv', async (req, res, next) => {
   }
 });
 
-router.get('/appointments', async (req, res, next) => {
+router.get('/appointments', requireCapability('appointments'), async (req, res, next) => {
+  const { wantsPaged, page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 20 });
+  const legacyLimit = Math.min(parseInt(req.query.limit, 10) || pageSize, 100);
+  if (wantsPaged) {
+    return pagedList(res, next, {
+      baseSql: 'SELECT a.*, u.full_name AS user_name, u.email AS user_email FROM appointments a JOIN users u ON u.id = a.user_id ORDER BY a.scheduled_at DESC',
+      countSql: 'SELECT COUNT(*) AS total FROM appointments',
+      params: [], page, pageSize, offset, wantsPaged,
+    });
+  }
   try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
     const [rows] = await pool.query(
       'SELECT a.*, u.full_name AS user_name, u.email AS user_email FROM appointments a JOIN users u ON u.id = a.user_id ORDER BY a.scheduled_at DESC LIMIT ?',
-      [limit]
+      [legacyLimit]
     );
     res.json(rows);
   } catch (err) {
@@ -82,12 +98,20 @@ router.get('/appointments', async (req, res, next) => {
   }
 });
 
-router.get('/exams', async (req, res, next) => {
+router.get('/exams', requireCapability('appointments'), async (req, res, next) => {
+  const { wantsPaged, page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 20 });
+  const legacyLimit = Math.min(parseInt(req.query.limit, 10) || pageSize, 100);
+  if (wantsPaged) {
+    return pagedList(res, next, {
+      baseSql: 'SELECT e.*, u.full_name AS user_name, u.email AS user_email FROM exams e JOIN users u ON u.id = e.user_id ORDER BY e.scheduled_at DESC',
+      countSql: 'SELECT COUNT(*) AS total FROM exams',
+      params: [], page, pageSize, offset, wantsPaged,
+    });
+  }
   try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
     const [rows] = await pool.query(
       'SELECT e.*, u.full_name AS user_name, u.email AS user_email FROM exams e JOIN users u ON u.id = e.user_id ORDER BY e.scheduled_at DESC LIMIT ?',
-      [limit]
+      [legacyLimit]
     );
     res.json(rows);
   } catch (err) {
@@ -95,77 +119,9 @@ router.get('/exams', async (req, res, next) => {
   }
 });
 
-// PATCH /admin/:kind/:id — confirmar, cancelar e/ou reagendar (admin pode agir
-// sobre o agendamento de QUALQUER usuário; diferente das rotas /me/*, que só
-// deixam cada usuário mexer no próprio registro).
-router.patch('/:kind/:id', async (req, res, next) => {
-  try {
-    const entity = ENTITY_MAP[req.params.kind];
-    if (!entity) return res.status(404).json({ error: 'Tipo inválido.' });
-
-    const { status, scheduled_at } = req.body || {};
-    const updates = [];
-    const params = [];
-    const logParts = [];
-
-    if (status !== undefined) {
-      if (!VALID_STATUS.includes(status)) {
-        return res.status(400).json({ error: 'Status inválido.' });
-      }
-      updates.push('status=?');
-      params.push(status);
-      logParts.push(`status -> ${status}`);
-    }
-    if (scheduled_at) {
-      const windowError = validateScheduleWindow(scheduled_at);
-      if (windowError) return res.status(400).json({ error: windowError });
-      updates.push('scheduled_at=?');
-      params.push(scheduled_at);
-      logParts.push(`reagendado para ${scheduled_at}`);
-    }
-    if (!updates.length) {
-      return res.status(400).json({ error: 'Nada para atualizar.' });
-    }
-
-    // Reagendamento respeita dias/horários do profissional, conflitos e
-    // bloqueios (TAREFAS V3, item 4.5) — validação no servidor.
-    if (scheduled_at) {
-      const serviceColumn = entity.entityType === 'appointment' ? 'specialty' : 'exam_type';
-      const [[record]] = await pool.query(
-        `SELECT professional_id, unit_id, ${serviceColumn} AS service_name FROM ${entity.table} WHERE id = ?`,
-        [req.params.id]
-      );
-      if (record && record.professional_id && record.unit_id) {
-        const bookingError = await validateBooking(pool, {
-          kind: entity.entityType === 'appointment' ? 'consulta' : 'exame',
-          unitId: record.unit_id,
-          professionalId: record.professional_id,
-          serviceName: record.service_name,
-          scheduledAt: scheduled_at,
-          excludeId: req.params.id,
-        });
-        if (bookingError) return res.status(409).json({ error: bookingError });
-      }
-    }
-
-    params.push(req.params.id);
-    const [result] = await pool.query(
-      `UPDATE ${entity.table} SET ${updates.join(', ')} WHERE id=?`,
-      params
-    );
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Registro não encontrado.' });
-    }
-
-    await logAction(req.user.id, 'admin_update', entity.entityType, req.params.id, logParts.join('; '));
-    res.json({ id: req.params.id });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// Busca por e-mail (parcial) para localizar o histórico de um usuário
-router.get('/users', async (req, res, next) => {
+// Busca por e-mail (parcial) para localizar o histórico de um usuário.
+// Segurança (P0.4): exige a permissão 'users' (mesma da gestão de usuários).
+router.get('/users', requireCapability('users'), async (req, res, next) => {
   try {
     const email = String(req.query.email || '').toLowerCase().trim();
     const [rows] = await pool.query(
@@ -178,7 +134,8 @@ router.get('/users', async (req, res, next) => {
   }
 });
 
-router.get('/history', async (req, res, next) => {
+// Histórico de um usuário — exige a permissão 'users' (P0.4) e audita a leitura.
+router.get('/history', requireCapability('users'), async (req, res, next) => {
   try {
     const userId = req.query.userId;
     if (!userId) return res.status(400).json({ error: 'userId é obrigatório.' });
@@ -198,13 +155,16 @@ router.get('/history', async (req, res, next) => {
       [userId]
     );
 
+    await req.audit('admin_view_history', 'user', userId,
+      `histórico lido: ${appointments.length} consulta(s), ${exams.length} exame(s)`);
     res.json({ user, appointments, exams });
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/diseases', async (req, res, next) => {
+// CRUD de doenças — permissão 'diseases' (o nível 'alertas' é o dono desta área).
+router.get('/diseases', requireCapability('diseases'), async (req, res, next) => {
   try {
     const [rows] = await pool.query('SELECT * FROM diseases ORDER BY created_at DESC');
     res.json(rows);
@@ -213,7 +173,7 @@ router.get('/diseases', async (req, res, next) => {
   }
 });
 
-router.patch('/diseases/:id', async (req, res, next) => {
+router.patch('/diseases/:id', requireCapability('diseases'), async (req, res, next) => {
   try {
     const { name, region, alert_level, description, active } = req.body || {};
     const updates = [];
@@ -228,12 +188,12 @@ router.patch('/diseases/:id', async (req, res, next) => {
     params.push(req.params.id);
     const [result] = await pool.query(`UPDATE diseases SET ${updates.join(', ')} WHERE id=?`, params);
     if (!result.affectedRows) return res.status(404).json({ error: 'Alerta não encontrado.' });
-    await logAction(req.user.id, 'admin_update_disease', 'disease', req.params.id, details.join('; '));
+    await req.audit('admin_update_disease', 'disease', req.params.id, details.join('; '));
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
 
-router.post('/diseases', async (req, res, next) => {
+router.post('/diseases', requireCapability('diseases'), async (req, res, next) => {
   try {
     const { name, region, alert_level, description } = req.body || {};
     if (!name) return res.status(400).json({ error: 'Nome é obrigatório.' });
@@ -246,43 +206,89 @@ router.post('/diseases', async (req, res, next) => {
       'INSERT INTO diseases (id, name, region, alert_level, description) VALUES (?,?,?,?,?)',
       [id, name, region || null, level, description || null]
     );
-    await logAction(req.user.id, 'create', 'disease', id, `"${name}" (${level})`);
+    await req.audit('create', 'disease', id, `"${name}" (${level})`);
     res.status(201).json({ id });
   } catch (err) {
     next(err);
   }
 });
 
-router.delete('/diseases/:id', async (req, res, next) => {
+router.delete('/diseases/:id', requireCapability('diseases'), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM diseases WHERE id = ?', [req.params.id]);
-    await logAction(req.user.id, 'delete', 'disease', req.params.id, null);
+    await req.audit('delete', 'disease', req.params.id, null);
     res.status(204).end();
   } catch (err) {
     next(err);
   }
 });
 
+// PATCH /admin/:kind/:id — confirmar, cancelar e/ou reagendar (admin pode agir
+// sobre o agendamento de QUALQUER usuário; diferente das rotas /me/*, que só
+// deixam cada usuário mexer no próprio registro).
+// DEPOIS das rotas específicas: o Express casa na ordem de definição, e um
+// PATCH /admin/diseases/:id cairia aqui (kind='diseases') se viesse antes.
+// Regra única em booking.js (Fase 2, item 3); aqui só chama e audita.
+router.patch('/:kind/:id', requireCapability('appointments'), async (req, res, next) => {
+  try {
+    const result = await applyBookingChange(pool, {
+      kindKey: req.params.kind,
+      id: req.params.id,
+      body: req.body || {},
+    });
+    if (result.status !== 200) return res.status(result.status).json(result.body);
+    await req.audit('admin_update', result.audit.entityType, req.params.id, result.audit.details);
+    res.json(result.body);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /admin/audit-log — histórico de ações administrativas
-router.get('/audit-log', async (req, res, next) => {
+// Trilha de auditoria — permissão 'audit' (não é para todo admin ver tudo
+// que os outros fizeram; ver docs/SOA_27001.md §5.3 segregação de funções).
+router.get('/audit-log', requireCapability('audit'), async (req, res, next) => {
+  const entityType = String(req.query.entityType || '').trim();
+  const action = String(req.query.action || '').trim();
+  const actorId = String(req.query.actorId || '').trim();
+  const filters = [];
+  const params = [];
+  if (entityType) { filters.push('al.entity_type = ?'); params.push(entityType); }
+  if (action) { filters.push('al.action = ?'); params.push(action); }
+  if (actorId) { filters.push('al.actor_id = ?'); params.push(actorId); }
+  const where = filters.length ? 'WHERE ' + filters.join(' AND ') : '';
+  const { wantsPaged, page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 50, maxPageSize: 200 });
+  if (wantsPaged) {
+    return pagedList(res, next, {
+      baseSql: `SELECT al.*, u.full_name AS actor_name, u.email AS actor_email
+       FROM audit_log al JOIN users u ON u.id = al.actor_id
+       ${where} ORDER BY al.created_at DESC`,
+      countSql: `SELECT COUNT(*) AS total FROM audit_log al ${where}`,
+      params, page, pageSize, offset, wantsPaged,
+    });
+  }
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
-    const entityType = String(req.query.entityType || '').trim();
-    const action = String(req.query.action || '').trim();
-    const actorId = String(req.query.actorId || '').trim();
-    const filters = [];
-    const params = [];
-    if (entityType) { filters.push('al.entity_type = ?'); params.push(entityType); }
-    if (action) { filters.push('al.action = ?'); params.push(action); }
-    if (actorId) { filters.push('al.actor_id = ?'); params.push(actorId); }
     const [rows] = await pool.query(
       `SELECT al.*, u.full_name AS actor_name, u.email AS actor_email
        FROM audit_log al JOIN users u ON u.id = al.actor_id
-       ${filters.length ? 'WHERE ' + filters.join(' AND ') : ''}
+       ${where}
        ORDER BY al.created_at DESC LIMIT ?`,
       [...params, limit]
     );
     res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /admin/audit-log/verify — verifica a cadeia de hashes (Aulas 1/6).
+// Detecta alteração, remoção ou inserção fora de ordem na trilha.
+router.get('/audit-log/verify', requireCapability('audit'), async (req, res, next) => {
+  try {
+    const result = await verifyChain(pool);
+    await req.audit('audit_verify', 'audit', 'chain', result.ok ? `cadeia íntegra (${result.checked} linhas)` : `FALHA na linha ${result.firstBad}: ${result.reason}`);
+    res.json(result);
   } catch (err) {
     next(err);
   }

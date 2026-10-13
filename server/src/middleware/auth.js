@@ -1,4 +1,6 @@
 const jwt = require('jsonwebtoken');
+// Permissões vivem em capabilities.js (Fase 3); aqui só re-exporta.
+const { requireCapability } = require('./capabilities');
 
 function verifyToken(req, res, next) {
   const header = req.headers.authorization || '';
@@ -26,20 +28,6 @@ function requireStaff(req, res, next) {
     return res.status(403).json({ error: 'Acesso restrito a atendentes e administradores.' });
   }
   next();
-}
-
-function requireCapability(capability) {
-  return (req, res, next) => {
-    const level = req.user && req.user.admin_level;
-    const permissions = {
-      superadmin: ['users', 'appointments', 'diseases', 'units', 'audit', 'reports'],
-      gestor: ['users', 'appointments', 'diseases', 'units', 'audit', 'reports'],
-      atendimento: ['appointments'],
-      alertas: ['diseases'],
-    };
-    if (req.user && req.user.role === 'admin' && permissions[level || 'gestor']?.includes(capability)) return next();
-    return res.status(403).json({ error: 'Seu nível administrativo não permite esta operação.' });
-  };
 }
 
 module.exports = { verifyToken, requireAdmin, requireStaff, requireCapability };

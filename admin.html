@@ -5,77 +5,111 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Painel ADM | Saúde+</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="assets/styles.css">
   <script defer src="assets/api.js"></script>
 </head>
 
 <body>
-  <header class="topbar">
-    <a class="brand" href="index.html"><span class="brand-dot"></span>Saúde+ <span class="badge"
-        style="margin-left:6px">ADM</span></a>
-    <nav class="nav">
-      <span id="userEmail" class="muted"></span>
-      <button class="btn btn-outline btn-sm" onclick="signOut()">Sair</button>
-    </nav>
-  </header>
-
-  <main class="container">
-    <h1>Painel administrativo</h1>
-    <p class="muted">Monitore atendimentos, usuários e alertas de saúde.</p>
-
-    <div class="tabs" role="tablist">
+  <a class="sr-only" href="#conteudo">Pular para o conteúdo</a>
+  <div class="app-shell">
+  <aside class="app-rail">
+    <a class="brand rail-brand" href="index.html"><span class="brand-dot"></span>Saúde+</a>
+    <nav class="tabs sidebar" role="tablist" aria-label="Navegação administrativa">
       <button class="tab active" data-tab="overview" role="tab" aria-selected="true" id="tab-overview"
-        aria-controls="overview">Visão geral</button>
-      <button class="tab" data-tab="usuarios" role="tab" aria-selected="false" id="tab-usuarios"
-        aria-controls="usuarios">Usuários e Histórico</button>
-      <button class="tab" data-tab="diseases" role="tab" aria-selected="false" id="tab-diseases"
-        aria-controls="diseases">Doenças</button>
-      <button class="tab" data-tab="units" role="tab" aria-selected="false" id="tab-units"
-        aria-controls="units">Unidades de Saúde</button>
-      <button class="tab" data-tab="profissionais" role="tab" aria-selected="false" id="tab-profissionais"
-        aria-controls="profissionais">Profissionais e Agenda</button>
+        aria-controls="overview">Início</button>
+      <button class="tab" data-tab="atendimentos" role="tab" aria-selected="false" id="tab-atendimentos"
+        aria-controls="atendimentos">Atendimentos</button>
+      <button class="tab" data-tab="cadastros" role="tab" aria-selected="false" id="tab-cadastros"
+        aria-controls="cadastros">Cadastros</button>
       <button class="tab" data-tab="auditoria" role="tab" aria-selected="false" id="tab-auditoria"
         aria-controls="auditoria">Auditoria</button>
+      <button class="tab" data-tab="minha-conta" role="tab" aria-selected="false" id="tab-minha-conta"
+        aria-controls="minha-conta">Minha conta</button>
+    </nav>
+
+    <div class="rail-user">
+      <div class="rail-user-head" id="railUserHead">
+        <span class="rail-user-email" id="userEmail"></span>
+      </div>
+      <button class="btn btn-outline btn-sm rail-signout" type="button" onclick="signOut()">Sair</button>
     </div>
+  </aside>
+
+  <div class="app-main">
+  <main class="container" id="conteudo">
+    <h1>Painel administrativo</h1>
+    <p class="muted">Monitore atendimentos, usuários e alertas de saúde.</p>
 
     <!-- ===== VISÃO GERAL ===== -->
     <section class="tabpanel active" id="overview" role="tabpanel" aria-labelledby="tab-overview">
       <div class="grid grid-5" id="stats"></div>
-      <div class="row" style="justify-content:flex-end;margin-top:12px">
-        <button class="btn btn-outline btn-sm" type="button" onclick="downloadSummaryReport()">Baixar resumo
-          CSV</button>
-      </div>
       <div class="card" style="margin-top:16px">
-        <h3>Consultas recentes</h3>
-        <div id="recentAppts">
-          <div class="spinner"></div>
+        <h2>Precisa da sua atenção</h2>
+        <div id="attention">
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn btn-primary btn-sm" type="button" id="shortcutAgenda" onclick="gotoAtendimentos()">Ver atendimentos de hoje</button>
+        <button class="btn btn-outline btn-sm" type="button" id="shortcutPessoas" onclick="gotoPessoas('pendente')">Ativar contas pendentes</button>
+        <button class="btn btn-outline btn-sm" type="button" id="shortcutCSV" onclick="downloadSummaryReport()">Baixar resumo CSV</button>
+      </div>
       <div class="card" style="margin-top:16px">
-        <h3>Exames recentes</h3>
-        <div id="recentExams">
-          <div class="spinner"></div>
+        <h2>Atividade recente</h2>
+        <div id="recentActivity">
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
-
     </section>
 
-    <!-- ===== GESTÃO DE USUÁRIOS E HISTÓRICO ===== -->
-    <section class="tabpanel" id="usuarios" role="tabpanel" aria-labelledby="tab-usuarios">
+    <!-- ===== ATENDIMENTOS (agenda de hoje + recentes) ===== -->
+    <section class="tabpanel" id="atendimentos" role="tabpanel" aria-labelledby="tab-atendimentos">
       <div class="card">
-        <h3>Gestão de usuários</h3>
+        <h2>Agenda de hoje</h2>
+        <p class="muted" style="margin-top:-8px">Consultas e exames marcados para hoje — confirme, cancele ou reagende.</p>
+        <div id="agendaToday">
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Consultas recentes</h2>
+        <div id="recentAppts">
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Exames recentes</h2>
+        <div id="recentExams">
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== CADASTROS (pessoas + rede + doenças) ===== -->
+    <section class="tabpanel" id="cadastros" role="tabpanel" aria-labelledby="tab-cadastros">
+      <style>.subpanel{display:none}.subpanel.active{display:block}</style>
+      <div class="tabs" role="tablist" aria-label="Cadastros" style="margin-bottom:16px">
+        <button class="tab active" type="button" data-subtab="pessoas" onclick="setSubTab('pessoas')">Pessoas</button>
+        <button class="tab" type="button" data-subtab="rede" onclick="setSubTab('rede')">Rede de saúde</button>
+        <button class="tab" type="button" data-subtab="doencas" onclick="setSubTab('doencas')">Doenças e alertas</button>
+      </div>
+      <div class="subpanel active" id="sub-pessoas">
+      <div class="card">
+        <h2>Gestão de usuários</h2>
         <p class="muted" style="margin-top:-8px">Localize contas, revise pendências e abra o perfil ou o histórico de
           atendimento.</p>
-        <form id="userSearchForm" class="row">
-          <input class="input" name="q" placeholder="Nome, e-mail ou telefone" style="flex:1;min-width:220px">
-          <select class="select" name="role" style="width:160px" aria-label="Filtrar por papel">
+        <form id="userSearchForm" class="row" aria-label="Buscar usuários">
+          <label for="userSearchQ" class="sr-only">Nome, e-mail ou telefone</label>
+          <input class="input" id="userSearchQ" name="q" placeholder="Nome, e-mail ou telefone" style="flex:1;min-width:220px">
+          <label for="userSearchRole" class="sr-only">Filtrar por papel</label>
+          <select class="select" id="userSearchRole" name="role" style="width:160px" aria-label="Filtrar por papel">
             <option value="">Todos os papéis</option>
             <option value="paciente">Paciente</option>
             <option value="atendente">Atendente</option>
             <option value="admin">Admin</option>
           </select>
-          <select class="select" name="status" style="width:170px" aria-label="Filtrar por status">
+          <label for="userSearchStatus" class="sr-only">Filtrar por status</label>
+          <select class="select" id="userSearchStatus" name="status" style="width:170px" aria-label="Filtrar por status">
             <option value="">Todos os status</option>
             <option value="pendente">Aguardando ativação</option>
             <option value="ativo">Ativos</option>
@@ -88,45 +122,41 @@
       </div>
       <div id="userEditBox" style="margin-top:16px;display:none"></div>
       <div id="userHistoryBox" style="margin-top:16px;display:none"></div>
-    </section>
-
-    <!-- ===== DOENÇAS ===== -->
-    <section class="tabpanel" id="diseases" role="tabpanel" aria-labelledby="tab-diseases">
+      </div><!-- /sub-pessoas -->
+      <div class="subpanel" id="sub-doencas">
       <div class="card">
-        <h3>Cadastrar doença / alerta</h3>
-        <form id="diseaseForm" class="grid grid-2">
-          <div class="field"><label>Nome</label><input class="input" name="name" required></div>
+        <h2>Cadastrar doença / alerta</h2>
+        <form id="diseaseForm" class="grid grid-2" aria-label="Cadastrar alerta de doença">
+          <div class="field"><label for="diseaseName">Nome</label><input class="input" id="diseaseName" name="name" required></div>
           <div class="field">
-            <label>Região (Bairro)</label>
+            <label for="diseaseRegionSelect">Região (Bairro)</label>
             <select class="select" name="region" id="diseaseRegionSelect" required>
               <option value="">Carregando regiões...</option>
             </select>
           </div>
-          <div class="field"><label>Nível</label>
-            <select class="select" name="alert_level">
+          <div class="field"><label for="diseaseLevel">Nível</label>
+            <select class="select" id="diseaseLevel" name="alert_level">
               <option value="baixo">Baixo</option>
               <option value="medio">Médio</option>
               <option value="alto">Alto</option>
             </select>
           </div>
-          <div class="field"><label>&nbsp;</label><button class="btn btn-primary" type="submit"
+          <div class="field"><span aria-hidden="true">&nbsp;</span><button class="btn btn-primary" type="submit"
               style="width:100%">Adicionar</button></div>
-          <div class="field" style="grid-column:1/-1"><label>Descrição</label><textarea class="textarea"
-              name="description"></textarea></div>
+          <div class="field" style="grid-column:1/-1"><label for="diseaseDescription">Descrição</label><textarea class="textarea"
+              name="description" id="diseaseDescription"></textarea></div>
         </form>
       </div>
       <div class="card" style="margin-top:16px">
-        <h3>Doenças cadastradas</h3>
+        <h2>Doenças cadastradas</h2>
         <div id="diseaseList">
-          <div class="spinner"></div>
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
-    </section>
-
-    <!-- ===== UNIDADES DE SAÚDE ===== -->
-    <section class="tabpanel" id="units" role="tabpanel" aria-labelledby="tab-units">
+      </div><!-- /sub-doencas -->
+      <div class="subpanel" id="sub-rede">
       <div class="card">
-        <h3 id="unitFormTitle">Cadastrar unidade de saúde</h3>
+        <h2 id="unitFormTitle">Cadastrar unidade de saúde</h2>
         <form id="unitForm" class="grid grid-2">
           <div class="field">
             <label for="unitName">Nome da unidade</label>
@@ -156,17 +186,17 @@
       <div class="card" style="margin-top:16px">
         <div class="row between">
           <div>
-            <h3>Unidades cadastradas</h3>
+            <h2>Unidades cadastradas</h2>
             <p class="muted" style="margin-top:-8px">Unidades inativas não aparecem nos formulários de agendamento.</p>
           </div>
           <button class="btn btn-outline btn-sm" type="button" onclick="loadUnits()">Atualizar</button>
         </div>
         <div id="unitList">
-          <div class="spinner"></div>
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
       <div class="card" style="margin-top:16px">
-        <h3>Serviços oferecidos pela unidade</h3>
+        <h2>Serviços oferecidos pela unidade</h2>
         <p class="muted" style="margin-top:-8px">Especialidades de consulta e tipos de exame que o paciente pode escolher
           para cada unidade. A fonte da verdade do agendamento.</p>
         <form id="unitOfferForm" class="grid grid-2" style="margin-top:12px">
@@ -191,12 +221,8 @@
         </form>
         <div id="unitOfferList" style="margin-top:8px"></div>
       </div>
-    </section>
-
-    <!-- ===== PROFISSIONAIS E AGENDA ===== -->
-    <section class="tabpanel" id="profissionais" role="tabpanel" aria-labelledby="tab-profissionais">
-      <div class="card">
-        <h3 id="profFormTitle">Cadastrar profissional</h3>
+      <div class="card" style="margin-top:16px">
+        <h2 id="profFormTitle">Cadastrar profissional</h2>
         <p class="muted" style="margin-top:-8px">Profissional ativo só aparece no agendamento depois de vinculado a uma
           unidade e a um serviço.</p>
         <form id="profForm" class="grid grid-4">
@@ -222,38 +248,177 @@
       <div class="card" style="margin-top:16px">
         <div class="row between">
           <div>
-            <h3>Profissionais cadastrados</h3>
+            <h2>Profissionais cadastrados</h2>
             <p class="muted" style="margin-top:-8px">Em "Gerenciar" ficam vínculos com unidades, especialidades, horários
               de atendimento e bloqueios de agenda.</p>
           </div>
           <button class="btn btn-outline btn-sm" type="button" onclick="loadProfessionals()">Atualizar</button>
         </div>
         <div id="profList">
-          <div class="spinner"></div>
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
         <div id="profDetail" style="display:none"></div>
       </div>
+      </div><!-- /sub-rede -->
     </section>
 
     <!-- ===== AUDITORIA ===== -->
     <section class="tabpanel" id="auditoria" role="tabpanel" aria-labelledby="tab-auditoria">
       <div class="card">
-        <h3>Ações administrativas recentes</h3>
+        <h2>Ações administrativas recentes</h2>
         <p class="muted" style="margin-top:-8px">Quem fez o quê e quando — confirmações, cancelamentos e gestão de
           alertas.</p>
-        <form id="auditFilterForm" class="row" style="margin-top:12px">
-          <input class="input" name="entityType" placeholder="Tipo da entidade" style="min-width:180px">
-          <input class="input" name="action" placeholder="Ação" style="min-width:180px">
+        <form id="auditFilterForm" class="row" aria-label="Filtrar auditoria" style="margin-top:12px">
+          <label for="auditEntityType" class="sr-only">Tipo da entidade</label>
+          <input class="input" id="auditEntityType" name="entityType" placeholder="Tipo da entidade" style="min-width:180px">
+          <label for="auditAction" class="sr-only">Ação</label>
+          <input class="input" id="auditAction" name="action" placeholder="Ação" style="min-width:180px">
           <button class="btn btn-outline" type="submit">Filtrar</button>
           <button class="btn btn-outline" type="button" onclick="resetAuditFilters()">Limpar</button>
+          <button class="btn btn-outline" type="button" onclick="verifyAuditChain()">Verificar integridade</button>
         </form>
+        <div id="chainResult" class="muted" style="margin-top:8px;font-size:.88rem"></div>
         <div id="auditLog" style="margin-top:12px">
-          <div class="spinner"></div>
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== MINHA CONTA (perfil + LGPD + privacidade + DPO) ===== -->
+    <section class="tabpanel" id="minha-conta" role="tabpanel" aria-labelledby="tab-minha-conta">
+      <div class="grid grid-2" style="align-items:start">
+        <div class="card">
+          <h2>Meus dados</h2>
+          <p class="muted">Você também é um usuário do sistema: complete seus dados ou atualize-os quando mudar.</p>
+          <div style="display:flex;align-items:center;gap:12px;margin:14px 0">
+            <div style="flex:1;height:10px;border-radius:6px;background:var(--border);overflow:hidden">
+              <div id="acctBar" style="height:100%;width:0%;background:var(--primary)"></div>
+            </div>
+            <strong id="acctPct">0%</strong>
+          </div>
+          <form id="acctForm" novalidate aria-label="Meus dados">
+            <h3>Identificação</h3>
+            <div class="grid grid-2" style="gap:12px">
+              <div class="field">
+                <label for="a_full_name">Nome completo *</label>
+                <input class="input" id="a_full_name" name="full_name" autocomplete="name" required>
+              </div>
+              <div class="field">
+                <label for="a_social_name">Nome social <span class="opt">(opcional)</span></label>
+                <input class="input" id="a_social_name" name="social_name">
+              </div>
+              <div class="field">
+                <label for="a_birth_date">Data de nascimento</label>
+                <input class="input" type="date" id="a_birth_date" name="birth_date">
+              </div>
+              <div class="field">
+                <label for="a_gender">Gênero</label>
+                <select class="select" id="a_gender" name="gender">
+                  <option value="">Prefiro não informar</option>
+                  <option value="feminino">Feminino</option>
+                  <option value="masculino">Masculino</option>
+                  <option value="outro">Outro</option>
+                  <option value="nao_informar">Prefiro não informar</option>
+                </select>
+              </div>
+            </div>
+            <h3 style="margin-top:16px">Documentos</h3>
+            <div class="grid grid-2" style="gap:12px">
+              <div class="field">
+                <label for="a_cpf">CPF</label>
+                <input class="input" id="a_cpf" name="cpf" inputmode="numeric" maxlength="14" oninput="maskCpf(this)">
+              </div>
+              <div class="field">
+                <label for="a_rg">RG <span class="opt">(opcional)</span></label>
+                <input class="input" id="a_rg" name="rg" maxlength="15" oninput="maskRg(this)">
+              </div>
+              <div class="field">
+                <label for="a_cns">Cartão SUS (CNS)</label>
+                <input class="input" id="a_cns" name="cns" inputmode="numeric" maxlength="15" oninput="maskCns(this)">
+              </div>
+            </div>
+            <h3 style="margin-top:16px">Contato e endereço</h3>
+            <div class="grid grid-2" style="gap:12px">
+              <div class="field">
+                <label for="a_mobile">Celular *</label>
+                <input class="input" id="a_mobile" name="mobile" inputmode="tel" maxlength="16" placeholder="(00) 90000-0000" required>
+              </div>
+              <div class="field">
+                <label for="a_phone">Telefone fixo <span class="opt">(opcional)</span></label>
+                <input class="input" id="a_phone" name="phone" inputmode="tel" maxlength="15">
+              </div>
+              <div class="field">
+                <label for="a_cep">CEP</label>
+                <input class="input" id="a_cep" name="cep" maxlength="9" oninput="maskCep(this)"
+                  onblur="lookupCep('a_cep',{street:'a_street',neighborhood:'a_neighborhood',city:'a_city',state:'a_state'})">
+              </div>
+              <div class="field">
+                <label for="a_number">Número</label>
+                <input class="input" id="a_number" name="address_number">
+              </div>
+              <div class="field" style="grid-column:1/-1">
+                <label for="a_street">Rua / Logradouro</label>
+                <input class="input" id="a_street" name="street">
+              </div>
+              <div class="field">
+                <label for="a_neighborhood">Bairro</label>
+                <input class="input" id="a_neighborhood" name="neighborhood">
+              </div>
+              <div class="field">
+                <label for="a_city">Cidade</label>
+                <input class="input" id="a_city" name="city">
+              </div>
+              <div class="field" style="max-width:120px">
+                <label for="a_state">UF</label>
+                <input class="input" id="a_state" name="state" maxlength="2" placeholder="UF"
+                  oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')">
+              </div>
+            </div>
+            <div class="row" style="margin-top:18px">
+              <button class="btn btn-primary" type="submit" id="acctSubmit">Salvar meus dados</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="grid" style="gap:16px">
+          <div class="card">
+            <h2>Meus dados (LGPD)</h2>
+            <p class="muted">Veja o que o sistema registra sobre você, baixe uma cópia ou peça a exclusão da conta.</p>
+            <div id="acctConsent" class="muted" style="font-size:.9rem">
+              <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+            </div>
+            <div class="row" style="margin-top:14px">
+              <button class="btn btn-outline btn-sm" type="button" onclick="downloadMyAccountData()">Baixar meus dados (JSON)</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="deleteMyAccount()" style="color:var(--danger)">Excluir minha conta…</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Privacidade</h2>
+            <p class="muted">Coletamos o mínimo necessário para o atendimento público. A base legal é o dever legal do
+              SUS (art. 11, II, <em>f</em> da LGPD), não o consentimento — por isso não há caixa de aceite genérico.</p>
+            <ul class="muted" style="font-size:.9rem;padding-left:18px;margin:10px 0">
+              <li>Dados de saúde são sensíveis e ficam restritos à equipe que presta o atendimento.</li>
+              <li>CPF, RG e CNS são gravados criptografados no banco.</li>
+              <li>Cada acesso da equipe a documentos pessoais fica registrado na auditoria.</li>
+              <li>Você pode corrigir, exportar ou apagar seus dados a qualquer momento.</li>
+            </ul>
+            <a class="btn btn-outline btn-sm" href="privacy.html">Ler a Política de Privacidade</a>
+          </div>
+
+          <div class="card">
+            <h2>Encarregado (DPO)</h2>
+            <p class="muted">Canal oficial para qualquer assunto sobre seus dados pessoais (LGPD, art. 41).</p>
+            <p id="acctDpo" style="font-weight:600;margin:10px 0 0"><span class="spinner"></span></p>
+          </div>
         </div>
       </div>
     </section>
   </main>
+  </div><!-- /app-main -->
+  </div><!-- /app-shell -->
 
+  <script src="assets/ui.js"></script>
   <script>
     let SESSION;
     let pendingReagendar = null;
@@ -275,8 +440,21 @@
       if (!SESSION) return;
       if (!(await isAdmin())) { toast('Acesso restrito ao admin', 'error'); location.replace('dashboard.html'); return; }
       document.getElementById('userEmail').textContent = SESSION.user.email;
+      const levelTag = document.createElement('span');
+      levelTag.id = 'levelBadge';
+      levelTag.className = 'badge';
+      levelTag.style.marginLeft = '0';
+      document.getElementById('railUserHead').prepend(levelTag);
 
-      document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+      applyLevelGating();
+      // Atalhos do Início respeitam o nível (sem permissão, sem botão).
+      document.getElementById('shortcutAgenda').style.display = can('appointments') ? '' : 'none';
+      document.getElementById('shortcutPessoas').style.display = can('users') ? '' : 'none';
+      document.getElementById('shortcutCSV').style.display = can('reports') ? '' : 'none';
+
+      // Só abas principais (com data-tab) usam o switchTab genérico;
+      // sub-abas (Pessoas/Rede/Doenças) têm onclick próprio (setSubTab).
+      document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => { if (t.dataset.tab) switchTab(t.dataset.tab); }));
       document.getElementById('diseaseForm').addEventListener('submit', addDisease);
       document.getElementById('userSearchForm').addEventListener('submit', searchUsers);
       document.getElementById('unitForm').addEventListener('submit', saveUnit);
@@ -284,26 +462,71 @@
       document.getElementById('profForm').addEventListener('submit', saveProf);
       document.getElementById('offerUnitSel').addEventListener('change', renderUnitOffers);
       document.getElementById('auditFilterForm').addEventListener('submit', loadAuditLog);
+      document.getElementById('acctForm').addEventListener('submit', saveAccount);
 
       ensureReagendarModal();
       ensureDeleteDiseaseModal();
       setDateLimits();
       loadHealthUnitsRegions();
-      loadUnits();
+      // P3: carrega só o que o nível pode ver (o resto o back barraria com 403).
+      if (can('units')) loadUnits();
+      if (can('diseases')) loadDiseases();
       loadOverview();
-      loadDiseases();
     });
 
+    // P3: visões por nível administrativo (espelha requireCapability do back).
+    // atendimento → só atendimentos; alertas → só doenças; gestor/superadmin → tudo.
+    const LEVEL_CAPS = {
+      superadmin: ['users', 'appointments', 'diseases', 'units', 'audit', 'reports'],
+      gestor: ['users', 'appointments', 'diseases', 'units', 'audit', 'reports'],
+      atendimento: ['appointments'],
+      alertas: ['diseases'],
+    };
+    function myCaps() {
+      const level = SESSION && SESSION.user && SESSION.user.admin_level;
+      return LEVEL_CAPS[level] || LEVEL_CAPS.gestor;
+    }
+    function can(cap) { return myCaps().includes(cap); }
+
+    function applyLevelGating() {
+      // Abas principais: Atendimentos precisa de 'appointments'; Cadastros
+      // aparece se houver ao menos uma sub-aba permitida; Auditoria de 'audit'.
+      const showAtend = can('appointments');
+      const showAuditoria = can('audit');
+      const showPessoas = can('users');
+      const showRede = can('units');
+      const showDoencas = can('diseases');
+      document.getElementById('tab-atendimentos').style.display = showAtend ? '' : 'none';
+      document.getElementById('tab-auditoria').style.display = showAuditoria ? '' : 'none';
+      document.getElementById('tab-cadastros').style.display = (showPessoas || showRede || showDoencas) ? '' : 'none';
+      document.querySelector('#cadastros [data-subtab="pessoas"]').style.display = showPessoas ? '' : 'none';
+      document.querySelector('#cadastros [data-subtab="rede"]').style.display = showRede ? '' : 'none';
+      document.querySelector('#cadastros [data-subtab="doencas"]').style.display = showDoencas ? '' : 'none';
+      // Se a sub-aba padrão (Pessoas) estiver oculta, abre a primeira permitida.
+      const firstSub = showPessoas ? 'pessoas' : showRede ? 'rede' : showDoencas ? 'doencas' : null;
+      if (firstSub) setSubTab(firstSub);
+      // Card de atividade recente exige 'audit'.
+      const activityCard = document.getElementById('recentActivity')?.closest('.card');
+      if (activityCard && !showAuditoria) activityCard.style.display = 'none';
+      const level = SESSION.user.admin_level || 'gestor';
+      const badge = document.getElementById('levelBadge');
+      if (badge) badge.textContent = level;
+    }
+
     function switchTab(name) {
-      document.querySelectorAll('.tab').forEach(t => {
+      // Escopo: só abas principais — não apaga o destaque das sub-abas.
+      // P3: barra navegação para seção oculta pelo nível (volta ao Início).
+      const btn = document.querySelector(`.tab[data-tab="${name}"]`);
+      if (btn && btn.style.display === 'none') name = 'overview';
+      document.querySelectorAll('.tab[data-tab]').forEach(t => {
         const a = t.dataset.tab === name;
         t.classList.toggle('active', a);
         t.setAttribute('aria-selected', a ? 'true' : 'false');
       });
       document.querySelectorAll('.tabpanel').forEach(p => p.classList.toggle('active', p.id === name));
       if (name === 'auditoria') loadAuditLog();
-      if (name === 'profissionais') loadProfessionals();
-      if (name === 'units') renderUnitOffers();
+      if (name === 'cadastros' && can('units')) { loadProfessionals(); renderUnitOffers(); }
+      if (name === 'minha-conta') initMyAccount();
     }
 
     async function loadHealthUnitsRegions() {
@@ -329,7 +552,7 @@
     async function loadUnits() {
       const box = document.getElementById('unitList');
       if (!box) return;
-      box.innerHTML = '<div class="spinner"></div>';
+      box.innerHTML = '<div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
       try {
         const data = await apiGet('/health-units/manage');
         units = Array.isArray(data) ? data : [];
@@ -346,7 +569,7 @@
       const active = Number(unit.active) === 1;
       return `<div class="item">
         <div>
-          <h4>${esc(unit.name)} <span class="badge ${active ? 'badge-success' : 'badge-danger'}">${active ? 'Ativa' : 'Inativa'}</span></h4>
+          <h3>${esc(unit.name)} <span class="badge ${active ? 'badge-success' : 'badge-danger'}">${active ? 'Ativa' : 'Inativa'}</span></h3>
           <p>${esc(typeLabels[unit.type] || unit.type)}${unit.neighborhood ? ' · ' + esc(unit.neighborhood) : ''}</p>
         </div>
         <div class="row" style="gap:6px">
@@ -425,14 +648,14 @@
       if (!box) return;
       const unitId = document.getElementById('offerUnitSel').value;
       if (!unitId) { box.innerHTML = '<div class="empty">Cadastre uma unidade para adicionar serviços.</div>'; return; }
-      box.innerHTML = '<div class="spinner"></div>';
+      box.innerHTML = '<div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
       try {
         const rows = await apiGet('/health-units/' + encodeURIComponent(unitId) + '/offers');
         box.innerHTML = rows.length ? rows.map(o => `
           <div class="item">
             <div>
-              <h4>${esc(o.name)} <span class="badge">${o.kind === 'exame' ? 'Exame' : 'Consulta'}</span>
-                <span class="badge ${Number(o.active) ? 'badge-success' : 'badge-danger'}">${Number(o.active) ? 'Ativo' : 'Inativo'}</span></h4>
+              <h3>${esc(o.name)} <span class="badge">${o.kind === 'exame' ? 'Exame' : 'Consulta'}</span>
+                <span class="badge ${Number(o.active) ? 'badge-success' : 'badge-danger'}">${Number(o.active) ? 'Ativo' : 'Inativo'}</span></h3>
             </div>
             <button class="btn btn-outline btn-sm" type="button" onclick="delUnitOffer('${unitId}','${o.id}')">Remover</button>
           </div>`).join('')
@@ -469,7 +692,7 @@
     async function loadProfessionals() {
       const box = document.getElementById('profList');
       if (!box) return;
-      box.innerHTML = '<div class="spinner"></div>';
+      box.innerHTML = '<div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
       try {
         const data = await apiGet('/admin/professionals');
         professionals = data.professionals || [];
@@ -493,8 +716,8 @@
       const nBlocks = profBlocks.filter(b => b.professional_id === p.id).length;
       return `<div class="item">
         <div>
-          <h4>${esc(p.name)} <span class="badge ${active ? 'badge-success' : 'badge-danger'}">${active ? 'Ativo' : 'Inativo'}</span>
-            ${p.job_title ? `<span class="badge">${esc(p.job_title)}</span>` : ''}</h4>
+          <h3>${esc(p.name)} <span class="badge ${active ? 'badge-success' : 'badge-danger'}">${active ? 'Ativo' : 'Inativo'}</span>
+            ${p.job_title ? `<span class="badge">${esc(p.job_title)}</span>` : ''}</h3>
           <p class="muted">${p.registry ? 'Registro: ' + esc(p.registry) + ' · ' : ''}${nOffers} vínculo(s) · ${nSched} horário(s) · ${nBlocks} bloqueio(s)</p>
         </div>
         <div class="row" style="gap:6px">
@@ -521,53 +744,53 @@
       box.style.display = 'block';
       box.innerHTML = `<div class="card" style="margin-top:16px">
       <div class="row between">
-        <h3 style="margin:0">${esc(p.name)} — vínculos e agenda</h3>
+        <h2 style="margin:0">${esc(p.name)} — vínculos e agenda</h2>
         <button class="btn btn-outline btn-sm" type="button" onclick="closeProfDetail()">Fechar</button>
       </div>
 
-      <h4 style="margin-top:18px">Vínculos com unidades e serviços</h4>
+      <h3 style="margin-top:18px">Vínculos com unidades e serviços</h3>
       <p class="muted" style="margin-top:-6px;font-size:.85rem">O profissional só aparece para o serviço vinculado naquela unidade.</p>
-      <form id="profOfferForm" class="grid grid-3">
-        <div class="field"><label>Unidade</label><select class="select" name="unit_id" required>${unitOptions('')}</select></div>
-        <div class="field"><label>Tipo</label><select class="select" name="kind"><option value="consulta">Consulta</option><option value="exame">Exame</option></select></div>
-        <div class="field"><label>Especialidade / exame</label><input class="input" name="name" required placeholder="Ex.: Cardiologia"></div>
-        <div class="field"><label>Motivo <span class="muted" style="font:inherit">(opcional)</span></label><input class="input" name="reason" placeholder="Ex.: contratação nova"></div>
-        <div class="field"><label>&nbsp;</label><button class="btn btn-outline" type="submit">Vincular</button></div>
+      <form id="profOfferForm" class="grid grid-3" aria-label="Vincular profissional a unidade e serviço">
+        <div class="field"><label for="profOfferUnit">Unidade</label><select class="select" id="profOfferUnit" name="unit_id" required>${unitOptions('')}</select></div>
+        <div class="field"><label for="profOfferKind">Tipo</label><select class="select" id="profOfferKind" name="kind"><option value="consulta">Consulta</option><option value="exame">Exame</option></select></div>
+        <div class="field"><label for="profOfferName">Especialidade / exame</label><input class="input" id="profOfferName" name="name" required placeholder="Ex.: Cardiologia"></div>
+        <div class="field"><label for="profOfferReason">Motivo <span class="muted" style="font:inherit">(opcional)</span></label><input class="input" id="profOfferReason" name="reason" placeholder="Ex.: contratação nova"></div>
+        <div class="field"><span aria-hidden="true">&nbsp;</span><button class="btn btn-outline" type="submit">Vincular</button></div>
       </form>
       <div>${offers.length ? offers.map(o => `
-        <div class="item"><div><h4>${esc(o.name)} <span class="badge">${o.kind === 'exame' ? 'Exame' : 'Consulta'}</span></h4>
+        <div class="item"><div><h3>${esc(o.name)} <span class="badge">${o.kind === 'exame' ? 'Exame' : 'Consulta'}</span></h3>
         <p class="muted">${esc(o.unit_name)}</p></div>
         <button class="btn btn-outline btn-sm" type="button" onclick="delProfOffer('${id}','${o.id}')">Remover</button></div>`).join('')
           : '<div class="empty">Nenhum vínculo cadastrado.</div>'}</div>
 
-      <h4 style="margin-top:18px">Dias e horários de atendimento</h4>
-      <form id="profScheduleForm" class="grid grid-4">
-        <div class="field"><label>Unidade</label><select class="select" name="unit_id" required>${unitOptions('')}</select></div>
-        <div class="field"><label>Dia da semana</label><select class="select" name="weekday">${WEEK.map((d, i) => `<option value="${i}">${d}</option>`).join('')}</select></div>
-        <div class="field"><label>Início</label><input class="input" type="time" name="start_time" required></div>
-        <div class="field"><label>Fim</label><input class="input" type="time" name="end_time" required></div>
-        <div class="field"><label>Duração (min)</label><input class="input" type="number" name="slot_minutes" value="30" min="5" max="240"></div>
-        <div class="field"><label>Motivo <span class="muted" style="font:inherit">(opcional)</span></label><input class="input" name="reason"></div>
-        <div class="field"><label>&nbsp;</label><button class="btn btn-outline" type="submit">Adicionar horário</button></div>
+      <h3 style="margin-top:18px">Dias e horários de atendimento</h3>
+      <form id="profScheduleForm" class="grid grid-4" aria-label="Adicionar horário de atendimento">
+        <div class="field"><label for="profSchedUnit">Unidade</label><select class="select" id="profSchedUnit" name="unit_id" required>${unitOptions('')}</select></div>
+        <div class="field"><label for="profSchedWeekday">Dia da semana</label><select class="select" id="profSchedWeekday" name="weekday"><option value="">Selecione o dia...</option>${WEEK.map((d, i) => `<option value="${i}">${d}</option>`).join('')}</select></div>
+        <div class="field"><label for="profSchedStart">Início</label><input class="input" id="profSchedStart" type="time" name="start_time" required></div>
+        <div class="field"><label for="profSchedEnd">Fim</label><input class="input" id="profSchedEnd" type="time" name="end_time" required></div>
+        <div class="field"><label for="profSchedSlot">Duração (min)</label><input class="input" id="profSchedSlot" type="number" name="slot_minutes" value="30" min="5" max="240"></div>
+        <div class="field"><label for="profSchedReason">Motivo <span class="muted" style="font:inherit">(opcional)</span></label><input class="input" id="profSchedReason" name="reason"></div>
+        <div class="field"><span aria-hidden="true">&nbsp;</span><button class="btn btn-outline" type="submit">Adicionar horário</button></div>
       </form>
       <div>${schedules.length ? schedules.map(s => `
-        <div class="item"><div><h4>${WEEK[Number(s.weekday)] || s.weekday}
+        <div class="item"><div><h3>${WEEK[Number(s.weekday)] || s.weekday}
         <span class="badge">${String(s.start_time).slice(0, 5)}–${String(s.end_time).slice(0, 5)}</span>
-        <span class="badge">${Number(s.slot_minutes)} min</span></h4>
+        <span class="badge">${Number(s.slot_minutes)} min</span></h3>
         <p class="muted">${esc(s.unit_name)}</p></div>
         <button class="btn btn-outline btn-sm" type="button" onclick="delProfSchedule('${id}','${s.id}')">Remover</button></div>`).join('')
           : '<div class="empty">Nenhum horário cadastrado — o profissional não aparece na agenda.</div>'}</div>
 
-      <h4 style="margin-top:18px">Bloqueios, folgas e intervalos</h4>
-      <form id="profBlockForm" class="grid grid-4">
-        <div class="field"><label>Unidade</label><select class="select" name="unit_id" required>${unitOptions('')}</select></div>
-        <div class="field"><label>Início</label><input class="input" type="datetime-local" name="starts_at" required></div>
-        <div class="field"><label>Fim</label><input class="input" type="datetime-local" name="ends_at" required></div>
-        <div class="field"><label>Motivo <span class="muted" style="font:inherit">(obrigatório na prática)</span></label><input class="input" name="reason" placeholder="Ex.: férias"></div>
-        <div class="field"><label>&nbsp;</label><button class="btn btn-outline" type="submit">Bloquear agenda</button></div>
+      <h3 style="margin-top:18px">Bloqueios, folgas e intervalos</h3>
+      <form id="profBlockForm" class="grid grid-4" aria-label="Bloquear agenda do profissional">
+        <div class="field"><label for="profBlockUnit">Unidade</label><select class="select" id="profBlockUnit" name="unit_id" required>${unitOptions('')}</select></div>
+        <div class="field"><label for="profBlockStart">Início</label><input class="input" id="profBlockStart" type="datetime-local" name="starts_at" required></div>
+        <div class="field"><label for="profBlockEnd">Fim</label><input class="input" id="profBlockEnd" type="datetime-local" name="ends_at" required></div>
+        <div class="field"><label for="profBlockReason">Motivo <span class="muted" style="font:inherit">(obrigatório na prática)</span></label><input class="input" id="profBlockReason" name="reason" placeholder="Ex.: férias"></div>
+        <div class="field"><span aria-hidden="true">&nbsp;</span><button class="btn btn-outline" type="submit">Bloquear agenda</button></div>
       </form>
       <div>${blocks.length ? blocks.map(b => `
-        <div class="item"><div><h4>${fmtDate(b.starts_at)} → ${fmtDate(b.ends_at)}</h4>
+        <div class="item"><div><h3>${fmtDate(b.starts_at)} → ${fmtDate(b.ends_at)}</h3>
         <p class="muted">${esc(b.unit_name)}${b.reason ? ' · ' + esc(b.reason) : ''}</p></div>
         <button class="btn btn-outline btn-sm" type="button" onclick="delProfBlock('${id}','${b.id}')">Remover</button></div>`).join('')
           : '<div class="empty">Nenhum bloqueio futuro.</div>'}</div>
@@ -598,6 +821,23 @@
     async function submitProfSchedule(e) {
       e.preventDefault();
       const f = Object.fromEntries(new FormData(e.target));
+      // P2a.7: valida no front (o back também valida — aqui é feedback imediato).
+      // Sem dia explícito, o select cairia em Domingo (índice 0) em silêncio.
+      const wdEl = document.getElementById('profSchedWeekday');
+      if (f.weekday === '' || f.weekday === undefined) {
+        setFieldError(wdEl, 'Selecione o dia da semana.');
+        showFirstError(wdEl);
+        return;
+      }
+      clearFieldError(wdEl);
+      const startEl = document.getElementById('profSchedStart');
+      const endEl = document.getElementById('profSchedEnd');
+      if (f.start_time && f.end_time && f.start_time >= f.end_time) {
+        setFieldError(endEl, 'O horário final deve ser depois do inicial.');
+        showFirstError(endEl);
+        return;
+      }
+      clearFieldError(endEl);
       try {
         await apiPost('/admin/professionals/' + encodeURIComponent(activeProfId) + '/schedules', f);
         toast('Horário adicionado', 'success');
@@ -608,6 +848,16 @@
     async function submitProfBlock(e) {
       e.preventDefault();
       const f = Object.fromEntries(new FormData(e.target));
+      // P2a.7: mesma validação imediata do bloqueio (back valida também).
+      const endEl = document.getElementById('profBlockEnd');
+      const start = String(f.starts_at || '').replace('T', ' ');
+      const end = String(f.ends_at || '').replace('T', ' ');
+      if (start && end && new Date(start) >= new Date(end)) {
+        setFieldError(endEl, 'O fim do bloqueio deve ser depois do início.');
+        showFirstError(endEl);
+        return;
+      }
+      clearFieldError(endEl);
       try {
         await apiPost('/admin/professionals/' + encodeURIComponent(activeProfId) + '/blocks', f);
         toast('Agenda bloqueada no período', 'success');
@@ -687,18 +937,75 @@
       } catch (err) { toast(err.message || 'Erro ao atualizar profissional', 'error'); }
     };
 
+    // Atalhos da central de comando.
+    window.gotoAtendimentos = function () { if (can('appointments')) switchTab('atendimentos'); };
+    window.gotoPessoas = function (status) {
+      if (!can('users')) return;
+      switchTab('cadastros'); setSubTab('pessoas');
+      const form = document.getElementById('userSearchForm');
+      if (form && status) form.status.value = status;
+      if (form) searchUsers({ preventDefault() {}, target: form });
+    };
+    window.setSubTab = function (name) {
+      // P3: ignora sub-aba oculta pelo nível.
+      const btn = document.querySelector(`#cadastros [data-subtab="${name}"]`);
+      if (btn && btn.style.display === 'none') return;
+      document.querySelectorAll('#cadastros [data-subtab]').forEach(t =>
+        t.classList.toggle('active', t.dataset.subtab === name));
+      document.querySelectorAll('#cadastros .subpanel').forEach(p =>
+        p.classList.toggle('active', p.id === 'sub-' + name));
+      if (name === 'rede') { loadProfessionals(); renderUnitOffers(); }
+    };
+
     async function loadOverview() {
       try {
+        // P3: busca só o que o nível permite (o resto o back barraria com 403).
         const [A, E, D, S] = await Promise.all([
-          apiGet('/admin/appointments?limit=20'),
-          apiGet('/admin/exams?limit=20'),
-          apiGet('/diseases?active=true'),
+          can('appointments') ? apiGet('/admin/appointments?limit=100').catch(() => []) : [],
+          can('appointments') ? apiGet('/admin/exams?limit=100').catch(() => []) : [],
+          can('diseases') ? apiGet('/diseases?active=true').catch(() => []) : [],
           apiGet('/admin/stats'),
         ]);
+        const today = new Date().toISOString().slice(0, 10);
+        const isToday = r => (r.scheduled_at || '').slice(0, 10) === today;
+        const todayAppts = A.filter(isToday);
+        const todayExams = E.filter(isToday);
+        const todayPending = [...todayAppts, ...todayExams].filter(r => r.status === 'pendente').length;
+        const pendingUsers = Number(S.users.pending || 0);
+        const inactiveUnits = Number(S.units.total || 0) - Number(S.units.active || 0);
+        const activeAlerts = Number(S.diseases.active ?? D.length);
+
         document.getElementById('stats').innerHTML =
-          stat('Consultas', A.length) + stat('Exames', E.length) + stat('Usuários pendentes', Number(S.users.pending || 0)) + stat('Unidades ativas', Number(S.units.active || 0)) + stat('Alertas ativos', Number(S.diseases.active || D.length));
-        document.getElementById('recentAppts').innerHTML = A.length ? renderActionableTable(A, ['user_name', 'scheduled_at', 'specialty', 'doctor', 'location', 'status'], 'appointments') : '<div class="empty">Sem consultas.</div>';
-        document.getElementById('recentExams').innerHTML = E.length ? renderActionableTable(E, ['user_name', 'scheduled_at', 'exam_type', 'location', 'status'], 'exams') : '<div class="empty">Sem exames.</div>';
+          (can('appointments') ? stat('Hoje (pendentes)', todayPending) : '') +
+          (can('users') ? stat('Aguardando ativação', pendingUsers) : '') +
+          (can('diseases') ? stat('Alertas ativos', activeAlerts) : '') +
+          (can('units') ? stat('Unidades ativas', Number(S.units.active || 0)) : '');
+
+        const notes = [];
+        if (can('users') && pendingUsers > 0) notes.push(`<div class="item"><div><h3>${pendingUsers} conta(s) aguardando ativação</h3><p>Atendentes não acessam o sistema até serem ativados.</p></div><button class="btn btn-primary btn-sm" onclick="gotoPessoas('pendente')">Ver contas</button></div>`);
+        if (can('appointments') && todayPending > 0) notes.push(`<div class="item"><div><h3>${todayPending} atendimento(s) pendente(s) hoje</h3><p>Confirme, cancele ou reagende na agenda do dia.</p></div><button class="btn btn-primary btn-sm" onclick="gotoAtendimentos()">Ver agenda</button></div>`);
+        if (can('units') && inactiveUnits > 0) notes.push(`<div class="item"><div><h3>${inactiveUnits} unidade(s) inativa(s)</h3><p>Unidades inativas não aparecem no agendamento do paciente.</p></div></div>`);
+        document.getElementById('attention').innerHTML = notes.length
+          ? notes.join('')
+          : '<div class="empty">Nenhuma pendência no momento.</div>';
+
+        const agendaCols = kind => kind === 'appointments'
+          ? ['user_name', 'scheduled_at', 'specialty', 'doctor', 'location', 'status']
+          : ['user_name', 'scheduled_at', 'exam_type', 'location', 'status'];
+        document.getElementById('agendaToday').innerHTML = (todayAppts.length || todayExams.length)
+          ? (todayAppts.length ? `<h3>Consultas de hoje</h3>` + renderActionableTable(todayAppts, agendaCols('appointments'), 'appointments') : '')
+          + (todayExams.length ? `<h3 style="margin-top:16px">Exames de hoje</h3>` + renderActionableTable(todayExams, agendaCols('exams'), 'exams') : '')
+          : '<div class="empty">Nada agendado para hoje.</div>';
+
+        document.getElementById('recentAppts').innerHTML = A.length ? renderActionableTable(A.slice(0, 20), ['user_name', 'scheduled_at', 'specialty', 'doctor', 'location', 'status'], 'appointments') : '<div class="empty">Sem consultas.</div>';
+        document.getElementById('recentExams').innerHTML = E.length ? renderActionableTable(E.slice(0, 20), ['user_name', 'scheduled_at', 'exam_type', 'location', 'status'], 'exams') : '<div class="empty">Sem exames.</div>';
+
+        try {
+          const rows = await apiGet('/admin/audit-log?limit=5');
+          document.getElementById('recentActivity').innerHTML = rows.length
+            ? rows.map(r => `<div class="item"><div><h3>${esc(r.actor_name || r.actor_email)} <span class="badge">${esc(r.action)}</span></h3><p>${esc(r.entity_type)} · ${esc(r.details || '')}</p></div><span class="muted">${fmtDate(r.created_at)}</span></div>`).join('')
+            : '<div class="empty">Nenhuma ação registrada ainda.</div>';
+        } catch (e) { document.getElementById('recentActivity').innerHTML = '<div class="empty">Não foi possível carregar a atividade.</div>'; }
       } catch (err) { toast(err.message || 'Erro ao carregar dados', 'error'); }
     }
 
@@ -731,18 +1038,18 @@
       const style = document.createElement('style');
       style.textContent = `#reagendarModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
   #reagendarModal.show{display:flex}
-  #reagendarModal .reagendar-modal-card{width:min(400px,100%);background:var(--surface,#fff);border:1px solid var(--border,#ddd);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
-  #reagendarModal h3{margin:0 0 10px}
+  #reagendarModal .reagendar-modal-card{width:min(400px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
+  #reagendarModal h2{margin:0 0 10px}
   #reagendarModal .reagendar-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}`;
       document.head.appendChild(style);
 
       document.body.insertAdjacentHTML('beforeend', `
-    <div id="reagendarModal" role="dialog" aria-modal="true">
+    <div id="reagendarModal" role="dialog" aria-modal="true" aria-labelledby="reagendarModalTitle">
       <div class="reagendar-modal-card">
-        <h3>Reagendar atendimento</h3>
+        <h2 id="reagendarModalTitle">Reagendar atendimento</h2>
         <p class="muted" style="font-size:.9rem;margin-bottom:14px">Selecione a nova data e horário:</p>
         <div class="field">
-          <label>Data/hora</label>
+          <label for="reagendarInputDate">Data/hora</label>
           <input class="input" id="reagendarInputDate" type="datetime-local" required>
         </div>
         <div class="reagendar-modal-actions">
@@ -763,6 +1070,7 @@
       ensureReagendarModal();
       pendingReagendar = { kind, id };
       const input = document.getElementById('reagendarInputDate');
+      setDateLimits();
       input.min = nowLocalForInput();
       input.value = '';
       document.getElementById('reagendarModal').classList.add('show');
@@ -809,7 +1117,7 @@
       const summary = document.getElementById('userSummary');
       document.getElementById('userEditBox').style.display = 'none';
       document.getElementById('userHistoryBox').style.display = 'none';
-      box.innerHTML = '<div class="spinner"></div>';
+      box.innerHTML = '<div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
       summary.textContent = 'Buscando usuários...';
       try {
         let path = '/admin/users?';
@@ -828,9 +1136,9 @@
         box.innerHTML = users.map(u => `
       <div class="item">
         <div>
-          <h4>${esc(u.full_name || '(Sem nome)')} <span class="badge">${ROLE_LABEL[u.role] || u.role}</span>
+          <h3>${esc(u.full_name || '(Sem nome)')} <span class="badge">${ROLE_LABEL[u.role] || u.role}</span>
             <span class="badge ${STATUS_CLASS[u.account_status] || ''}">${esc(u.account_status)}</span>
-          </h4>
+          </h3>
           <p class="muted">${esc(u.email)} ${u.mobile ? '· ' + esc(u.mobile) : ''} ${u.job_role ? '· ' + esc(u.job_role) : ''} ${u.last_login_at ? '· Último acesso: ' + fmtDate(u.last_login_at) : '· Nunca acessou'}</p>
         </div>
         <div class="row" style="gap:6px">
@@ -845,7 +1153,7 @@
       const box = document.getElementById('userHistoryBox');
       document.getElementById('userEditBox').style.display = 'none';
       box.style.display = 'block';
-      box.innerHTML = '<div class="card"><div class="spinner"></div></div>';
+      box.innerHTML = '<div class="card"><div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div></div>';
       box.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       try {
@@ -853,14 +1161,14 @@
         const user = data.user || { id: userId, full_name: name };
         box.innerHTML = `<div class="card">
       <div class="row between" style="margin-bottom:12px">
-        <h3 style="margin:0">Histórico de ${esc(user.full_name || 'Usuário')}</h3>
+        <h2 style="margin:0">Histórico de ${esc(user.full_name || 'Usuário')}</h2>
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('userHistoryBox').style.display='none'">Fechar</button>
       </div>
       <p class="muted" style="margin-top:0">${(data.appointments || []).length} consultas · ${(data.exams || []).length} exames</p>
       
-      <h4 style="margin-top:18px">Consultas</h4>
+      <h3 style="margin-top:18px">Consultas</h3>
       ${(data.appointments || []).length ? renderTable(data.appointments, ['scheduled_at', 'specialty', 'doctor', 'location', 'status']) : '<div class="empty">Sem consultas.</div>'}
-      <h4 style="margin-top:18px">Exames</h4>
+      <h3 style="margin-top:18px">Exames</h3>
       ${(data.exams || []).length ? renderTable(data.exams, ['scheduled_at', 'exam_type', 'location', 'status']) : '<div class="empty">Sem exames.</div>'}
     </div>`;
       } catch (err) { box.innerHTML = `<div class="card"><div class="empty">${esc(err.message || 'Erro ao carregar histórico')}</div></div>`; }
@@ -870,7 +1178,7 @@
     window.viewUser = async function (id) {
       const box = document.getElementById('userEditBox');
       document.getElementById('userHistoryBox').style.display = 'none';
-      box.style.display = 'block'; box.innerHTML = '<div class="card"><div class="spinner"></div></div>';
+      box.style.display = 'block'; box.innerHTML = '<div class="card"><div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div></div>';
       box.scrollIntoView({ behavior: 'smooth', block: 'start' });
       try {
         const u = await apiGet('/admin/users/' + encodeURIComponent(id));
@@ -878,10 +1186,10 @@
         const STATUS_LABEL = { ativo: 'Ativo', pendente: 'Pendente (aguardando ativação)', inativo: 'Inativo' };
         box.innerHTML = `<div class="card">
       <div class="row between" style="margin-bottom:16px">
-        <h3 style="margin:0">${esc(u.full_name)}</h3>
+        <h2 style="margin:0">${esc(u.full_name)}</h2>
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('userEditBox').style.display='none'">Fechar</button>
       </div>
-      <h4>Identificação e contato</h4>
+      <h3>Identificação e contato</h3>
       <div class="grid grid-2" style="gap:10px;margin-bottom:16px;font-size:.9rem">
         ${row2('E-mail', u.email)} ${row2('Celular', u.mobile || '—')}
         ${row2('Nascimento', u.birth_date ? new Date(u.birth_date).toLocaleDateString('pt-BR') : '—')} ${row2('Gênero', u.gender || '—')}
@@ -891,11 +1199,11 @@
         ${row2('Prioridade legal', u.priority || '—')} ${row2('Responsável (menor)', u.guardian_name || '—')}
         ${row2('Cor / raça', u.race || '—')}
       </div>
-      <h4>Documentos protegidos</h4>
+      <h3>Documentos protegidos</h3>
       <div class="grid grid-2" style="gap:10px;margin-bottom:16px;font-size:.9rem">
         ${row2('CPF', u.cpf || '—')} ${row2('RG', u.rg || '—')}
       </div>
-      <h4>Endereço</h4>
+      <h3>Endereço</h3>
       <div class="grid grid-2" style="gap:10px;margin-bottom:16px;font-size:.9rem">
         ${row2('CEP', u.cep || '—')} ${row2('Endereço', u.street ? (u.street + (u.address_number ? ', ' + u.address_number : '')) : '—')}
         ${row2('Bairro', u.neighborhood || '—')} ${row2('Cidade/UF', u.city ? (u.city + (u.state ? ' / ' + u.state : '')) : '—')}
@@ -906,16 +1214,16 @@
       </p>
       <div class="grid grid-2" style="gap:10px">
         <div class="field">
-          <label>Status da conta</label>
-          <select class="select" id="edit_status_${u.id}">
+          <label for="edit_status_${u.id}">Status da conta</label>
+          <select class="select" id="edit_status_${u.id}" data-current-status="${u.account_status || ''}">
             ${STATUSES.map(s => `<option value="${s}" ${u.account_status === s ? 'selected' : ''}>${STATUS_LABEL[s]}</option>`).join('')}
           </select>
         </div>
         <div class="field">
-          <label>Motivo da alteração <span class="muted" style="font-weight:400">(obrigatório ao mudar status)</span></label>
+          <label for="edit_reason_${u.id}">Motivo da alteração <span class="muted" style="font-weight:400">(obrigatório ao mudar status)</span></label>
           <input class="input" id="edit_reason_${u.id}" placeholder="Ex.: solicitação do paciente, cadastro duplicado">
         </div>
-        ${u.role === 'admin' && SESSION.user.admin_level === 'superadmin' ? `<div class="field"><label>Nível administrativo</label><select class="select" id="edit_admin_level_${u.id}"><option value="superadmin" ${u.admin_level === 'superadmin' ? 'selected' : ''}>Superadmin</option><option value="gestor" ${(!u.admin_level || u.admin_level === 'gestor') ? 'selected' : ''}>Gestor</option><option value="atendimento" ${u.admin_level === 'atendimento' ? 'selected' : ''}>Atendimento</option><option value="alertas" ${u.admin_level === 'alertas' ? 'selected' : ''}>Alertas</option></select></div>` : ''}
+        ${u.role === 'admin' && SESSION.user.admin_level === 'superadmin' ? `<div class="field"><label for="edit_admin_level_${u.id}">Nível administrativo</label><select class="select" id="edit_admin_level_${u.id}"><option value="superadmin" ${u.admin_level === 'superadmin' ? 'selected' : ''}>Superadmin</option><option value="gestor" ${(!u.admin_level || u.admin_level === 'gestor') ? 'selected' : ''}>Gestor</option><option value="atendimento" ${u.admin_level === 'atendimento' ? 'selected' : ''}>Atendimento</option><option value="alertas" ${u.admin_level === 'alertas' ? 'selected' : ''}>Alertas</option></select></div>` : ''}
       </div>
       <button class="btn btn-primary" style="margin-top:12px" onclick="adminUpdateUser('${u.id}')">Salvar status</button>
     </div>`;
@@ -927,10 +1235,21 @@
     }
 
     window.adminUpdateUser = async function (id) {
-      const account_status = document.getElementById('edit_status_' + id)?.value;
-      const reason = document.getElementById('edit_reason_' + id)?.value.trim();
+      const statusEl = document.getElementById('edit_status_' + id);
+      const account_status = statusEl?.value;
+      const reasonEl = document.getElementById('edit_reason_' + id);
+      const reason = reasonEl?.value.trim();
       const adminLevel = document.getElementById('edit_admin_level_' + id)?.value;
+      // P2a.6: o label diz "(obrigatório ao mudar status)" — agora o front
+      // valida antes do PATCH em vez de tomar 400 genérico do back.
       try {
+        const currentStatus = statusEl?.dataset.currentStatus || '';
+        if (account_status !== currentStatus && !reason) {
+          setFieldError(reasonEl, 'Informe o motivo da alteração de status.');
+          showFirstError(reasonEl);
+          return;
+        }
+        clearFieldError(reasonEl);
         const payload = { account_status, reason, status_notes: reason };
         if (adminLevel) payload.admin_level = adminLevel;
         await apiPatch('/admin/users/' + encodeURIComponent(id), payload);
@@ -945,7 +1264,7 @@
         const data = await apiGet('/admin/diseases');
         diseases = Array.isArray(data) ? data : [];
         document.getElementById('diseaseList').innerHTML = (data || []).length
-          ? data.map(d => `<div class="item"><div><h4>${esc(d.name)} <span class="badge ${levelClass(d.alert_level)}">${esc(d.alert_level)}</span> <span class="badge ${Number(d.active) ? 'badge-success' : 'badge-danger'}">${Number(d.active) ? 'Ativo' : 'Inativo'}</span></h4>
+          ? data.map(d => `<div class="item"><div><h3>${esc(d.name)} <span class="badge ${levelClass(d.alert_level)}">${esc(d.alert_level)}</span> <span class="badge ${Number(d.active) ? 'badge-success' : 'badge-danger'}">${Number(d.active) ? 'Ativo' : 'Inativo'}</span></h3>
           <p>${esc(d.description || '')} ${d.region ? '· ' + esc(d.region) : ''}</p></div>
           <div class="row"><button class="btn btn-outline btn-sm" onclick="editDisease('${d.id}')">Editar</button><button class="btn btn-outline btn-sm" onclick="toggleDisease('${d.id}',${Number(d.active) ? 0 : 1})">${Number(d.active) ? 'Desativar' : 'Ativar'}</button><button class="btn btn-outline btn-sm" onclick="delDisease('${d.id}')">Excluir</button></div></div>`).join('')
           : '<div class="empty">Sem registros.</div>';
@@ -970,7 +1289,7 @@
       const style = document.createElement('style');
       style.textContent = `#deleteDiseaseModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}#deleteDiseaseModal.show{display:flex}#deleteDiseaseModal .modal-card{width:min(440px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}`;
       document.head.appendChild(style);
-      document.body.insertAdjacentHTML('beforeend', `<div id="deleteDiseaseModal" role="dialog" aria-modal="true" aria-labelledby="deleteDiseaseTitle"><div class="modal-card"><h3 id="deleteDiseaseTitle">Excluir alerta?</h3><p>O alerta deixará de aparecer para os usuários. Essa ação não pode ser desfeita.</p><div class="row" style="justify-content:flex-end;margin-top:20px"><button type="button" class="btn btn-outline" onclick="closeDeleteDiseaseModal()">Voltar</button><button type="button" class="btn btn-primary" style="background:var(--danger);border-color:var(--danger)" onclick="confirmDeleteDisease()">Excluir alerta</button></div></div></div>`);
+      document.body.insertAdjacentHTML('beforeend', `<div id="deleteDiseaseModal" role="dialog" aria-modal="true" aria-labelledby="deleteDiseaseTitle"><div class="modal-card"><h2 id="deleteDiseaseTitle">Excluir alerta?</h2><p>O alerta deixará de aparecer para os usuários. Essa ação não pode ser desfeita.</p><div class="row" style="justify-content:flex-end;margin-top:20px"><button type="button" class="btn btn-outline" onclick="closeDeleteDiseaseModal()">Voltar</button><button type="button" class="btn btn-primary" style="background:var(--danger);border-color:var(--danger)" onclick="confirmDeleteDisease()">Excluir alerta</button></div></div></div>`);
     }
 
     window.closeDeleteDiseaseModal = function () {
@@ -1005,7 +1324,7 @@
       const style = document.createElement('style');
       style.textContent = `#diseaseEditModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}#diseaseEditModal.show{display:flex}#diseaseEditModal .modal-card{width:min(560px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}`;
       document.head.appendChild(style);
-      document.body.insertAdjacentHTML('beforeend', `<div id="diseaseEditModal" role="dialog" aria-modal="true" aria-labelledby="diseaseEditTitle"><div class="modal-card"><h3 id="diseaseEditTitle">Editar alerta</h3><form id="diseaseEditForm"><div class="field"><label for="diseaseEditName">Nome</label><input class="input" id="diseaseEditName" required></div><div class="grid grid-2"><div class="field"><label for="diseaseEditRegion">Região</label><input class="input" id="diseaseEditRegion"></div><div class="field"><label for="diseaseEditLevel">Nível</label><select class="select" id="diseaseEditLevel"><option value="baixo">Baixo</option><option value="medio">Médio</option><option value="alto">Alto</option></select></div></div><div class="field"><label for="diseaseEditDescription">Descrição</label><textarea class="textarea" id="diseaseEditDescription"></textarea></div><div class="row" style="justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="closeDiseaseModal()">Cancelar</button><button type="submit" class="btn btn-primary" id="diseaseEditSubmit">Salvar alterações</button></div></form></div></div>`);
+      document.body.insertAdjacentHTML('beforeend', `<div id="diseaseEditModal" role="dialog" aria-modal="true" aria-labelledby="diseaseEditTitle"><div class="modal-card"><h2 id="diseaseEditTitle">Editar alerta</h2><form id="diseaseEditForm"><div class="field"><label for="diseaseEditName">Nome</label><input class="input" id="diseaseEditName" required></div><div class="grid grid-2"><div class="field"><label for="diseaseEditRegion">Região</label><input class="input" id="diseaseEditRegion"></div><div class="field"><label for="diseaseEditLevel">Nível</label><select class="select" id="diseaseEditLevel"><option value="baixo">Baixo</option><option value="medio">Médio</option><option value="alto">Alto</option></select></div></div><div class="field"><label for="diseaseEditDescription">Descrição</label><textarea class="textarea" id="diseaseEditDescription"></textarea></div><div class="row" style="justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="closeDiseaseModal()">Cancelar</button><button type="submit" class="btn btn-primary" id="diseaseEditSubmit">Salvar alterações</button></div></form></div></div>`);
       document.getElementById('diseaseEditForm').addEventListener('submit', saveDiseaseEdit);
     }
 
@@ -1051,7 +1370,7 @@
         const rows = await apiGet('/admin/audit-log?' + params.toString());
         document.getElementById('auditLog').innerHTML = rows.length
           ? rows.map(r => `<div class="item"><div>
-          <h4>${esc(r.actor_name || r.actor_email)} <span class="badge">${esc(r.action)}</span></h4>
+          <h3>${esc(r.actor_name || r.actor_email)} <span class="badge">${esc(r.action)}</span></h3>
           <p>${esc(r.entity_type)} · ${esc(r.details || '')}</p>
         </div><span class="muted">${fmtDate(r.created_at)}</span></div>`).join('')
           : '<div class="empty">Nenhuma ação registrada ainda.</div>';
@@ -1061,6 +1380,18 @@
     window.resetAuditFilters = function () {
       document.getElementById('auditFilterForm').reset();
       loadAuditLog();
+    };
+
+    // Aulas 1/6: verifica a cadeia de hashes da trilha (integridade).
+    window.verifyAuditChain = async function () {
+      const box = document.getElementById('chainResult');
+      box.textContent = 'Verificando…';
+      try {
+        const r = await apiGet('/admin/audit-log/verify');
+        box.innerHTML = r.ok
+          ? `<span class="badge badge-success">ÍNTEGRA</span> ${r.checked} linha(s) verificadas. Cabeça: <code>${esc((r.head || '').slice(0, 16))}…</code>`
+          : `<span class="badge badge-danger">VIOLADA</span> Falha na linha <code>${esc(r.firstBad || '?')}</code>: ${esc(r.reason || '')}`;
+      } catch (err) { box.textContent = 'Erro: ' + (err.message || err); }
     };
 
     const COL_LABELS = { scheduled_at: 'Data/hora', specialty: 'Especialidade', doctor: 'Médico', location: 'Local', status: 'Status', user_name: 'Paciente', exam_type: 'Tipo de exame' };
@@ -1111,6 +1442,179 @@
         });
       });
     });
+
+    /* ================= MINHA CONTA (perfil + LGPD + privacidade + DPO) ================= */
+    // O admin é um usuário do sistema: os mesmos endpoints /auth/me atendem qualquer role.
+    const ACCT_IDS = {
+      full_name: 'a_full_name', social_name: 'a_social_name', birth_date: 'a_birth_date',
+      gender: 'a_gender', cpf: 'a_cpf', rg: 'a_rg', cns: 'a_cns', mobile: 'a_mobile',
+      phone: 'a_phone', cep: 'a_cep', street: 'a_street', address_number: 'a_number',
+      neighborhood: 'a_neighborhood', city: 'a_city', state: 'a_state',
+    };
+    const ACCT_TRACKED = ['social_name', 'birth_date', 'gender', 'rg', 'cns', 'phone',
+      'cep', 'street', 'neighborhood', 'city', 'state'];
+    const ACCT_LABELS = {
+      social_name: 'nome social', birth_date: 'data de nascimento', gender: 'gênero',
+      rg: 'RG', cns: 'cartão SUS', phone: 'telefone fixo', cep: 'CEP', street: 'rua',
+      neighborhood: 'bairro', city: 'cidade', state: 'UF',
+    };
+
+    function acctCompleteness(user) {
+      const filled = ACCT_TRACKED.filter(k => {
+        const v = user && user[k];
+        return v !== null && v !== undefined && String(v).trim() !== '';
+      }).length;
+      return Math.round((filled / ACCT_TRACKED.length) * 100);
+    }
+
+    let acctLoaded = false;
+    async function initMyAccount(force) {
+      if (acctLoaded && !force) return;
+      acctLoaded = true;
+      try {
+        const { user } = await apiGet('/auth/me');
+        for (const [key, id] of Object.entries(ACCT_IDS)) {
+          const input = document.getElementById(id);
+          if (input) input.value = user[key] ?? '';
+        }
+        const pct = acctCompleteness(user);
+        document.getElementById('acctBar').style.width = pct + '%';
+        document.getElementById('acctPct').textContent = pct + '%';
+      } catch (err) {
+        acctLoaded = false;
+        toast(err.message || 'Erro ao carregar seus dados', 'error');
+        return;
+      }
+      loadAccountConsent();
+      loadDpoContact();
+    }
+
+    async function loadAccountConsent() {
+      const box = document.getElementById('acctConsent');
+      if (!box) return;
+      box.innerHTML = '<div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
+      try {
+        // /auth/me/export é a única leitura que traz privacy_version/consent_at do titular.
+        const data = await apiGet('/auth/me/export');
+        const p = data.profile || {};
+        const quando = p.consent_at ? fmtDate(p.consent_at) : 'não registrado';
+        box.innerHTML =
+          `<p style="margin:0">Política de privacidade na versão <strong>${esc(data.privacy_version || p.privacy_version || '—')}</strong></p>` +
+          `<p style="margin:4px 0 0">Consentimento registrado em: <strong>${esc(quando)}</strong></p>`;
+      } catch (err) {
+        box.textContent = err.message || 'Não foi possível ler os registros de consentimento.';
+      }
+    }
+
+    async function loadDpoContact() {
+      const box = document.getElementById('acctDpo');
+      if (!box) return;
+      try {
+        const d = await (await fetch(window.API_BASE + '/public/dpo')).json();
+        box.textContent = (d && d.configured && d.email)
+          ? `${d.name} — ${d.email}`
+          : 'a definir pela Secretaria (configure DPO_NAME/DPO_EMAIL na API)';
+      } catch (err) {
+        box.textContent = 'indisponível no momento — tente mais tarde.';
+      }
+    }
+
+    async function saveAccount(e) {
+      e.preventDefault();
+      const btn = document.getElementById('acctSubmit');
+      const get = (id) => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
+      // Validação local dos documentos (mesmas regras do back).
+      ['a_cpf', 'a_cns', 'a_cep'].forEach(id => {
+        if (get(id)) clearFieldError(document.getElementById(id));
+      });
+      if (get('a_cpf') && !isValidCPF(get('a_cpf'))) {
+        setFieldError(document.getElementById('a_cpf'), 'CPF inválido. Confira os números digitados.');
+        showFirstError(document.getElementById('a_cpf'));
+        return;
+      }
+      if (get('a_cns') && !isValidCNS(get('a_cns'))) {
+        setFieldError(document.getElementById('a_cns'), 'Cartão SUS inválido. Confira os 15 números do cartão.');
+        showFirstError(document.getElementById('a_cns'));
+        return;
+      }
+      if (get('a_cep') && get('a_cep').replace(/\D/g, '').length !== 8) {
+        setFieldError(document.getElementById('a_cep'), 'O CEP precisa ter 8 dígitos.');
+        showFirstError(document.getElementById('a_cep'));
+        return;
+      }
+      btn.disabled = true;
+      try {
+        await apiPut('/auth/me', {
+          full_name: get('a_full_name') || undefined,
+          social_name: get('a_social_name'), birth_date: get('a_birth_date') || undefined,
+          gender: get('a_gender'),
+          // Documento vazio NÃO vai no corpo: no back, chave presente = limpar.
+          cpf: get('a_cpf') || undefined, rg: get('a_rg'), cns: get('a_cns') || undefined,
+          mobile: get('a_mobile') || undefined, phone: get('a_phone'),
+          cep: get('a_cep'), street: get('a_street'), address_number: get('a_number'),
+          neighborhood: get('a_neighborhood'), city: get('a_city'),
+          state: get('a_state').toUpperCase(),
+        });
+        toast('Dados atualizados', 'success');
+        acctLoaded = false;
+        await initMyAccount(true);
+      } catch (err) {
+        toast(err.message || 'Erro ao salvar', 'error');
+      } finally { btn.disabled = false; }
+    }
+
+    async function downloadMyAccountData() {
+      try {
+        const data = await apiGet('/auth/me/export');
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'meus-dados-saude-mais.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        toast('Arquivo gerado', 'success');
+      } catch (err) { toast(err.message || 'Erro ao exportar', 'error'); }
+    }
+
+    function ensureDeleteAccountModal() {
+      if (document.getElementById('deleteAccountModal')) return;
+      const style = document.createElement('style');
+      style.textContent = `#deleteAccountModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}#deleteAccountModal.show{display:flex}#deleteAccountModal .modal-card{width:min(440px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}`;
+      document.head.appendChild(style);
+      document.body.insertAdjacentHTML('beforeend', `<div id="deleteAccountModal" role="dialog" aria-modal="true" aria-labelledby="delAcctTitle"><div class="modal-card"><h2 id="delAcctTitle">Excluir sua conta?</h2><p>Seus dados pessoais serão anonimizados e você perderá o acesso administrativo. Confirme com sua senha.</p><div class="field" style="margin-top:14px"><label for="delAcctPass">Senha</label><input class="input" type="password" id="delAcctPass" autocomplete="current-password"></div><p id="delAcctError" style="color:var(--danger);font-size:.9rem;margin:0"></p><div class="row" style="justify-content:flex-end;margin-top:20px"><button type="button" class="btn btn-outline" onclick="closeDeleteAccountModal()">Voltar</button><button type="button" class="btn btn-primary" style="background:var(--danger);border-color:var(--danger)" onclick="confirmDeleteAccount()">Excluir conta</button></div></div></div>`);
+    }
+    window.closeDeleteAccountModal = function () {
+      document.getElementById('deleteAccountModal')?.classList.remove('show');
+      const p = document.getElementById('delAcctPass');
+      if (p) p.value = '';
+    };
+    window.deleteMyAccount = function () {
+      ensureDeleteAccountModal();
+      document.getElementById('delAcctError').textContent = '';
+      document.getElementById('deleteAccountModal').classList.add('show');
+      document.getElementById('delAcctPass').focus();
+    };
+    window.confirmDeleteAccount = async function () {
+      const pass = document.getElementById('delAcctPass').value;
+      if (!pass) { document.getElementById('delAcctError').textContent = 'Informe sua senha.'; return; }
+      try {
+        // apiDelete não envia corpo; usa fetch direto com a senha de confirmação.
+        const token = localStorage.getItem('saude_token');
+        const res = await fetch(window.API_BASE + '/auth/me', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ password: pass }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) { document.getElementById('delAcctError').textContent = body.error || 'Não foi possível excluir.'; return; }
+        toast('Conta excluída', 'success');
+        closeDeleteAccountModal();
+        setTimeout(() => location.replace('index.html'), 900);
+      } catch (err) {
+        document.getElementById('delAcctError').textContent = err.message || 'Falha de rede.';
+      }
+    };
 
     function setDateLimits() {
       const now = new Date();

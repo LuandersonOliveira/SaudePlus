@@ -10,22 +10,45 @@
 
   var TOKEN_KEY = 'saude_token';
   var USER_KEY = 'saude_user';
+  var REFRESH_KEY = 'saude_refresh';
 
   function getToken() { return localStorage.getItem(TOKEN_KEY); }
+  function getRefreshToken() { return localStorage.getItem(REFRESH_KEY); }
   function getStoredUser() {
     var raw = localStorage.getItem(USER_KEY);
     return raw ? JSON.parse(raw) : null;
   }
-  function setSession(token, user) {
+  function setSession(token, user, refreshToken) {
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(USER_KEY, JSON.stringify(user));
+    if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
   }
   function clearSession() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(REFRESH_KEY);
   }
 
-  async function request(method, path, body) {
+  // Troca o refresh por um par novo (Fase 0, item 0.3). Retorna true se renovou.
+  async function tryRefresh() {
+    var refreshToken = getRefreshToken();
+    if (!refreshToken) return false;
+    try {
+      var res = await fetch(window.API_BASE + '/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: refreshToken })
+      });
+      if (!res.ok) return false;
+      var data = await res.json();
+      setSession(data.token, data.user, data.refreshToken);
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  async function request(method, path, body, _retried) {
     var headers = { 'Content-Type': 'application/json' };
     var token = getToken();
     if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -42,6 +65,11 @@
     try { data = await res.json(); } catch (_e) { /* resposta sem corpo JSON */ }
 
     if (!res.ok) {
+      // Access curto (15 min): tenta renovar uma vez antes de deslogar.
+      // Não aplica a /auth/* (evita recursão no próprio refresh/login).
+      if (res.status === 401 && !_retried && path.indexOf('/auth/') !== 0 && await tryRefresh()) {
+        return request(method, path, body, true);
+      }
       if (res.status === 401) clearSession();
       var message = (data && (data.error || data.message)) || ('Erro inesperado (' + res.status + ')');
       throw new Error(message);
@@ -59,7 +87,7 @@
   // ---- Autenticação ----
   window.authLogin = async function (email, password) {
     var data = await request('POST', '/auth/login', { email: email, password: password });
-    setSession(data.token, data.user);
+    setSession(data.token, data.user, data.refreshToken);
     return data;
   };
 
@@ -67,7 +95,17 @@
     return request('POST', '/auth/signup', payload);
   };
 
+  window.setSession = setSession;
   window.signOut = function () {
+    // Revoga o refresh no servidor (best-effort) antes de limpar a sessão local.
+    var refreshToken = getRefreshToken();
+    if (refreshToken) {
+      fetch(window.API_BASE + '/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: refreshToken })
+      }).catch(function () { /* logout local vale mesmo se a rede falhar */ });
+    }
     clearSession();
     location.href = 'auth.html';
   };
@@ -116,6 +154,35 @@
   window.isAdmin = async function () {
     var session = await getSession();
     return !!(session && session.user && session.user.role === 'admin');
+  };
+
+  // ---- Validadores de documento (P2a.4: fonte única no front) ----
+  // Mesmas regras do back (server/src/utils/validators.js). Antes o CNS só
+  // checava 15 dígitos no front e o CPF tinha cópia divergente em auth.html.
+  function digitsOnly(value) { return String(value || '').replace(/\D/g, ''); }
+
+  window.isValidCPF = function (value) {
+    var cpf = digitsOnly(value);
+    if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+    var sum = 0, i, d;
+    for (i = 0; i < 9; i++) sum += Number(cpf[i]) * (10 - i);
+    d = (sum * 10) % 11; if (d === 10) d = 0;
+    if (d !== Number(cpf[9])) return false;
+    sum = 0;
+    for (i = 0; i < 10; i++) sum += Number(cpf[i]) * (11 - i);
+    d = (sum * 10) % 11; if (d === 10) d = 0;
+    return d === Number(cpf[10]);
+  };
+
+  // CNS: regra oficial DEF-CNS (15 dígitos com início 1/2/7/8/9 + DV).
+  window.isValidCNS = function (value) {
+    var cns = digitsOnly(value);
+    if (!/^[12789]\d{14}$/.test(cns)) return false;
+    var sum = 0, i;
+    for (i = 0; i < 15; i++) sum += Number(cns[i]) * (15 - i);
+    if (sum % 11 === 0) return true;
+    if (cns[0] === '1' || cns[0] === '2') return (sum + 2) % 11 === 0;
+    return false;
   };
 
   // ---- Helpers de UI ----

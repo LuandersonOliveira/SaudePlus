@@ -4,53 +4,54 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Painel Atendente | Saúde+</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="assets/styles.css">
 <script defer src="assets/api.js"></script>
 </head>
 <body>
-<header class="topbar">
-  <a class="brand" href="index.html"><span class="brand-dot"></span>Saúde+
-    <span class="badge" style="margin-left:6px;background:var(--primary-100);color:var(--primary-600)">Atendente</span>
-  </a>
-  <nav class="nav">
-    <span id="userEmail" class="muted"></span>
-    <button class="btn btn-outline btn-sm" onclick="signOut()">Sair</button>
+<a class="sr-only" href="#conteudo">Pular para o conteúdo</a>
+<div class="app-shell">
+<aside class="app-rail">
+  <a class="brand rail-brand" href="index.html"><span class="brand-dot"></span>Saúde+</a>
+  <nav class="tabs sidebar" role="tablist" aria-label="Navegação do atendimento">
+    <button class="tab active has-badge" data-tab="fila" role="tab" aria-selected="true" id="tab-fila" aria-controls="fila"><span>Fila do dia</span><span id="queueBadge"></span></button>
+    <button class="tab" data-tab="agendamentos" role="tab" aria-selected="false" id="tab-agendamentos" aria-controls="agendamentos">Agendamentos</button>
+    <button class="tab" data-tab="pacientes" role="tab" aria-selected="false" id="tab-pacientes" aria-controls="pacientes">Buscar paciente</button>
+    <button class="tab" data-tab="minha-conta" role="tab" aria-selected="false" id="tab-minha-conta" aria-controls="minha-conta">Minha conta</button>
   </nav>
-</header>
+  <div class="rail-user">
+    <div class="rail-user-head">
+      <span class="badge" style="background:var(--primary-100);color:var(--primary-600)">Atendente</span>
+      <span class="rail-user-name" id="userName"></span>
+      <span class="rail-user-email" id="railUserRole"></span>
+      <span class="rail-user-email" id="userEmail"></span>
+    </div>
+    <button class="btn btn-outline btn-sm rail-signout" type="button" onclick="signOut()">Sair</button>
+  </div>
+</aside>
 
-<main class="container">
+<div class="app-main">
+<main class="container" id="conteudo">
   <h1 id="greetingTitle">Painel de atendimento</h1>
   <p class="muted" id="greetingSub">Gerencie os agendamentos e acompanhe seus pacientes.</p>
-
-  <div class="tabs" role="tablist">
-    <button class="tab active" data-tab="fila" role="tab" aria-selected="true" id="tab-fila" aria-controls="fila">Fila do dia <span id="queueBadge"></span></button>
-    <button class="tab" data-tab="consultas" role="tab" aria-selected="false" id="tab-consultas" aria-controls="consultas">Consultas</button>
-    <button class="tab" data-tab="exames" role="tab" aria-selected="false" id="tab-exames" aria-controls="exames">Exames</button>
-    <button class="tab" data-tab="pacientes" role="tab" aria-selected="false" id="tab-pacientes" aria-controls="pacientes">Buscar paciente</button>
-  </div>
 
   <!-- Fila do dia (pendentes de hoje) -->
   <section class="tabpanel active" id="fila" role="tabpanel" aria-labelledby="tab-fila">
     <div class="grid grid-4" id="stats" style="margin-bottom:16px"></div>
-    <div class="card"><h3>Pendentes para hoje</h3><div id="todayQueue"><div class="spinner"></div></div></div>
+    <div class="card"><h2>Pendentes para hoje</h2><div id="todayQueue"><div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div></div></div>
   </section>
 
-  <!-- Consultas recentes -->
-  <section class="tabpanel" id="consultas" role="tabpanel" aria-labelledby="tab-consultas">
-    <div class="card"><h3>Consultas recentes</h3><div id="allAppts"><div class="spinner"></div></div></div>
-  </section>
-
-  <!-- Exames recentes -->
-  <section class="tabpanel" id="exames" role="tabpanel" aria-labelledby="tab-exames">
-    <div class="card"><h3>Exames recentes</h3><div id="allExams"><div class="spinner"></div></div></div>
+  <!-- Agendamentos (consultas + exames) -->
+  <section class="tabpanel" id="agendamentos" role="tabpanel" aria-labelledby="tab-agendamentos">
+    <div class="card"><h2>Consultas recentes</h2><div id="allAppts"><div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div></div></div>
+    <div class="card" style="margin-top:16px"><h2>Exames recentes</h2><div id="allExams"><div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div></div></div>
   </section>
 
   <!-- Buscar paciente -->
   <section class="tabpanel" id="pacientes" role="tabpanel" aria-labelledby="tab-pacientes">
     <div class="card">
-      <h3>Buscar paciente</h3>
-      <form id="patientSearchForm" class="row">
+      <h2>Buscar paciente</h2>
+      <form id="patientSearchForm" class="row" aria-label="Buscar paciente">
+        <label for="patientQuery" class="sr-only">Nome ou e-mail do paciente</label>
         <input class="input" id="patientQuery" placeholder="Nome ou e-mail do paciente" style="flex:1;min-width:260px">
         <button class="btn btn-primary" type="submit">Buscar</button>
       </form>
@@ -58,8 +59,142 @@
     </div>
     <div id="patientHistory" style="margin-top:16px"></div>
   </section>
-</main>
 
+  <!-- MINHA CONTA (perfil + LGPD + privacidade + DPO) -->
+  <section class="tabpanel" id="minha-conta" role="tabpanel" aria-labelledby="tab-minha-conta">
+    <div class="grid grid-2" style="align-items:start">
+      <div class="card">
+        <h2>Meu perfil</h2>
+        <p class="muted">Seus dados de cadastro como profissional. O cargo só pode ser alterado pelo administrador.</p>
+        <div style="display:flex;align-items:center;gap:12px;margin:12px 0">
+          <div style="flex:1;height:10px;border-radius:6px;background:var(--border);overflow:hidden">
+            <div id="atBar" style="height:100%;width:0%;background:var(--primary)"></div>
+          </div>
+          <strong id="atPct">0%</strong>
+        </div>
+        <form id="atForm" novalidate aria-label="Meu perfil">
+          <h3 style="margin-top:8px">Identificação</h3>
+          <div class="grid grid-2" style="gap:12px">
+            <div class="field" style="grid-column:1/-1">
+              <label for="at_full_name">Nome completo *</label>
+              <input class="input" id="at_full_name" required autocomplete="name">
+            </div>
+            <div class="field" style="grid-column:1/-1">
+              <label for="at_social_name">Nome social <span class="opt">(opcional)</span></label>
+              <input class="input" id="at_social_name" maxlength="150">
+            </div>
+            <div class="field">
+              <label for="at_birth_date">Data de nascimento</label>
+              <input class="input" id="at_birth_date" type="date">
+            </div>
+            <div class="field">
+              <label for="at_gender">Gênero</label>
+              <select class="select" id="at_gender">
+                <option value="">Selecione...</option>
+                <option value="masculino">Masculino</option>
+                <option value="feminino">Feminino</option>
+                <option value="outro">Outro</option>
+                <option value="prefiro_nao_informar">Prefiro não informar</option>
+              </select>
+            </div>
+            <div class="field" style="grid-column:1/-1">
+              <label for="at_job_role">Cargo / Função</label>
+              <input class="input" id="at_job_role" disabled title="O cargo é definido pelo administrador">
+            </div>
+          </div>
+          <h3 style="margin-top:16px">Documentos</h3>
+          <div class="grid grid-2" style="gap:12px">
+            <div class="field">
+              <label for="at_cpf">CPF</label>
+              <input class="input" id="at_cpf" placeholder="000.000.000-00" maxlength="14" inputmode="numeric">
+            </div>
+            <div class="field">
+              <label for="at_rg">RG</label>
+              <input class="input" id="at_rg" placeholder="00.000.000-0" maxlength="12" oninput="maskRg(this)">
+            </div>
+            <div class="field">
+              <label for="at_cns">Cartão SUS (CNS)</label>
+              <input class="input" id="at_cns" placeholder="15 dígitos" maxlength="18" inputmode="numeric">
+            </div>
+          </div>
+          <h3 style="margin-top:16px">Contato e endereço</h3>
+          <div class="grid grid-2" style="gap:12px">
+            <div class="field">
+              <label for="at_mobile">Celular *</label>
+              <input class="input" id="at_mobile" placeholder="(00) 90000-0000" maxlength="16" required inputmode="tel">
+            </div>
+            <div class="field">
+              <label for="at_phone">Telefone fixo <span class="opt">(opcional)</span></label>
+              <input class="input" id="at_phone" placeholder="(00) 0000-0000" maxlength="15">
+            </div>
+            <div class="field">
+              <label for="at_cep">CEP</label>
+              <input class="input" id="at_cep" placeholder="00000-000" maxlength="9" oninput="maskCep(this)" onblur="lookupCep('at_cep',{street:'at_street',neighborhood:'at_neighborhood',city:'at_city',state:'at_state'})">
+            </div>
+            <div class="field">
+              <label for="at_number">Número</label>
+              <input class="input" id="at_number" placeholder="413">
+            </div>
+            <div class="field" style="grid-column:1/-1">
+              <label for="at_street">Rua / Logradouro</label>
+              <input class="input" id="at_street" placeholder="Preenchido pelo CEP (editável)">
+            </div>
+            <div class="field">
+              <label for="at_neighborhood">Bairro</label>
+              <input class="input" id="at_neighborhood">
+            </div>
+            <div class="field">
+              <label for="at_city">Cidade</label>
+              <input class="input" id="at_city">
+            </div>
+            <div class="field" style="flex:0 0 80px">
+              <label for="at_state">UF</label>
+              <input class="input" id="at_state" maxlength="2" placeholder="UF" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')">
+            </div>
+          </div>
+          <div class="row" style="margin-top:16px">
+            <button class="btn btn-primary" type="submit" id="atSubmit">Salvar perfil</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="grid" style="gap:16px">
+        <div class="card">
+          <h2>Meus dados (LGPD)</h2>
+          <p class="muted">Baixe tudo que o sistema guarda sobre você ou peça a exclusão da conta.</p>
+          <div id="atConsentLine" class="muted" style="font-size:.9rem">
+            <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+          </div>
+          <div class="row" style="margin-top:14px">
+            <button class="btn btn-outline btn-sm" type="button" onclick="downloadAtData()">Baixar meus dados (JSON)</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="atDeleteAccount()" style="color:var(--danger)">Excluir minha conta…</button>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Privacidade</h2>
+          <p class="muted">Coletamos o mínimo necessário para o atendimento público. A base legal é o dever legal do
+            SUS (art. 11, II, <em>f</em> da LGPD), não o consentimento — por isso não há caixa de aceite genérico.</p>
+          <ul class="muted" style="font-size:.9rem;padding-left:18px;margin:10px 0">
+            <li>Dados de saúde são sensíveis e ficam restritos à equipe que presta o atendimento.</li>
+            <li>CPF, RG e CNS são gravados criptografados no banco.</li>
+            <li>Cada acesso seu a documentos de pacientes fica registrado na auditoria.</li>
+            <li>Você pode corrigir, exportar ou apagar seus dados a qualquer momento.</li>
+          </ul>
+          <a class="btn btn-outline btn-sm" href="privacy.html">Ler a Política de Privacidade</a>
+        </div>
+        <div class="card">
+          <h2>Encarregado (DPO)</h2>
+          <p class="muted">Canal oficial para qualquer assunto sobre seus dados pessoais (LGPD, art. 41).</p>
+          <p id="atDpoLine" style="font-weight:600;margin:10px 0 0"><span class="spinner"></span></p>
+        </div>
+      </div>
+    </div><!-- /grid Minha conta -->
+  </section>
+</main>
+</div><!-- /app-main -->
+</div><!-- /app-shell -->
+
+<script src="assets/ui.js"></script>
 <script>
 let SESSION;
 let allAppointments = [];
@@ -103,18 +238,18 @@ function ensureReagendarModal() {
   const style = document.createElement('style');
   style.textContent = `#reagendarModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
   #reagendarModal.show{display:flex}
-  #reagendarModal .reagendar-modal-card{width:min(400px,100%);background:var(--surface,#fff);border:1px solid var(--border,#ddd);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
-  #reagendarModal h3{margin:0 0 10px}
+  #reagendarModal .reagendar-modal-card{width:min(400px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
+  #reagendarModal h2{margin:0 0 10px}
   #reagendarModal .reagendar-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}`;
   document.head.appendChild(style);
   
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="reagendarModal" role="dialog" aria-modal="true">
+    <div id="reagendarModal" role="dialog" aria-modal="true" aria-labelledby="reagendarModalTitle">
       <div class="reagendar-modal-card">
-        <h3>Reagendar atendimento</h3>
+        <h2 id="reagendarModalTitle">Reagendar atendimento</h2>
         <p class="muted" style="font-size:.9rem;margin-bottom:14px">Selecione a nova data e horário:</p>
         <div class="field">
-          <label>Data/hora</label>
+          <label for="reagendarInputDate">Data/hora</label>
           <input class="input" id="reagendarInputDate" type="datetime-local" required>
         </div>
         <div class="reagendar-modal-actions">
@@ -181,12 +316,16 @@ window.addEventListener('load', async ()=>{
   const formattedRole = formatJobRole(SESSION.user.job_role);
   
   document.getElementById('userEmail').textContent = SESSION.user.email;
+  document.getElementById('userName').textContent = name;
+  const roleLine = document.getElementById('railUserRole');
+  if (formattedRole) { roleLine.textContent = formattedRole; } else { roleLine.style.display = 'none'; }
   document.getElementById('greetingTitle').textContent = 'Olá, ' + esc(name.split(' ')[0]) + '!';
   document.getElementById('greetingSub').textContent =
     (formattedRole ? formattedRole + ' · ' : '') + 'Painel de atendimento';
 
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click', ()=>switchTab(t.dataset.tab)));
   document.getElementById('patientSearchForm').addEventListener('submit', searchPatient);
+  document.getElementById('atForm').addEventListener('submit', saveAtAccount);
 
   ensureReagendarModal();
   setDateLimits(); // item 3.4 — limita o calendário a hoje + 1 ano
@@ -200,7 +339,172 @@ function switchTab(name){
     t.setAttribute('aria-selected', active ? 'true' : 'false');
   });
   document.querySelectorAll('.tabpanel').forEach(p=>p.classList.toggle('active', p.id===name));
+  if (name === 'minha-conta') initAtAccount();
 }
+
+/* ================= MINHA CONTA (perfil + LGPD + privacidade + DPO) ================= */
+// A conta também é um usuário do sistema: os mesmos endpoints /auth/me atendem qualquer role.
+const AT_IDS = {
+  full_name: 'at_full_name', social_name: 'at_social_name', birth_date: 'at_birth_date',
+  gender: 'at_gender', cpf: 'at_cpf', rg: 'at_rg', cns: 'at_cns', mobile: 'at_mobile',
+  phone: 'at_phone', cep: 'at_cep', street: 'at_street', address_number: 'at_number',
+  neighborhood: 'at_neighborhood', city: 'at_city', state: 'at_state',
+};
+const AT_TRACKED = ['social_name', 'birth_date', 'gender', 'rg', 'cns', 'phone',
+  'cep', 'street', 'neighborhood', 'city', 'state'];
+
+function atCompleteness(user) {
+  const filled = AT_TRACKED.filter(k => {
+    const v = user && user[k];
+    return v !== null && v !== undefined && String(v).trim() !== '';
+  }).length;
+  return Math.round((filled / AT_TRACKED.length) * 100);
+}
+
+let atAccountLoaded = false;
+async function initAtAccount(force) {
+  if (atAccountLoaded && !force) return;
+  atAccountLoaded = true;
+  try {
+    const { user } = await apiGet('/auth/me');
+    for (const [key, id] of Object.entries(AT_IDS)) {
+      const input = document.getElementById(id);
+      if (input) input.value = user[key] ?? '';
+    }
+    document.getElementById('at_job_role').value = formatJobRole(user.job_role);
+    const pct = atCompleteness(user);
+    document.getElementById('atBar').style.width = pct + '%';
+    document.getElementById('atPct').textContent = pct + '%';
+    document.getElementById('at_cpf').addEventListener('input', e => maskCpf(e.target));
+    document.getElementById('at_cns').addEventListener('input', e => maskCns(e.target));
+    document.getElementById('at_mobile').addEventListener('input', e => maskPhone(e.target, true));
+    document.getElementById('at_phone').addEventListener('input', e => maskPhone(e.target, false));
+  } catch (err) {
+    atAccountLoaded = false;
+    toast(err.message || 'Erro ao carregar seus dados', 'error');
+    return;
+  }
+  loadAtAccountExtras();
+}
+
+async function loadAtAccountExtras() {
+  try {
+    // /auth/me/export é a única leitura que traz privacy_version/consent_at do titular.
+    const data = await apiGet('/auth/me/export');
+    const p = data.profile || {};
+    const quando = p.consent_at ? fmtDate(p.consent_at) : 'não registrado';
+    document.getElementById('atConsentLine').innerHTML =
+      `<p style="margin:0">Política de privacidade na versão <strong>${esc(data.privacy_version || p.privacy_version || '—')}</strong></p>` +
+      `<p style="margin:4px 0 0">Consentimento registrado em: <strong>${esc(quando)}</strong></p>`;
+  } catch (err) {
+    document.getElementById('atConsentLine').textContent = err.message || 'Não foi possível ler os registros de consentimento.';
+  }
+  try {
+    const dpo = await (await fetch(window.API_BASE + '/public/dpo')).json();
+    document.getElementById('atDpoLine').textContent = (dpo && dpo.configured && dpo.email)
+      ? `${dpo.name} — ${dpo.email}`
+      : 'a definir pela Secretaria (configure DPO_NAME/DPO_EMAIL na API)';
+  } catch (err) {
+    document.getElementById('atDpoLine').textContent = 'indisponível no momento — tente mais tarde.';
+  }
+}
+
+async function saveAtAccount(e) {
+  e.preventDefault();
+  const btn = document.getElementById('atSubmit');
+  const get = (id) => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
+  // Validação local dos documentos (mesmas regras do back).
+  ['at_cpf', 'at_cns', 'at_cep'].forEach(id => {
+    if (get(id)) clearFieldError(document.getElementById(id));
+  });
+  if (get('at_cpf') && !isValidCPF(get('at_cpf'))) {
+    setFieldError(document.getElementById('at_cpf'), 'CPF inválido. Confira os números digitados.');
+    showFirstError(document.getElementById('at_cpf'));
+    return;
+  }
+  if (get('at_cns') && !isValidCNS(get('at_cns'))) {
+    setFieldError(document.getElementById('at_cns'), 'Cartão SUS inválido. Confira os 15 números do cartão.');
+    showFirstError(document.getElementById('at_cns'));
+    return;
+  }
+  if (get('at_cep') && get('at_cep').replace(/\D/g, '').length !== 8) {
+    setFieldError(document.getElementById('at_cep'), 'O CEP precisa ter 8 dígitos.');
+    showFirstError(document.getElementById('at_cep'));
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await apiPut('/auth/me', {
+      full_name: get('at_full_name') || undefined,
+      social_name: get('at_social_name'), birth_date: get('at_birth_date') || undefined,
+      gender: get('at_gender'),
+      // Documento vazio NÃO vai no corpo: no back, chave presente = limpar.
+      cpf: get('at_cpf') || undefined, rg: get('at_rg'), cns: get('at_cns') || undefined,
+      mobile: get('at_mobile') || undefined, phone: get('at_phone'),
+      cep: get('at_cep'), street: get('at_street'), address_number: get('at_number'),
+      neighborhood: get('at_neighborhood'), city: get('at_city'),
+      state: get('at_state').toUpperCase(),
+    });
+    toast('Perfil atualizado', 'success');
+    atAccountLoaded = false;
+    await initAtAccount(true);
+  } catch (err) {
+    toast(err.message || 'Erro ao salvar', 'error');
+  } finally { btn.disabled = false; }
+}
+
+async function downloadAtData() {
+  try {
+    const data = await apiGet('/auth/me/export');
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'meus-dados-saude-mais.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Arquivo gerado', 'success');
+  } catch (err) { toast(err.message || 'Erro ao exportar', 'error'); }
+}
+
+function ensureAtDeleteModal() {
+  if (document.getElementById('deleteAtAccountModal')) return;
+  const style = document.createElement('style');
+  style.textContent = `#deleteAtAccountModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}#deleteAtAccountModal.show{display:flex}#deleteAtAccountModal .modal-card{width:min(440px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}`;
+  document.head.appendChild(style);
+  document.body.insertAdjacentHTML('beforeend', `<div id="deleteAtAccountModal" role="dialog" aria-modal="true" aria-labelledby="delAtTitle"><div class="modal-card"><h2 id="delAtTitle">Excluir sua conta?</h2><p>Seus dados pessoais serão anonimizados e você perderá o acesso ao painel. Confirme com sua senha.</p><div class="field" style="margin-top:14px"><label for="delAtPass">Senha</label><input class="input" type="password" id="delAtPass" autocomplete="current-password"></div><p id="delAtError" style="color:var(--danger);font-size:.9rem;margin:0"></p><div class="row" style="justify-content:flex-end;margin-top:20px"><button type="button" class="btn btn-outline" onclick="closeAtDeleteModal()">Voltar</button><button type="button" class="btn btn-primary" style="background:var(--danger);border-color:var(--danger)" onclick="confirmAtDelete()">Excluir conta</button></div></div></div>`);
+}
+window.closeAtDeleteModal = function () {
+  document.getElementById('deleteAtAccountModal')?.classList.remove('show');
+  const p = document.getElementById('delAtPass');
+  if (p) p.value = '';
+};
+window.atDeleteAccount = function () {
+  ensureAtDeleteModal();
+  document.getElementById('delAtError').textContent = '';
+  document.getElementById('deleteAtAccountModal').classList.add('show');
+  document.getElementById('delAtPass').focus();
+};
+window.confirmAtDelete = async function () {
+  const pass = document.getElementById('delAtPass').value;
+  if (!pass) { document.getElementById('delAtError').textContent = 'Informe sua senha.'; return; }
+  try {
+    // apiDelete não envia corpo; usa fetch direto com a senha de confirmação.
+    const token = localStorage.getItem('saude_token');
+    const res = await fetch(window.API_BASE + '/auth/me', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ password: pass }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { document.getElementById('delAtError').textContent = body.error || 'Não foi possível excluir.'; return; }
+    toast('Conta excluída', 'success');
+    closeAtDeleteModal();
+    setTimeout(() => location.replace('index.html'), 900);
+  } catch (err) {
+    document.getElementById('delAtError').textContent = err.message || 'Falha de rede.';
+  }
+};
 
 async function loadAll(){
   try{
@@ -260,7 +564,7 @@ function itemRow(r, kind, label){
 
   return `<div class="item">
     <div>
-      <h4><span class="badge" style="margin-right:6px">${label}</span>${title}</h4>
+      <h3><span class="badge" style="margin-right:6px">${label}</span>${title}</h3>
       <p>${esc(r.location||r.reason||'')} · <span class="badge ${statusClass(r.status)}">${esc(r.status)}</span>
          · <span class="muted">${esc(r.user_name||'')}</span>
       </p>
@@ -283,10 +587,17 @@ window.act = async function(kind, id, status){
 /* ===== BUSCAR PACIENTE COM AVISO DE INATIVO (4.2) ===== */
 async function searchPatient(e){
   e.preventDefault();
-  const q = document.getElementById('patientQuery').value.trim();
-  if(!q) return;
+  const input = document.getElementById('patientQuery');
+  const q = input.value.trim();
+  // P2a.8: busca vazia dava return silencioso — o usuário concluía que quebrou.
+  if(!q){
+    setFieldError(input, 'Digite o nome ou o e-mail do paciente para buscar.');
+    showFirstError(input);
+    return;
+  }
+  clearFieldError(input);
   const box = document.getElementById('patientResults');
-  box.innerHTML = '<div class="spinner"></div>';
+  box.innerHTML = '<div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
   document.getElementById('patientHistory').innerHTML = '';
   try{
     const patients = await apiGet('/staff/patients?q='+encodeURIComponent(q));
@@ -297,9 +608,9 @@ async function searchPatient(e){
       if (status === 'inativo' || status === 'pendente') {
         const labelStatus = status === 'inativo' ? 'Inativa' : 'Pendente de ativação';
         return `
-          <div class="item" style="border-left: 4px solid var(--warning, #e6a23c); background: rgba(230,162,60,0.05);">
+          <div class="item" style="border-left: 4px solid var(--warning); background: var(--warning-bg);">
             <div>
-              <h4>${esc(p.full_name || 'Paciente cadastrado')} <span class="badge badge-warning">Conta ${labelStatus}</span></h4>
+              <h3>${esc(p.full_name || 'Paciente cadastrado')} <span class="badge badge-warning">Conta ${labelStatus}</span></h3>
               <p class="muted">Este paciente possui um cadastro existente no sistema, mas sua conta está atualmente <strong>${status}</strong>. Entre em contato com a administração para reativação.</p>
             </div>
           </div>`;
@@ -308,7 +619,7 @@ async function searchPatient(e){
       return `
         <div class="item">
           <div>
-            <h4>${esc(p.full_name)}</h4>
+            <h3>${esc(p.full_name)}</h3>
             <p class="muted">${esc(p.email)} ${p.phone?'· '+esc(p.phone):''} ${p.birth_date?'· Nasc: '+fmtSimpleDate(p.birth_date):''}</p>
           </div>
           <button class="btn btn-outline btn-sm" onclick="viewPatient('${p.id}','${esc(p.full_name)}')">Ver histórico</button>
@@ -319,21 +630,21 @@ async function searchPatient(e){
 
 window.viewPatient = async function(id, name){
   const box = document.getElementById('patientHistory');
-  box.innerHTML = '<div class="spinner"></div>';
+  box.innerHTML = '<div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
   try{
     const data = await apiGet('/staff/patients/'+encodeURIComponent(id)+'/history');
     const u = data.user;
     box.innerHTML = `
       <div class="card">
         <div class="row between" style="margin-bottom:12px">
-          <h3 style="margin:0">${esc(u.full_name)}</h3>
+          <h2 style="margin:0">${esc(u.full_name)}</h2>
           <span class="muted">${data.appointments.length} consultas · ${data.exams.length} exames</span>
         </div>
         ${u.birth_date ? `<p class="muted" style="margin:0 0 4px">Nasc: ${fmtSimpleDate(u.birth_date)} · ${esc(u.gender||'—')} · Tipo sanguíneo: ${esc(u.blood_type||'—')}</p>` : ''}
         ${u.mobile ? `<p class="muted" style="margin:0 0 16px">📱 ${esc(u.mobile)}</p>` : ''}
-        <h4>Consultas</h4>
+        <h3>Consultas</h3>
         ${renderHistory(data.appointments, ['scheduled_at','specialty','doctor','location','status'])}
-        <h4 style="margin-top:16px">Exames</h4>
+        <h3 style="margin-top:16px">Exames</h3>
         ${renderHistory(data.exams, ['scheduled_at','exam_type','location','status'])}
       </div>`;
   }catch(err){ box.innerHTML=`<div class="empty">${esc(err.message)}</div>`; }

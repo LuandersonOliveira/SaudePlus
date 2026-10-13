@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const pool = require('../db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
-const { logAction } = require('../utils/audit');
+const { requireCapability } = require('../middleware/capabilities');
 
 const router = express.Router();
 
@@ -20,8 +20,9 @@ router.get('/', verifyToken, async (req, res, next) => {
   }
 });
 
-// GET /health-units/manage — catálogo completo para administradores
-router.get('/manage', verifyToken, requireAdmin, async (req, res, next) => {
+// GET /health-units/manage — catálogo completo para administradores.
+// P3: exige a permissão 'units' (não basta ser admin).
+router.get('/manage', verifyToken, requireAdmin, requireCapability('units'), async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       'SELECT id, name, type, neighborhood, active, created_at FROM health_units ORDER BY active DESC, name'
@@ -32,7 +33,7 @@ router.get('/manage', verifyToken, requireAdmin, async (req, res, next) => {
   }
 });
 
-router.post('/', verifyToken, requireAdmin, async (req, res, next) => {
+router.post('/', verifyToken, requireAdmin, requireCapability('units'), async (req, res, next) => {
   try {
     const { name, type, neighborhood } = req.body || {};
     if (!name || !String(name).trim()) {
@@ -44,14 +45,14 @@ router.post('/', verifyToken, requireAdmin, async (req, res, next) => {
       'INSERT INTO health_units (id, name, type, neighborhood) VALUES (?,?,?,?)',
       [id, String(name).trim(), unitType, neighborhood || null]
     );
-    await logAction(req.user.id, 'create', 'health_unit', id, `${String(name).trim()} (${unitType})`);
+    await req.audit('create', 'health_unit', id, `${String(name).trim()} (${unitType})`);
     res.status(201).json({ id });
   } catch (err) {
     next(err);
   }
 });
 
-router.patch('/:id', verifyToken, requireAdmin, async (req, res, next) => {
+router.patch('/:id', verifyToken, requireAdmin, requireCapability('units'), async (req, res, next) => {
   try {
     const { name, type, neighborhood, active } = req.body || {};
     const updates = [];
@@ -76,7 +77,7 @@ router.patch('/:id', verifyToken, requireAdmin, async (req, res, next) => {
     params.push(req.params.id);
     const [result] = await pool.query(`UPDATE health_units SET ${updates.join(', ')} WHERE id=?`, params);
     if (!result.affectedRows) return res.status(404).json({ error: 'Unidade não encontrada.' });
-    await logAction(req.user.id, 'admin_update_unit', 'health_unit', req.params.id, details.join('; '));
+    await req.audit('admin_update_unit', 'health_unit', req.params.id, details.join('; '));
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -90,7 +91,7 @@ router.patch('/:id', verifyToken, requireAdmin, async (req, res, next) => {
 // ---------------------------------------------------------------------
 const OFFER_KINDS = ['consulta', 'exame'];
 
-router.get('/:id/offers', verifyToken, requireAdmin, async (req, res, next) => {
+router.get('/:id/offers', verifyToken, requireAdmin, requireCapability('units'), async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       'SELECT id, kind, name, active FROM unit_offers WHERE unit_id = ? ORDER BY kind, name',
@@ -100,7 +101,7 @@ router.get('/:id/offers', verifyToken, requireAdmin, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/:id/offers', verifyToken, requireAdmin, async (req, res, next) => {
+router.post('/:id/offers', verifyToken, requireAdmin, requireCapability('units'), async (req, res, next) => {
   try {
     const { kind, name } = req.body || {};
     if (!OFFER_KINDS.includes(kind)) return res.status(400).json({ error: 'Tipo inválido (consulta ou exame).' });
@@ -114,13 +115,13 @@ router.post('/:id/offers', verifyToken, requireAdmin, async (req, res, next) => 
       'INSERT IGNORE INTO unit_offers (id, unit_id, kind, name) VALUES (?,?,?,?)',
       [id, req.params.id, kind, serviceName]
     );
-    await logAction(req.user.id, 'create', 'unit_offer', id,
+    await req.audit('create', 'unit_offer', id,
       `${serviceName} (${kind}) em ${unit.name}`);
     res.status(201).json({ id });
   } catch (err) { next(err); }
 });
 
-router.delete('/:id/offers/:offerId', verifyToken, requireAdmin, async (req, res, next) => {
+router.delete('/:id/offers/:offerId', verifyToken, requireAdmin, requireCapability('units'), async (req, res, next) => {
   try {
     const [[offer]] = await pool.query(
       'SELECT id, kind, name FROM unit_offers WHERE id = ? AND unit_id = ?',
@@ -128,7 +129,7 @@ router.delete('/:id/offers/:offerId', verifyToken, requireAdmin, async (req, res
     );
     if (!offer) return res.status(404).json({ error: 'Oferta não encontrada.' });
     await pool.query('DELETE FROM unit_offers WHERE id = ?', [req.params.offerId]);
-    await logAction(req.user.id, 'delete', 'unit_offer', req.params.offerId,
+    await req.audit('delete', 'unit_offer', req.params.offerId,
       `${offer.name} (${offer.kind}) removida da unidade`);
     res.status(204).end();
   } catch (err) { next(err); }

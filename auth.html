@@ -5,7 +5,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Entrar | Saúde+</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="assets/styles.css">
 <script defer src="assets/api.js"></script>
 <style>
@@ -26,6 +25,7 @@
 .role-card p{ margin:0; color:var(--muted); font-size:.8rem; }
 .auth-card .grid-2{ grid-template-columns:1fr 1fr; }
 @media(max-width:480px){ .auth-card .grid-2{ grid-template-columns:1fr; } }
+@media(max-width:360px){ .wizard-step{ font-size:.68rem; } .role-cards{ grid-template-columns:1fr; } }
 .opt{ font-size:.75rem; color:var(--muted); font-weight:400; margin-left:4px; }
 </style>
 </head>
@@ -41,34 +41,42 @@
 
     <!-- LOGIN -->
     <div class="tabpanel active" id="login">
-      <form id="loginForm">
-        <div class="field"><label>E-mail</label><input class="input" type="email" name="email" required autocomplete="email"></div>
-        <div class="field"><label>Senha</label><input class="input" type="password" name="password" required minlength="6" autocomplete="current-password"></div>
+      <form id="loginForm" aria-label="Entrar na conta">
+        <div class="field"><label for="loginEmail">E-mail</label><input class="input" id="loginEmail" type="email" name="email" required autocomplete="email"></div>
+        <div class="field"><label for="loginPassword">Senha</label><input class="input" id="loginPassword" type="password" name="password" required minlength="6" autocomplete="current-password"></div>
         <button class="btn btn-primary" style="width:100%" type="submit">Entrar</button>
+      </form>
+      <!-- MFA (segundo fator): aparece quando a conta exige -->
+      <form id="mfaForm" aria-label="Verificação em duas etapas" style="display:none;margin-top:16px">
+        <p class="muted" style="font-size:.85rem">Sua conta usa verificação em duas etapas. Abra o app autenticador e digite o código de 6 dígitos.</p>
+        <div class="field"><label for="mfaCode">Código</label><input class="input" id="mfaCode" inputmode="numeric" maxlength="6" placeholder="000000" required></div>
+        <button class="btn btn-primary" style="width:100%" type="submit">Verificar e entrar</button>
       </form>
     </div>
 
     <!-- WIZARD -->
     <div class="tabpanel" id="signup">
-      <div class="wizard-steps" id="wizardSteps">
-        <div class="wizard-step active" id="ws1">Tipo</div>
-        <div class="wizard-step" id="ws2">Dados</div>
-        <div class="wizard-step" id="ws3">Endereço</div>
-        <div class="wizard-step" id="ws4">Acesso</div>
+      <div class="wizard-steps" id="wizardSteps" aria-live="polite" aria-label="Etapa 1 de 2">
+        <div class="wizard-step active" id="ws1">Você</div>
+        <div class="wizard-step" id="ws2">Acesso</div>
       </div>
+
+      <!-- P2b: os 4 passos num <form> real (novalidate preserva as mensagens
+           PT customizadas; o form dá semântica e Enter-para-avançar). -->
+      <form id="signupForm" novalidate aria-label="Criar conta">
 
       <!-- PASSO 1 — Tipo de conta -->
       <div id="step1">
         <p class="muted" style="margin-bottom:16px">Como você vai usar o Saúde+?</p>
-        <div class="role-cards">
-          <div class="role-card selected" data-role="paciente" onclick="selectRole('paciente')">
+        <div class="role-cards" role="radiogroup" aria-label="Tipo de conta">
+          <div class="role-card selected" data-role="paciente" role="radio" aria-checked="true" tabindex="0" onclick="selectRole('paciente')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectRole('paciente')}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
             </svg>
             <h4>Paciente</h4>
             <p>Quero agendar consultas e exames</p>
           </div>
-          <div class="role-card" data-role="atendente" onclick="selectRole('atendente')">
+          <div class="role-card" data-role="atendente" role="radio" aria-checked="false" tabindex="0" onclick="selectRole('atendente')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectRole('atendente')}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
               <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
@@ -88,194 +96,66 @@
             <option value="Auxiliar Administrativo">Auxiliar Administrativo</option>
             <option value="Outro">Outro</option>
           </select>
+          <label for="jobRoleOther" class="sr-only">Informe o cargo</label>
           <input class="input" id="jobRoleOther" placeholder="Informe o cargo" maxlength="100" style="display:none;margin-top:10px">
         </div>
-        <p id="atendenteNote" style="display:none;font-size:.82rem;color:var(--warning);margin-top:12px;background:var(--warning-bg);padding:10px 12px;border-radius:8px">
-          ⚠️ Contas de atendente ficam <strong>pendentes</strong> até ativação pelo administrador.
+        <p id="atendenteNote" style="display:none;font-size:.82rem;color:var(--warning-ink);margin-top:12px;background:var(--warning-bg);padding:10px 12px;border-radius:var(--radius-sm)">
+          <span role="img" aria-label="Aviso">⚠️</span> Contas de atendente ficam <strong>pendentes</strong> até ativação pelo administrador.
         </p>
-        <button class="btn btn-primary" style="width:100%;margin-top:20px" onclick="validateStep1()">Continuar</button>
-      </div>
-
-      <!-- PASSO 2 — Dados pessoais -->
-      <div id="step2" style="display:none">
-        <div class="grid grid-2" style="gap:12px">
+        <!-- P4: cadastro mínimo — só o essencial para criar a conta.
+             O resto (documentos extras, endereço, perfil de saúde) vai para
+             "Meu perfil" depois do 1º login. -->
+        <div class="grid grid-2" style="gap:12px;margin-top:16px">
           <div class="field" style="grid-column:1/-1">
-            <label>Nome completo *</label>
-            <input class="input" id="s2_full_name" required>
-          </div> 
-          <div class="field" style="grid-column:1/-1">
-            <label>Nome social <span class="opt">(opcional)</span></label>
-            <input class="input" id="s2_social_name" maxlength="150">
-            <small class="muted" style="display:block;font-size:.78rem;margin-top:6px">
-              Preencha apenas se você tiver um nome pelo qual prefere ser chamado(a), diferente do seu registro civil.
-            </small>
+            <label for="s2_full_name">Nome completo *</label>
+            <input class="input" id="s2_full_name" required autocomplete="name">
           </div>
           <div class="field">
-            <label>Data de nascimento *</label>
+            <label for="s2_birth_date">Data de nascimento *</label>
             <input class="input" id="s2_birth_date" type="date" required>
           </div>
           <div class="field">
-            <label>Gênero *</label>
-            <select class="select" id="s2_gender" required>
-              <option value="">Selecione...</option>
-              <option value="masculino">Masculino</option>
-              <option value="feminino">Feminino</option>
-              <option value="outro">Outro</option>
-              <option value="prefiro_nao_informar">Prefiro não informar</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Tipo sanguíneo <span class="opt">(opcional)</span></label>
-            <select class="select" id="s2_blood_type">
-              <option value="">Não sei / Prefiro não informar</option>
-              <option>A+</option><option>A-</option>
-              <option>B+</option><option>B-</option>
-              <option>AB+</option><option>AB-</option>
-              <option>O+</option><option>O-</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>CPF *</label>
-            <input class="input" id="s2_cpf" placeholder="000.000.000-00" maxlength="14" required>
+            <label for="s2_cpf">CPF *</label>
+            <input class="input" id="s2_cpf" placeholder="000.000.000-00" maxlength="14" required inputmode="numeric">
             <small class="help-text">Usado para garantir que seus agendamentos fiquem vinculados unicamente a você.</small>
           </div>
-          <div class="field">
-            <label>RG *</label>
-            <input class="input" id="s2_rg" placeholder="00.000.000-0" maxlength="12" required>
-          </div>
-          <div class="field">
-            <label>Cartão Nacional de Saúde (CNS) <span class="opt">(opcional)</span></label>
-            <input class="input" id="s2_cns" inputmode="numeric" autocomplete="off" placeholder="000 0000 0000 0000" maxlength="18">
-            <small class="muted" style="display:block;font-size:.78rem;margin-top:6px">
-              O número que consta no seu cartão do SUS (opcional se não tiver em mãos).
-            </small>
-          </div>
-          <div class="field">
-            <label>Nome da mãe *</label>
-            <input class="input" id="s2_mother_name" required>
-          </div>
-          <div class="field">
-            <label>Nome do pai <span class="opt">(opcional)</span></label>
-            <input class="input" id="s2_father_name">
-          </div>
-          <div class="field">
-            <label>Celular *</label>
-            <input class="input" id="s2_mobile" placeholder="(00) 90000-0000" maxlength="16" required>
+          <div class="field" style="grid-column:1/-1">
+            <label for="s2_mobile">Celular *</label>
+            <input class="input" id="s2_mobile" placeholder="(00) 90000-0000" maxlength="16" required inputmode="tel" autocomplete="tel">
             <small class="help-text">Usado para avisar caso sua consulta precise ser reagendada.</small>
           </div>
-          <div class="field">
-            <label>Telefone fixo <span class="opt">(opcional)</span></label>
-            <input class="input" id="s2_phone" placeholder="(00) 0000-0000" maxlength="15">
-          </div>
-          <div class="field">
-            <label>Possui prioridade legal de atendimento? *</label>
-            <select class="select" id="s2_priority">
-              <option value="">Selecione...</option>
-              <option value="nenhuma">Nenhuma</option>
-              <option value="idoso">Idoso(a) (60+)</option>
-              <option value="gestante">Gestante</option>
-              <option value="pcd">Pessoa com deficiência (PCD)</option>
-              <option value="lactante">Lactante</option>
-            </select>
-            <small class="help-text">A Lei 10.048/2000 garante prioridade no atendimento. Se você tem 60 anos ou mais, marcamos "Idoso(a)" automaticamente.</small>
-          </div>
-          <div class="field">
-            <label>Cor ou raça (autodeclaração) <span class="opt">(opcional)</span></label>
-            <select class="select" id="s2_race">
-              <option value="">Prefiro não responder</option>
-              <option value="branca">Branca</option>
-              <option value="preta">Preta</option>
-              <option value="parda">Parda</option>
-              <option value="amarela">Amarela</option>
-              <option value="indigena">Indígena</option>
-              <option value="nao_informar">Prefiro não informar</option>
-            </select>
-            <small class="help-text">Exigência dos cadastros de saúde pública para que as políticas cheguem a todas as comunidades.</small>
-          </div>
           <div class="field" id="s2_guardianField" style="grid-column:1/-1;display:none">
-            <label>Nome do responsável legal / acompanhante *</label>
+            <label for="s2_guardian">Nome do responsável legal / acompanhante *</label>
             <input class="input" id="s2_guardian" maxlength="150">
             <small class="help-text">Menores de 18 anos não comparecem a consultas nem assinam termos de saúde desacompanhados.</small>
           </div>
         </div>
-        <div class="row" style="margin-top:16px">
-          <button class="btn btn-outline" onclick="goStep(1)">Voltar</button>
-          <button class="btn btn-primary" style="flex:1" onclick="validateStep2()">Continuar</button>
-        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:20px" type="button" onclick="validateStep1()">Continuar</button>
       </div>
 
-      <!-- PASSO 3 — Endereço -->
-      <div id="step3" style="display:none">
-        <div class="grid grid-2" style="gap:12px">
-          <div class="field">
-            <label>CEP *</label>
-            <input class="input" id="s3_cep" placeholder="00000-000" maxlength="9" required oninput="maskCep(this)" onblur="lookupCep()">
-          </div>
-          <div class="field">
-            <label>Número *</label>
-            <input class="input" id="s3_number" placeholder="413" required>
-          </div>
-          <div class="field" style="grid-column:1/-1">
-            <label>Rua / Logradouro *</label>
-            <input class="input" id="s3_street" placeholder="Preenchido pelo CEP (editável)" required>
-          </div>
-          <div class="field">
-            <label>Bairro *</label>
-            <input class="input" id="s3_neighborhood" placeholder="Preenchido pelo CEP" required>
-          </div>
-          <div class="field">
-            <label>Cidade *</label>
-            <input class="input" id="s3_city" placeholder="Preenchida pelo CEP" required>
-          </div>
-          <div class="field" style="flex:0 0 80px">
-            <label>UF *</label>
-            <input class="input" id="s3_state" maxlength="2" placeholder="UF" required>
-          </div>
-          <div class="field">
-            <label>Zona *</label>
-            <select class="select" id="s3_zone" required>
-              <option value="">Selecione...</option>
-              <option value="urbana">Urbana</option>
-              <option value="rural">Rural</option>
-            </select>
-          </div>
-          <div class="field" style="grid-column:1/-1">
-            <label id="s3_reference_label">Ponto de referência próximo à residência <span class="opt" id="s3_reference_opt">(opcional na zona urbana)</span></label>
-            <input class="input" id="s3_reference" placeholder="Ex: Próximo à Igreja São José, em frente ao mercadinho X...">
-            <small class="help-text" id="s3_reference_hint">Na zona rural é obrigatório, para a ambulância encontrar a residência: Ex: Sítio São José, após o engenho, próximo à casa de Dona Maria.</small>
-          </div>
-        </div>
-        <p class="muted" style="font-size:.8rem;margin-top:8px">
-          O endereço é preenchido automaticamente pelo CEP — os campos são editáveis se precisar corrigir.
-        </p>
-        <div class="row" style="margin-top:16px">
-          <button class="btn btn-outline" onclick="goStep(2)">Voltar</button>
-          <button class="btn btn-primary" style="flex:1" onclick="validateStep3()">Continuar</button>
-        </div>
-      </div>
-
-      <!-- PASSO 4 — Credenciais -->
-      <div id="step4" style="display:none">
+      <!-- PASSO 2 — Acesso -->
+      <div id="step2" style="display:none">
         <div class="field">
-          <label>E-mail *</label>
+          <label for="s4_email">E-mail *</label>
           <input class="input" id="s4_email" type="email" required autocomplete="email">
         </div>
         <div class="field">
-          <label>Senha * <span class="opt">— mínimo 6 caracteres</span></label>
+          <label for="s4_password">Senha * <span class="opt">— mínimo 6 caracteres</span></label>
           <input class="input" id="s4_password" type="password" required minlength="6" autocomplete="new-password">
           <div class="pw-meter" id="pwMeter"><span></span></div>
           <small class="pw-hint" id="pwHint">&nbsp;</small>
           <small class="help-text">Sua senha é criptografada e ninguém da equipe tem acesso a ela.</small>
         </div>
         <div class="field">
-          <label>Confirmar senha *</label>
+          <label for="s4_confirm">Confirmar senha *</label>
           <input class="input" id="s4_confirm" type="password" required minlength="6" autocomplete="new-password">
         </div>
         <div class="row" style="margin-top:16px">
-          <button class="btn btn-outline" onclick="goStep(3)">Voltar</button>
-          <button class="btn btn-primary" style="flex:1" id="submitBtn" onclick="submitSignup()">Criar conta</button>
+          <button class="btn btn-outline" type="button" onclick="goStep(1)">Voltar</button>
+          <button class="btn btn-primary" style="flex:1" id="submitBtn" type="submit">Criar conta</button>
         </div>
       </div>
+      </form><!-- /signupForm -->
     </div>
 
     <p class="muted" style="font-size:.8rem;margin-top:14px;text-align:center">
@@ -284,6 +164,7 @@
   </div>
 </div>
 
+<script src="assets/ui.js"></script>
 <script>
 let selectedRole = 'paciente';
 
@@ -291,26 +172,61 @@ window.addEventListener('load', ()=>{
   const params = new URLSearchParams(location.search);
   if(params.get('tab')==='signup') switchTab('signup');
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>switchTab(t.dataset.tab)));
+  let mfaTicket = null;
+  function enterWithRole(role){
+    if(role==='admin')     location.href = 'admin.html';
+    else if(role==='atendente') location.href = 'atendente.html';
+    else                   location.href = 'dashboard.html';
+  }
+  // P2b.11/12: Enter dentro do wizard avança a etapa (passo 1 valida;
+  // passo 2 cria a conta). O submit nativo é roteado pela etapa visível, e um
+  // keydown cobre os casos em que o navegador não faz submit implícito
+  // (ex.: botão de submit dentro de passo oculto por display:none).
+  function submitCurrentStep() {
+    const s2 = document.getElementById('step2');
+    if (s2 && s2.style.display !== 'none') submitSignup();
+    else validateStep1();
+  }
+  document.getElementById('signupForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    submitCurrentStep();
+  });
+  document.getElementById('signupForm').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const t = e.target;
+    if (t.closest('button, textarea') || t.type === 'submit' || t.tagName === 'SELECT') return;
+    e.preventDefault();
+    submitCurrentStep();
+  });
   document.getElementById('loginForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
     const f = new FormData(e.target);
     try{
       const data = await authLogin(f.get('email'), f.get('password'));
-      const role = data.user && data.user.role;
-      if(role==='admin')     location.href = 'admin.html';
-      else if(role==='atendente') location.href = 'atendente.html';
-      else                   location.href = 'dashboard.html';
+      if (data.mfa_required) {
+        mfaTicket = data.mfa_ticket;
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('mfaForm').style.display = 'block';
+        document.getElementById('mfaCode').focus();
+        return;
+      }
+      enterWithRole(data.user && data.user.role);
     }catch(err){ toast(err.message||'Erro ao entrar','error'); }
   });
+  document.getElementById('mfaForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const code = document.getElementById('mfaCode').value.trim();
+    try{
+      const data = await apiPost('/auth/mfa/verify', { ticket: mfaTicket, code });
+      setSession(data.token, data.user, data.refreshToken);
+      enterWithRole(data.user && data.user.role);
+    }catch(err){ toast(err.message||'Código inválido','error'); }
+  });
   document.getElementById('s2_cpf').addEventListener('input',   e=>maskCpf(e.target));
-  document.getElementById('s2_cns').addEventListener('input', e=>maskCns(e.target));
   document.getElementById('s2_mobile').addEventListener('input', e=>maskPhone(e.target,true));
-  document.getElementById('s2_phone').addEventListener('input',  e=>maskPhone(e.target,false));
 
-  // V3 — prioridade automática para 60+, responsável para menores (itens 1.4/1.5)
+  // V3 — responsável para menores (item 1.5; prioridade 60+ foi para o perfil)
   document.getElementById('s2_birth_date').addEventListener('change', onBirthDateChange);
-  // V3 — ponto de referência obrigatório só na zona rural (item 1.7)
-  document.getElementById('s3_zone').addEventListener('change', updateReferenceRequirement);
   // V3 — indicador de força de senha (item 1.9)
   document.getElementById('s4_password').addEventListener('input', updatePasswordStrength);
 
@@ -328,64 +244,78 @@ function switchTab(name){
 }
 function selectRole(role){
   selectedRole = role;
-  document.querySelectorAll('.role-card').forEach(c=>c.classList.toggle('selected',c.dataset.role===role));
+  document.querySelectorAll('.role-card').forEach(c=>{c.classList.toggle('selected',c.dataset.role===role);c.setAttribute('aria-checked',c.dataset.role===role?'true':'false');});
   const isAtend = role==='atendente';
   document.getElementById('jobRoleField').style.display  = isAtend?'flex':'none';
   document.getElementById('atendenteNote').style.display = isAtend?'block':'none';
 }
 function goStep(n){
-  for(let i=1;i<=4;i++){
-    document.getElementById('step'+i).style.display = i===n?'block':'none';
+  for(let i=1;i<=2;i++){
+    const step = document.getElementById('step'+i);
+    if (step) step.style.display = i===n?'block':'none';
     const ws = document.getElementById('ws'+i);
+    if (!ws) continue;
     ws.classList.remove('active','done');
     if(i<n) ws.classList.add('done');
     else if(i===n) ws.classList.add('active');
   }
+  // P2b.13: o leitor de tela anuncia a troca (o container tem aria-live).
+  document.getElementById('wizardSteps').setAttribute('aria-label', 'Etapa ' + n + ' de 2');
 }
 function validateStep1(){
-  if(selectedRole !== 'atendente'){ goStep(2); return; }
-  const select=document.getElementById('jobRoleSelect');
-  const other=document.getElementById('jobRoleOther');
-  clearFieldError(select); clearFieldError(other);
-  if(!select.value){
-    setFieldError(select, 'Selecione o cargo / função do atendente para continuar.');
-    select.focus(); return;
+  if(selectedRole === 'atendente'){
+    const select=document.getElementById('jobRoleSelect');
+    const other=document.getElementById('jobRoleOther');
+    clearFieldError(select); clearFieldError(other);
+    if(!select.value){
+      setFieldError(select, 'Selecione o cargo / função do atendente para continuar.');
+      select.focus(); return;
+    }
+    if(select.value==='Outro' && !other.value.trim()){
+      setFieldError(other, 'Informe qual é o cargo / função quando escolher "Outro".');
+      other.focus(); return;
+    }
   }
-  if(select.value==='Outro' && !other.value.trim()){
-    setFieldError(other, 'Informe qual é o cargo / função quando escolher "Outro".');
-    other.focus(); return;
+  // P4: cadastro mínimo — nome, nascimento, CPF e celular.
+  const required = [
+    ['s2_full_name', 'Informe seu nome completo.'],
+    ['s2_birth_date', 'Informe sua data de nascimento.'],
+    ['s2_cpf', 'Informe seu CPF.'],
+    ['s2_mobile', 'Informe seu celular com DDD.'],
+  ];
+  let firstError = null;
+  for(const [id, message] of required){
+    const el = document.getElementById(id);
+    if(!el.value.trim()){ setFieldError(el, message); if(!firstError) firstError = el; }
+    else clearFieldError(el);
   }
+  if(firstError){ showFirstError(firstError); return; }
+
+  const birth = document.getElementById('s2_birth_date');
+  const age = ageFromDate(birth.value);
+  if(age === null || age < 0 || age > 130){
+    setFieldError(birth, 'Data de nascimento inválida.');
+    showFirstError(birth); return;
+  }
+
+  const cpf = document.getElementById('s2_cpf');
+  if(!isValidCPF(cpf.value)){
+    setFieldError(cpf, 'CPF inválido. Confira os números digitados.');
+    showFirstError(cpf); return;
+  }
+
+  const guardian = document.getElementById('s2_guardian');
+  if(age < 18 && !guardian.value.trim()){
+    setFieldError(guardian, 'Informe o nome do responsável legal para menores de 18 anos.');
+    showFirstError(guardian); return;
+  }
+
   goStep(2);
 }
 
-/* ===== V3 — avisos de erro direto no campo errado (item 1.10) ===== */
-function setFieldError(el, message){
-  if(!el) return;
-  const field = el.closest('.field') || el.parentElement;
-  if(field && field !== document.body) field.classList.add('has-error');
-  el.classList.add('has-error');
-  if(!field){ toast(message, 'error'); return; }
-  let msg = field.querySelector('.field-msg');
-  if(!msg){ msg = document.createElement('small'); msg.className = 'field-msg'; field.appendChild(msg); }
-  msg.textContent = message;
-}
-
-function clearFieldError(el){
-  if(!el) return;
-  const field = el.closest('.field') || el.parentElement;
-  if(field && field !== document.body){
-    field.classList.remove('has-error');
-    const msg = field.querySelector('.field-msg');
-    if(msg) msg.remove();
-  }
-  el.classList.remove('has-error');
-}
-
-function showFirstError(el){
-  if(!el) return;
-  el.scrollIntoView({ behavior:'smooth', block:'center' });
-  try { el.focus({ preventScroll:true }); } catch(e){ el.focus(); }
-}
+/* ===== V3 — avisos de erro direto no campo errado (item 1.10) =====
+   P2a.2: setFieldError/clearFieldError/showFirstError agora vivem em
+   assets/ui.js (compartilhado com dashboard/atendente/admin). */
 
 function ageFromDate(birthStr){
   if(!birthStr) return null;
@@ -400,24 +330,12 @@ function ageFromDate(birthStr){
 
 function digitsOnly(v){ return String(v || '').replace(/\D/g, ''); }
 
-function isValidCPF(value){
-  const cpf = digitsOnly(value);
-  if(cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
-  let sum = 0;
-  for(let i = 0; i < 9; i++) sum += Number(cpf[i]) * (10 - i);
-  let d1 = (sum * 10) % 11; if(d1 === 10) d1 = 0;
-  if(d1 !== Number(cpf[9])) return false;
-  sum = 0;
-  for(let i = 0; i < 10; i++) sum += Number(cpf[i]) * (11 - i);
-  let d2 = (sum * 10) % 11; if(d2 === 10) d2 = 0;
-  return d2 === Number(cpf[10]);
-}
+// P2a.4: isValidCPF/isValidCNS vivem em assets/api.js (fonte única no front,
+// mesmas regras do back). A cópia local foi removida para não divergir.
 
-/* ===== V3 — prioridade automática 60+ e responsável de menor (itens 1.4 / 1.5) ===== */
+/* ===== Responsável de menor (a prioridade 60+ foi para "Meu perfil") ===== */
 function onBirthDateChange(){
   const age = ageFromDate(document.getElementById('s2_birth_date').value);
-  const priority = document.getElementById('s2_priority');
-  if(age !== null && age >= 60) priority.value = 'idoso';
 
   const guardianField = document.getElementById('s2_guardianField');
   const guardian = document.getElementById('s2_guardian');
@@ -430,16 +348,6 @@ function onBirthDateChange(){
     guardian.value = '';
     clearFieldError(guardian);
   }
-}
-
-/* ===== V3 — ponto de referência obrigatório só na zona rural (item 1.7) ===== */
-function updateReferenceRequirement(){
-  const zone = document.getElementById('s3_zone').value;
-  const input = document.getElementById('s3_reference');
-  const opt = document.getElementById('s3_reference_opt');
-  const isRural = zone === 'rural';
-  input.required = isRural;
-  opt.textContent = isRural ? '(obrigatório na zona rural)' : '(opcional na zona urbana)';
 }
 
 /* ===== V3 — indicador de senha fraca / média / forte (item 1.9) ===== */
@@ -464,106 +372,6 @@ function updatePasswordStrength(){
   hint.className = 'pw-hint' + (level ? ' ' + level : '');
   hint.textContent = label;
 }
-
-function validateStep2(){
-  const required = [
-    ['s2_full_name', 'Informe seu nome completo.'],
-    ['s2_birth_date', 'Informe sua data de nascimento.'],
-    ['s2_gender', 'Selecione seu gênero.'],
-    ['s2_cpf', 'Informe seu CPF.'],
-    ['s2_rg', 'Informe seu RG.'],
-    ['s2_mother_name', 'Informe o nome da mãe.'],
-    ['s2_mobile', 'Informe seu celular com DDD.'],
-    ['s2_priority', 'Selecione a opção de prioridade de atendimento.'],
-  ];
-  let firstError = null;
-  for(const [id, message] of required){
-    const el = document.getElementById(id);
-    if(!el.value.trim()){ setFieldError(el, message); if(!firstError) firstError = el; }
-    else clearFieldError(el);
-  }
-  if(firstError){ showFirstError(firstError); return; }
-
-  const birth = document.getElementById('s2_birth_date');
-  const age = ageFromDate(birth.value);
-  if(age === null || age < 0 || age > 130){
-    setFieldError(birth, 'Data de nascimento inválida.');
-    showFirstError(birth); return;
-  }
-
-  const cpf = document.getElementById('s2_cpf');
-  if(!isValidCPF(cpf.value)){
-    setFieldError(cpf, 'CPF inválido. Confira os números digitados.');
-    showFirstError(cpf); return;
-  }
-
-  const cns = document.getElementById('s2_cns');
-  const cnsDigits = digitsOnly(cns.value);
-  if(cnsDigits.length !== 0 && cnsDigits.length !== 15){
-    setFieldError(cns, 'O CNS deve conter exatamente 15 números.');
-    showFirstError(cns); return;
-  }
-
-  const guardian = document.getElementById('s2_guardian');
-  if(age < 18 && !guardian.value.trim()){
-    setFieldError(guardian, 'Informe o nome do responsável legal para menores de 18 anos.');
-    showFirstError(guardian); return;
-  }
-
-  goStep(3);
-}
-
-function validateStep3(){
-  const required = [
-    ['s3_cep', 'Informe o CEP.'],
-    ['s3_number', 'Informe o número da residência.'],
-    ['s3_street', 'Informe a rua / logradouro.'],
-    ['s3_neighborhood', 'Informe o bairro.'],
-    ['s3_city', 'Informe a cidade.'],
-    ['s3_state', 'Informe a UF.'],
-    ['s3_zone', 'Selecione a zona (urbana ou rural).'],
-  ];
-  let firstError = null;
-  for(const [id, message] of required){
-    const el = document.getElementById(id);
-    if(!el.value.trim()){ setFieldError(el, message); if(!firstError) firstError = el; }
-    else clearFieldError(el);
-  }
-  if(firstError){ showFirstError(firstError); return; }
-
-  const cep = document.getElementById('s3_cep');
-  if(digitsOnly(cep.value).length !== 8){
-    setFieldError(cep, 'O CEP precisa ter 8 dígitos.');
-    showFirstError(cep); return;
-  }
-
-  const zone = document.getElementById('s3_zone').value;
-  const reference = document.getElementById('s3_reference');
-  if(zone === 'rural' && !reference.value.trim()){
-    setFieldError(reference, 'Na zona rural, o ponto de referência é obrigatório.');
-    showFirstError(reference); return;
-  }
-  clearFieldError(reference);
-
-  goStep(4);
-}
-
-// ViaCEP
-function maskCep(el){ let v=el.value.replace(/\D/g,'').slice(0,8); if(v.length>5) v=v.slice(0,5)+'-'+v.slice(5); el.value=v; }
-async function lookupCep(){
-  const cep = document.getElementById('s3_cep').value.replace(/\D/g,'');
-  if(cep.length!==8) return;
-  try{
-    const r = await fetch('https://viacep.com.br/ws/'+cep+'/json/');
-    const d = await r.json();
-    if(d.erro){ toast('CEP não encontrado.','error'); return; }
-    document.getElementById('s3_street').value       = d.logradouro||'';
-    document.getElementById('s3_neighborhood').value = d.bairro||'';
-    document.getElementById('s3_city').value         = d.localidade||'';
-    document.getElementById('s3_state').value        = d.uf||'';
-  }catch(e){ /* sem internet — usuário preenche manualmente */ }
-}
-
 function toggleOtherJobRole(){
   const select=document.getElementById('jobRoleSelect');
   const other=document.getElementById('jobRoleOther');
@@ -572,10 +380,8 @@ function toggleOtherJobRole(){
   if(!isOther) other.value='';
 }
 
-// Máscaras
-function maskCpf(el){ let v=el.value.replace(/\D/g,'').slice(0,11); v=v.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2'); el.value=v; }
-function maskCns(el){ let v=el.value.replace(/\D/g,'').slice(0,15); if(v.length>3) v=v.slice(0,3)+' '+v.slice(3); if(v.length>8) v=v.slice(0,8)+' '+v.slice(8); if(v.length>13) v=v.slice(0,13)+' '+v.slice(13); el.value=v; }
-function maskPhone(el,mob){ let v=el.value.replace(/\D/g,'').slice(0,mob?11:10); if(mob) v=v.replace(/^(\d{2})(\d)/,'($1) $2').replace(/(\d{5})(\d)/,'$1-$2'); else v=v.replace(/^(\d{2})(\d)/,'($1) $2').replace(/(\d{4})(\d)/,'$1-$2'); el.value=v; }
+// Máscaras: ver assets/ui.js (P4, compartilhadas com a aba Meu perfil).
+// (As definições locais foram removidas para não divergir.)
 
 async function submitSignup(){
   const emailEl  = document.getElementById('s4_email');
@@ -601,31 +407,14 @@ async function submitSignup(){
   const btn = document.getElementById('submitBtn');
   btn.textContent='Criando...'; btn.disabled=true;
 
+  // P4: cadastro mínimo — 9 campos. O resto vai para "Meu perfil" pós-login.
   const payload = {
     role: selectedRole, email, password,
     full_name:    document.getElementById('s2_full_name').value.trim(),
-    social_name:  document.getElementById('s2_social_name').value.trim()||null,
     birth_date:   document.getElementById('s2_birth_date').value||null,
-    gender:       document.getElementById('s2_gender').value||null,
-    blood_type:   document.getElementById('s2_blood_type').value||null,
     cpf:          document.getElementById('s2_cpf').value||null,
-    rg:           document.getElementById('s2_rg').value||null,
-    cns:          document.getElementById('s2_cns').value.replace(/\D/g,'')||null,
-    priority:     document.getElementById('s2_priority').value||null,
-    race:         document.getElementById('s2_race').value||null,
     guardian_name: document.getElementById('s2_guardian').value.trim()||null,
-    mother_name:  document.getElementById('s2_mother_name').value||null,
-    father_name:  document.getElementById('s2_father_name').value||null,
     mobile:       document.getElementById('s2_mobile').value||null,
-    phone:        document.getElementById('s2_phone').value||null,
-    cep:          document.getElementById('s3_cep').value||null,
-    address_number: document.getElementById('s3_number').value||null,
-    street:       document.getElementById('s3_street').value||null,
-    neighborhood: document.getElementById('s3_neighborhood').value||null,
-    city:         document.getElementById('s3_city').value||null,
-    state:        document.getElementById('s3_state').value||null,
-    zone:         document.getElementById('s3_zone').value||null,
-    reference_point: document.getElementById('s3_reference').value||null,
     job_role: selectedRole==='atendente'
       ? (document.getElementById('jobRoleSelect').value==='Outro'
           ? document.getElementById('jobRoleOther').value.trim()

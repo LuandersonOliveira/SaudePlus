@@ -1,19 +1,35 @@
 const express = require('express');
 const pool = require('../db');
 const { verifyToken, requireStaff } = require('../middleware/auth');
-const { logAction } = require('../utils/audit');
-const { validateBooking, validateScheduleWindow } = require('../utils/booking');
+const { applyBookingChange } = require('../utils/booking');
+const { parsePagination } = require('../utils/validators');
 
 const router = express.Router();
 router.use(verifyToken, requireStaff);
 
-const VALID_STATUS = ['pendente', 'confirmado', 'cancelado', 'concluido'];
-const ENTITY_MAP = {
-  appointments: { table: 'appointments', entityType: 'appointment' },
-  exams:        { table: 'exams',        entityType: 'exam'        },
-};
+// Listagem paginável sem quebra: com ?page/?pageSize responde
+// envelope {data,page,pageSize,total}; sem query mantém o array legado.
+async function pagedList(res, next, { baseSql, countSql, params, page, pageSize, offset }) {
+  try {
+    const [rows] = await pool.query(`${baseSql} LIMIT ? OFFSET ?`, [...params, pageSize, offset]);
+    const [[countRow]] = await pool.query(countSql, params);
+    return res.json({ data: rows, page, pageSize, total: Number(countRow.total) });
+  } catch (err) {
+    next(err);
+  }
+}
 
 router.get('/appointments', async (req, res, next) => {
+  const { wantsPaged, page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 50, maxPageSize: 200 });
+  if (wantsPaged) {
+    return pagedList(res, next, {
+      baseSql: `SELECT a.*, u.full_name AS user_name, u.email AS user_email
+       FROM appointments a JOIN users u ON u.id = a.user_id
+       ORDER BY a.scheduled_at DESC`,
+      countSql: 'SELECT COUNT(*) AS total FROM appointments',
+      params: [], page, pageSize, offset,
+    });
+  }
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
     const [rows] = await pool.query(
@@ -26,6 +42,16 @@ router.get('/appointments', async (req, res, next) => {
 });
 
 router.get('/exams', async (req, res, next) => {
+  const { wantsPaged, page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 50, maxPageSize: 200 });
+  if (wantsPaged) {
+    return pagedList(res, next, {
+      baseSql: `SELECT e.*, u.full_name AS user_name, u.email AS user_email
+       FROM exams e JOIN users u ON u.id = e.user_id
+       ORDER BY e.scheduled_at DESC`,
+      countSql: 'SELECT COUNT(*) AS total FROM exams',
+      params: [], page, pageSize, offset,
+    });
+  }
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
     const [rows] = await pool.query(
@@ -58,13 +84,18 @@ router.get('/patients', async (req, res, next) => {
 });
 
 // Histórico completo de um paciente (sem CPF/RG)
+//
+// Segurança (P0.2): só pacientes ATIVOS. Antes o filtro era só por `role`, e
+// o front escondia o botão de histórico para contas inativas/pendentes — mas a
+// API aceitava o `user_id` vindo de /staff/appointments. Agora o servidor
+// bloqueia (front não é controle de segurança) e a LEITURA é auditada.
 router.get('/patients/:id/history', async (req, res, next) => {
   try {
     const [[user]] = await pool.query(
       `SELECT id, full_name, email, phone, mobile, birth_date, gender, blood_type
-       FROM users WHERE id = ? AND role = 'paciente'`, [req.params.id]
+       FROM users WHERE id = ? AND role = 'paciente' AND account_status = 'ativo'`, [req.params.id]
     );
-    if (!user) return res.status(404).json({ error: 'Paciente não encontrado.' });
+    if (!user) return res.status(404).json({ error: 'Paciente não encontrado ou conta inativa.' });
 
     const [appointments] = await pool.query(
       'SELECT * FROM appointments WHERE user_id = ? ORDER BY scheduled_at DESC', [req.params.id]
@@ -72,64 +103,24 @@ router.get('/patients/:id/history', async (req, res, next) => {
     const [exams] = await pool.query(
       'SELECT * FROM exams WHERE user_id = ? ORDER BY scheduled_at DESC', [req.params.id]
     );
+    await req.audit('staff_view_history', 'user', req.params.id,
+      `histórico lido: ${appointments.length} consulta(s), ${exams.length} exame(s)`);
     res.json({ user, appointments, exams });
   } catch (err) { next(err); }
 });
 
-// PATCH /:kind/:id — mesma lógica de confirmação/cancelamento/reagendamento do admin
+// PATCH /:kind/:id — mesma lógica de confirmação/cancelamento/reagendamento do admin.
+// Regra única em booking.js (Fase 2, item 3); aqui só chama e audita.
 router.patch('/:kind/:id', async (req, res, next) => {
   try {
-    const entity = ENTITY_MAP[req.params.kind];
-    if (!entity) return res.status(404).json({ error: 'Tipo inválido.' });
-
-    const { status, scheduled_at } = req.body || {};
-    const updates = [];
-    const params = [];
-    const logParts = [];
-
-    if (status !== undefined) {
-      if (!VALID_STATUS.includes(status)) {
-        return res.status(400).json({ error: 'Status inválido.' });
-      }
-      updates.push('status=?'); params.push(status); logParts.push(`status -> ${status}`);
-    }
-    if (scheduled_at) {
-      const windowError = validateScheduleWindow(scheduled_at);
-      if (windowError) return res.status(400).json({ error: windowError });
-      updates.push('scheduled_at=?'); params.push(scheduled_at);
-      logParts.push(`reagendado para ${scheduled_at}`);
-    }
-    if (!updates.length) return res.status(400).json({ error: 'Nada para atualizar.' });
-
-    // Se o registro tem profissional vinculado, revalida disponibilidade
-    // (dias/horários, conflito e bloqueios) — item 4.5.
-    if (scheduled_at) {
-      const serviceColumn = entity.entityType === 'appointment' ? 'specialty' : 'exam_type';
-      const [[record]] = await pool.query(
-        `SELECT professional_id, unit_id, ${serviceColumn} AS service_name FROM ${entity.table} WHERE id = ?`,
-        [req.params.id]
-      );
-      if (record && record.professional_id && record.unit_id) {
-        const bookingError = await validateBooking(pool, {
-          kind: entity.entityType === 'appointment' ? 'consulta' : 'exame',
-          unitId: record.unit_id,
-          professionalId: record.professional_id,
-          serviceName: record.service_name,
-          scheduledAt: scheduled_at,
-          excludeId: req.params.id,
-        });
-        if (bookingError) return res.status(409).json({ error: bookingError });
-      }
-    }
-
-    params.push(req.params.id);
-    const [result] = await pool.query(
-      `UPDATE ${entity.table} SET ${updates.join(', ')} WHERE id=?`, params
-    );
-    if (result.affectedRows === 0) return res.status(404).json({ error: 'Registro não encontrado.' });
-
-    await logAction(req.user.id, 'staff_update', entity.entityType, req.params.id, logParts.join('; '));
-    res.json({ id: req.params.id });
+    const result = await applyBookingChange(pool, {
+      kindKey: req.params.kind,
+      id: req.params.id,
+      body: req.body || {},
+    });
+    if (result.status !== 200) return res.status(result.status).json(result.body);
+    await req.audit('staff_update', result.audit.entityType, req.params.id, result.audit.details);
+    res.json(result.body);
   } catch (err) { next(err); }
 });
 

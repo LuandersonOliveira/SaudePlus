@@ -1,8 +1,7 @@
 <!--
-  AVISO PARA QUEM ESTÁ EDITANDO: este texto foi escrito em linguagem simples
-  para ser honesto e compreensível, mas NÃO é um documento jurídico revisado
-  por advogado. Antes de publicar para uso real com dados de pacientes,
-  vale ter alguém com conhecimento em LGPD revisando este conteúdo.
+  AVISO: texto estruturado conforme a LGPD (Fase 1), mas AINDA NÃO revisado
+  por advogado. Antes do uso real com dados da população, a Secretaria deve
+  submeter esta política + docs/ROPA.md + docs/RIPD.md à Procuradoria/DPO.
 -->
 <!doctype html>
 <html lang="pt-BR">
@@ -10,7 +9,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Política de Privacidade | Saúde+</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="assets/styles.css">
 </head>
 <body>
@@ -23,42 +21,96 @@
 
 <main class="container" style="max-width:720px">
   <h1>Política de Privacidade</h1>
-  <p class="muted">Última atualização: junho de 2026. Escrita em linguagem simples, sem juridiquês.</p>
+  <p class="muted">Versão v1-2026-10-09. Escrita em linguagem simples, sem juridiquês.</p>
 
   <div class="card" style="margin-top:24px">
-    <h3>Quais dados coletamos</h3>
-    <p>Quando você cria uma conta: nome completo, e-mail, telefone (opcional) e uma senha (que nunca guardamos em texto puro — ela é criptografada). Quando você usa o sistema: as consultas e os exames que você mesmo cadastra, incluindo local, data/hora e observações que você escrever.</p>
+    <h3>Quem cuida dos seus dados</h3>
+    <p><strong>Controladora:</strong> Secretaria Municipal de Saúde de Lagoa de Itaenga/PE
+    (opera o Saúde+ para executar políticas públicas do SUS).
+    <strong>Encarregado (DPO):</strong> <span id="dpoContact">carregando…</span></p>
   </div>
 
   <div class="card" style="margin-top:16px">
-    <h3>Por que coletamos esses dados</h3>
-    <p>Para que você consiga agendar e acompanhar suas próprias consultas e exames, e para que a equipe de saúde responsável pelo seu atendimento saiba quem você é e o que foi solicitado.</p>
+    <h3>Quais dados coletamos</h3>
+    <p><strong>Cadastro:</strong> nome, nome social (opcional), e-mail, telefones,
+    CPF, RG, Cartão SUS (CNS), nascimento, endereço e dados de perfil de saúde
+    (tipo sanguíneo, prioridade legal, etc.). <strong>Uso:</strong> consultas e exames
+    que você agenda (local, data/hora, profissional, observações) e lembretes gerados.</p>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Por que podemos tratar — base legal (LGPD)</h3>
+    <p>Seus dados de saúde são <strong>dados sensíveis</strong> e só são tratados porque a lei
+    permite, nas hipóteses do <strong>art. 11 da LGPD</strong>:</p>
+    <ul>
+      <li><strong>Tutela da saúde</strong> (art. 11, II, f) — organizar seu atendimento na rede municipal;</li>
+      <li><strong>Execução de política pública de saúde</strong> (art. 11, II, b + art. 23) — SUS, Lei 8.080/1990.</li>
+    </ul>
+    <p>Não pedimos "aceite" genérico porque o fundamento é legal, não consentimento.
+    Se um dia usarmos seus dados para algo fora do SUS (pesquisa, por exemplo),
+    pediremos autorização específica e destacada — e você poderá revogar quando quiser.</p>
   </div>
 
   <div class="card" style="margin-top:16px">
     <h3>Quem pode ver seus dados</h3>
-    <p>Você mesmo, sempre. E a equipe administrativa autorizada (contas com papel de administrador), que precisa dessa informação para organizar os atendimentos da rede de saúde. Nenhum outro usuário do sistema tem acesso ao seu histórico — cada pessoa só enxerga os próprios agendamentos.</p>
+    <p>Você (só os seus). Atendentes veem o necessário para confirmar seu atendimento
+    (sem CPF/RG). Administradores da Secretaria veem o cadastro completo, com cada
+    acesso registrado em trilha de auditoria. Nenhum paciente vê dado de outro paciente.
+    Dados nunca são vendidos nem usados para vantagem econômica.</p>
   </div>
 
   <div class="card" style="margin-top:16px">
-    <h3>Como protegemos seus dados</h3>
-    <p>Sua senha é armazenada de forma criptografada, nunca em texto legível. Todo acesso ao sistema exige login, e cada solicitação é verificada antes de qualquer dado ser entregue.</p>
+    <h3>Como protegemos</h3>
+    <p>Senha com hash irreversível; CPF/RG/CNS <strong>cifrados no banco</strong> (AES-256);
+    sessão curta com renovação controlada; bloqueio contra tentativas de invasão;
+    acessos por papel (paciente/atendente/admin); backups e retenção controlada.
+    Detalhes técnicos: <code>docs/PLANO_RNDS_LGPD.md</code>.</p>
   </div>
 
   <div class="card" style="margin-top:16px">
-    <h3>Seus direitos</h3>
-    <p>Você pode pedir a exclusão da sua conta e dos seus dados a qualquer momento, entrando em contato pelo e-mail abaixo. Também pode pedir para ver tudo que temos cadastrado sobre você.</p>
+    <h3>Seus direitos (LGPD, art. 18)</h3>
+    <ul>
+      <li><strong>Ver tudo:</strong> logado, peça sua cópia em <em>Meu painel → seus dados</em>
+      (ou via API <code>GET /auth/me/export</code>);</li>
+      <li><strong>Corrigir:</strong> edite seu perfil em <em>Meu painel</em> (<code>PUT /auth/me</code>);</li>
+      <li><strong>Excluir:</strong> <code>DELETE /auth/me</code> com sua senha — seu perfil é
+      anonimizado, agendamentos futuros cancelados e a conta desativada.
+      O histórico clínico vira estatística anônima e a auditoria é preservada por obrigação legal;</li>
+      <li><strong>Falar com o DPO:</strong> contato acima. Respondemos em até 15 dias.</li>
+    </ul>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Por quanto tempo guardamos</h3>
+    <p>Enquanto sua conta estiver ativa. Contas de paciente sem acesso há mais de
+    <strong>5 anos</strong> têm o perfil anonimizado automaticamente. Registros de saúde
+    seguem os prazos legais do SUS. Tabela completa em <code>docs/ROPA.md</code>.</p>
   </div>
 
   <div class="card" style="margin-top:16px">
     <h3>Contato</h3>
-    <!-- TODO: trocar pelo contato real antes de publicar -->
-    <p>Dúvidas sobre seus dados? Escreva para <a href="mailto:contato@saudemais.app">contato@saudemais.app</a>.</p>
+    <p>Dúvidas sobre seus dados? Escreva para o Encarregado: <span id="dpoContact2">carregando…</span></p>
   </div>
 </main>
 
 <footer style="text-align:center;padding:32px;color:var(--muted);font-size:.85rem">
-  © Saúde+ — Versão HTML/CSS/JS
+  © Saúde+ — Feito para Lagoa de Itaenga
 </footer>
+<script>
+var API = (window.API_BASE || 'http://localhost:4000');
+fetch(API + '/public/dpo')
+  .then(function (r) { return r.json(); })
+  .then(function (d) {
+    var txt = (d.configured && d.email)
+      ? d.name + ' — ' + d.email
+      : 'a definir pela Secretaria (configure DPO_NAME/DPO_EMAIL na API)';
+    document.getElementById('dpoContact').textContent = txt;
+    document.getElementById('dpoContact2').textContent = txt;
+  })
+  .catch(function () {
+    document.getElementById('dpoContact').textContent = 'indisponível no momento — tente mais tarde.';
+    document.getElementById('dpoContact2').textContent = 'indisponível no momento — tente mais tarde.';
+  });
+</script>
 </body>
 </html>

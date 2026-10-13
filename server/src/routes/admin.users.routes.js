@@ -1,10 +1,25 @@
 const express = require('express');
 const pool = require('../db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
-const { logAction } = require('../utils/audit');
+const { requireCapability } = require('../middleware/capabilities');
+const { audit } = require('../middleware/audit');
 
 const router = express.Router();
 router.use(verifyToken, requireAdmin);
+
+// Segurança (P0.4): a gestão de usuários passa a exigir a permissão 'users'.
+// Até aqui `admin_level` só era usado para trocar o nível de outro admin —
+// qualquer admin (inclusive 'atendimento'/'alertas') tinha poder total aqui.
+router.use(requireCapability('users'));
+
+// Hierarquia de privilégio — impede escalonamento lateral (P0.4).
+// Um admin não pode alterar o status de alguém de nível igual ou superior.
+const LEVEL_RANK = { superadmin: 4, gestor: 3, atendimento: 2, alertas: 1 };
+const SELF_RANK = 4; // admin sem admin_level explícito é tratado como gestor (fallback do middleware)
+
+function actorRank(user) {
+  return LEVEL_RANK[user.admin_level] ?? LEVEL_RANK.gestor;
+}
 
 const SAFE_ROLES = ['paciente', 'atendente', 'admin'];
 const SAFE_STATUSES = ['ativo', 'inativo', 'pendente'];
@@ -46,8 +61,11 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// GET /admin/users/:id — perfil completo incluindo CPF/RG (admin only)
-router.get('/:id', async (req, res, next) => {
+// GET /admin/users/:id — perfil completo incluindo CPF/RG (admin only).
+// A leitura dos documentos é auditada pelo middleware declarativo (Fase 3).
+router.get('/:id',
+  audit('admin_view_user_docs', 'user', (req) => req.params.id, 'visualizou documentos'),
+  async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       `SELECT id, full_name, social_name, email, role, account_status,
@@ -61,7 +79,13 @@ router.get('/:id', async (req, res, next) => {
       [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Usuário não encontrado.' });
-    res.json(rows[0]);
+    // Fase 1: documentos saem cifrados do banco e são decifrados só aqui,
+    // no endpoint que já exige requireAdmin.
+    const user = rows[0];
+    for (const col of ['cpf', 'rg', 'cns']) {
+      try { user[col] = req.decryptDoc(user[col]); } catch { user[col] = '[ilegível: chave ausente]'; }
+    }
+    res.json(user);
   } catch (err) {
     next(err);
   }
@@ -77,10 +101,22 @@ router.patch('/:id', async (req, res, next) => {
     const logParts = [];
 
     const [[currentUser]] = await pool.query(
-      'SELECT account_status, job_role, admin_level FROM users WHERE id = ?',
+      'SELECT account_status, job_role, admin_level, role FROM users WHERE id = ?',
       [req.params.id]
     );
     if (!currentUser) return res.status(404).json({ error: 'Usuário não encontrado.' });
+
+    // Segurança (P0.4): escalonamento lateral. Um admin de nível inferior
+    // (ou igual) não pode desativar nem rebaixar alguém de nível superior —
+    // antes isso permitia, por exemplo, um 'atendimento' desativar o superadmin.
+    if (currentUser.role === 'admin') {
+      const targetRank = LEVEL_RANK[currentUser.admin_level] ?? LEVEL_RANK.gestor;
+      if (actorRank(req.user) <= targetRank) {
+        return res.status(403).json({
+          error: 'Você não pode alterar uma conta de nível administrativo igual ou superior ao seu.',
+        });
+      }
+    }
 
     if (account_status !== undefined) {
       if (!SAFE_STATUSES.includes(account_status)) {
@@ -102,6 +138,10 @@ router.patch('/:id', async (req, res, next) => {
     if (admin_level !== undefined) {
       if (req.user.admin_level !== 'superadmin') return res.status(403).json({ error: 'Somente o superadmin pode alterar níveis administrativos.' });
       if (!SAFE_ADMIN_LEVELS.includes(admin_level)) return res.status(400).json({ error: 'Nível administrativo inválido.' });
+      // Não pode rebaixar para baixo do próprio nível.
+      if ((LEVEL_RANK[admin_level] ?? 0) < actorRank(req.user)) {
+        return res.status(403).json({ error: 'Você não pode definir um nível abaixo do seu.' });
+      }
       updates.push('admin_level=?'); params.push(admin_level); logParts.push(`nível admin -> ${admin_level}`);
     }
 
@@ -123,7 +163,7 @@ router.patch('/:id', async (req, res, next) => {
     if (admin_level !== undefined && admin_level !== currentUser.admin_level) {
       previous.push(`nível admin: ${currentUser.admin_level || 'gestor'} -> ${admin_level}`);
     }
-    await logAction(req.user.id, 'admin_update_user', 'user', req.params.id,
+    await req.audit('admin_update_user', 'user', req.params.id,
       `${previous.join('; ')}${logParts.length ? `; ${logParts.join('; ')}` : ''}`);
     res.json({ ok: true });
   } catch (err) {

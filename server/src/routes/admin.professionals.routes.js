@@ -9,10 +9,11 @@ const express = require('express');
 const crypto = require('crypto');
 const pool = require('../db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
-const { logAction } = require('../utils/audit');
+const { requireCapability } = require('../middleware/capabilities');
 
 const router = express.Router();
-router.use(verifyToken, requireAdmin);
+// P3: gestão de profissionais/agenda exige a permissão 'units'.
+router.use(verifyToken, requireAdmin, requireCapability('units'));
 
 const KINDS = ['consulta', 'exame'];
 const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/;
@@ -78,7 +79,7 @@ router.post('/', async (req, res, next) => {
       [id, String(name).trim(), jobTitle || null, registry || null]
     );
     const reason = reasonOf(req);
-    await logAction(req.user.id, 'create', 'professional', id,
+    await req.audit('create', 'professional', id,
       `profissional "${String(name).trim()}"${reason ? `; motivo: ${reason}` : ''}`);
     res.status(201).json({ id });
   } catch (err) { next(err); }
@@ -124,7 +125,7 @@ router.patch('/:id', async (req, res, next) => {
     await pool.query(`UPDATE professionals SET ${updates.join(', ')} WHERE id=?`, params);
 
     const reason = reasonOf(req);
-    await logAction(req.user.id, 'admin_update_professional', 'professional', req.params.id,
+    await req.audit('admin_update_professional', 'professional', req.params.id,
       `${details.join('; ')}${reason ? `; motivo: ${reason}` : ''}`);
     res.json({ ok: true });
   } catch (err) { next(err); }
@@ -150,7 +151,7 @@ router.post('/:id/offers', async (req, res, next) => {
       [id, req.params.id, unitId, kind, serviceName]
     );
     const reason = reasonOf(req);
-    await logAction(req.user.id, 'create', 'professional_offer', id,
+    await req.audit('create', 'professional_offer', id,
       `vínculo: ${serviceName} (${kind}) em ${unit.name}${reason ? `; motivo: ${reason}` : ''}`);
     res.status(201).json({ id });
   } catch (err) { next(err); }
@@ -167,7 +168,7 @@ router.delete('/:id/offers/:offerId', async (req, res, next) => {
     if (!offer) return res.status(404).json({ error: 'Vínculo não encontrado.' });
     await pool.query('DELETE FROM professional_offers WHERE id = ?', [req.params.offerId]);
     const reason = reasonOf(req);
-    await logAction(req.user.id, 'delete', 'professional_offer', req.params.offerId,
+    await req.audit('delete', 'professional_offer', req.params.offerId,
       `vínculo removido: ${offer.name} (${offer.kind}) em ${offer.unit_name}${reason ? `; motivo: ${reason}` : ''}`);
     res.status(204).end();
   } catch (err) { next(err); }
@@ -203,7 +204,7 @@ router.post('/:id/schedules', async (req, res, next) => {
     );
     const reason = reasonOf(req);
     const WEEK = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
-    await logAction(req.user.id, 'create', 'work_schedule', id,
+    await req.audit('create', 'work_schedule', id,
       `${WEEK[wd]} ${start.slice(0, 5)}-${end.slice(0, 5)} (${slot} min) em ${label}${reason ? `; motivo: ${reason}` : ''}`);
     res.status(201).json({ id });
   } catch (err) {
@@ -223,7 +224,7 @@ router.delete('/:id/schedules/:scheduleId', async (req, res, next) => {
     if (!row) return res.status(404).json({ error: 'Horário não encontrado.' });
     await pool.query('DELETE FROM work_schedules WHERE id = ?', [req.params.scheduleId]);
     const reason = reasonOf(req);
-    await logAction(req.user.id, 'delete', 'work_schedule', req.params.scheduleId,
+    await req.audit('delete', 'work_schedule', req.params.scheduleId,
       `horário de atendimento removido${reason ? `; motivo: ${reason}` : ''}`);
     res.status(204).end();
   } catch (err) { next(err); }
@@ -254,7 +255,7 @@ router.post('/:id/blocks', async (req, res, next) => {
       'INSERT INTO schedule_blocks (id, professional_id, unit_id, starts_at, ends_at, reason) VALUES (?,?,?,?,?,?)',
       [id, req.params.id, unitId, start, end, reason || null]
     );
-    await logAction(req.user.id, 'create', 'schedule_block', id,
+    await req.audit('create', 'schedule_block', id,
       `bloqueio de ${start} a ${end} em ${label}${reason ? `; motivo: ${reason}` : ''}`);
     res.status(201).json({ id });
   } catch (err) { next(err); }
@@ -269,7 +270,7 @@ router.delete('/:id/blocks/:blockId', async (req, res, next) => {
     if (!row) return res.status(404).json({ error: 'Bloqueio não encontrado.' });
     await pool.query('DELETE FROM schedule_blocks WHERE id = ?', [req.params.blockId]);
     const reason = reasonOf(req);
-    await logAction(req.user.id, 'delete', 'schedule_block', req.params.blockId,
+    await req.audit('delete', 'schedule_block', req.params.blockId,
       `bloqueio removido${reason ? `; motivo: ${reason}` : ''}`);
     res.status(204).end();
   } catch (err) { next(err); }

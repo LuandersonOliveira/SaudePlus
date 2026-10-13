@@ -5,116 +5,129 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Meu painel | Saúde+</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="assets/styles.css">
   <script defer src="assets/api.js"></script>
 </head>
 
 <body>
-  <header class="topbar">
-    <a class="brand" href="index.html"><span class="brand-dot"></span>Saúde+</a>
-    <nav class="nav">
-      <span id="userEmail" class="muted"></span>
-      <button class="btn btn-outline btn-sm" onclick="signOut()">Sair</button>
-    </nav>
-  </header>
-
-  <main class="container">
-    <h1>Meu painel</h1>
-    <p class="muted">Acompanhe seus agendamentos, exames e alertas de saúde.</p>
-
-    <div class="tabs" role="tablist">
+  <a class="sr-only" href="#conteudo">Pular para o conteúdo</a>
+  <div class="app-shell">
+  <aside class="app-rail">
+    <a class="brand rail-brand" href="index.html"><span class="brand-dot"></span>Saúde+</a>
+    <nav class="tabs sidebar" role="tablist" aria-label="Navegação do painel">
       <button class="tab active" data-tab="inicio" role="tab" aria-selected="true" id="tab-inicio"
         aria-controls="inicio">Início</button>
+      <button class="tab" data-tab="agendar" role="tab" aria-selected="false" id="tab-agendar"
+        aria-controls="agendar">Agendar</button>
       <button class="tab" data-tab="agendamentos" role="tab" aria-selected="false" id="tab-agendamentos"
-        aria-controls="agendamentos">Minha agenda</button>
-      <button class="tab" data-tab="consultas" role="tab" aria-selected="false" id="tab-consultas"
-        aria-controls="consultas">Consultas</button>
-      <button class="tab" data-tab="exames" role="tab" aria-selected="false" id="tab-exames"
-        aria-controls="exames">Exames</button>
+        aria-controls="agendamentos">Meus agendamentos</button>
       <button class="tab" data-tab="alertas" role="tab" aria-selected="false" id="tab-alertas"
         aria-controls="alertas">Alertas</button>
+      <button class="tab" data-tab="minha-conta" role="tab" aria-selected="false" id="tab-minha-conta"
+        aria-controls="minha-conta">Minha conta</button>
+    </nav>
+    <div class="rail-user">
+      <div class="rail-user-head">
+        <span class="badge">Paciente</span>
+        <span class="rail-user-name" id="userName"></span>
+        <span class="rail-user-email" id="userEmail"></span>
+      </div>
+      <button class="btn btn-outline btn-sm rail-signout" type="button" onclick="signOut()">Sair</button>
     </div>
+  </aside>
+
+  <div class="app-main">
+  <main class="container" id="conteudo">
+    <h1>Meu painel</h1>
+    <p class="muted">Acompanhe seus agendamentos, exames e alertas de saúde.</p>
 
     <!-- INÍCIO -->
     <section class="tabpanel active" id="inicio" role="tabpanel" aria-labelledby="tab-inicio">
       <div id="welcomeBanner"></div>
+      <div id="profileBanner"></div>
       <div class="grid grid-5" id="stats"></div>
       <div class="card" style="margin-top:16px">
-        <h3>Próximos eventos</h3>
+        <h2>Próximos eventos</h2>
         <div id="upcoming">
-          <div class="spinner"></div>
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
       <div class="card" style="margin-top:16px">
-        <h3>Lembretes</h3>
+        <h2>Lembretes</h2>
         <div id="reminders">
-          <div class="spinner"></div>
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
     </section>
 
-    <!-- MINHA AGENDA -->
+    <!-- MEUS AGENDAMENTOS -->
     <section class="tabpanel" id="agendamentos" role="tabpanel" aria-labelledby="tab-agendamentos">
       <div class="card">
-        <h3>Todos os meus agendamentos</h3>
+        <h2>Todos os meus agendamentos</h2>
         <p class="muted" style="margin-top:-8px;margin-bottom:16px">Consultas e exames — ativos, confirmados e
           cancelados.</p>
         <div id="allScheduled">
-          <div class="spinner"></div>
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Minhas consultas</h2>
+        <div id="appts">
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h2>Meus exames</h2>
+        <div id="exams">
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
     </section>
 
-    <!-- CONSULTAS -->
-    <section class="tabpanel" id="consultas" role="tabpanel" aria-labelledby="tab-consultas">
-      <div class="card">
+    <!-- AGENDAR (consulta ou exame) -->
+    <section class="tabpanel" id="agendar" role="tabpanel" aria-labelledby="tab-agendar">
+      <div class="tabs" role="tablist" aria-label="Tipo de agendamento" style="margin-bottom:16px">
+        <button class="tab active" type="button" id="kindAppt" onclick="setBookingKind('appointments')">Consulta</button>
+        <button class="tab" type="button" id="kindExam" onclick="setBookingKind('exams')">Exame</button>
+      </div>
+      <div class="card" id="apptFormCard">
         <p class="edit-banner" id="apptEditBanner" style="display:none">Você está editando este agendamento.</p>
-        <h3 id="apptFormTitle">Agendar consulta</h3>
-        <form id="apptForm" class="grid grid-2">
+        <h2 id="apptFormTitle">Agendar consulta</h2>
+        <form id="apptForm" class="grid grid-2" novalidate>
           <div class="field" style="grid-column:1/-1">
-            <label>Local — Posto de Saúde / PSF *</label>
-            <select class="select" name="location" id="apptLocationSelect" required>
-              <option value="">Carregando...</option>
+            <label for="apptServiceSelect">Especialidade *</label>
+            <select class="select" id="apptServiceSelect">
+              <option value="">Carregando serviços...</option>
             </select>
-          </div>
-          <div class="field">
-            <label>Especialidade *</label>
-            <select class="select" id="specialtySelect">
-              <option value="">Escolha a unidade primeiro</option>
-            </select>
+            <label for="specialtyOutra" class="sr-only">Digite a especialidade</label>
             <input class="input" name="specialty_outra" id="specialtyOutra" placeholder="Digite a especialidade"
               style="display:none;margin-top:8px">
             <small class="help-text" id="apptServiceHelp" style="display:none"></small>
           </div>
-          <div class="field">
-            <label>Profissional *</label>
-            <select class="select" id="apptDoctorSelect" disabled>
-              <option value="">Escolha a especialidade primeiro</option>
-            </select>
-            <input type="hidden" name="doctor" id="apptDoctorName">
-            <small class="help-text" id="apptDoctorHelp" style="display:none"></small>
+          <div class="field" style="grid-column:1/-1">
+            <div class="muted" id="apptSlotsHint" style="font-size:.9rem">Escolha um serviço para ver as vagas livres.</div>
+            <div id="apptSlotsPanel" class="slots-panel" aria-live="polite"></div>
           </div>
-          <div class="field">
-            <label>Dia *</label>
-            <select class="select" id="apptDateSelect" disabled>
-              <option value="">Escolha o profissional primeiro</option>
-            </select>
+          <div id="apptManualBlock" style="grid-column:1/-1;display:none">
+            <div class="grid grid-2">
+              <div class="field">
+                <label for="apptManualUnit">Unidade *</label>
+                <select class="select" id="apptManualUnit"><option value="">Selecione...</option></select>
+              </div>
+              <div class="field">
+                <label for="apptManualDate">Data/hora *</label>
+                <input class="input" id="apptManualDate" type="datetime-local">
+              </div>
+            </div>
+            <p class="muted" style="font-size:.9rem">Sem vaga na grade? A unidade aloca o atendimento e confirma depois.</p>
           </div>
-          <div class="field">
-            <label>Horário *</label>
-            <select class="select" id="apptTimeSelect" disabled>
-              <option value="">Escolha o dia primeiro</option>
-            </select>
+          <div class="field" id="apptSummaryField" style="grid-column:1/-1;display:none">
+            <div class="slot-summary" id="apptSelectionSummary"></div>
           </div>
-          <div class="field" id="apptManualDateField" style="grid-column:1/-1;display:none">
-            <label>Data/hora *</label>
-            <input class="input" id="apptManualDate" type="datetime-local">
-          </div>
-          <div class="field" style="grid-column:1/-1"><label>Observações</label><textarea class="textarea"
-              name="notes"></textarea></div>
+          <div class="field" style="grid-column:1/-1"><label for="apptNotes">Observações</label><textarea class="textarea"
+              name="notes" id="apptNotes"></textarea></div>
           <div class="row" style="grid-column:1/-1">
-            <button class="btn btn-primary" type="submit">Agendar</button>
+            <button class="btn btn-primary" type="submit" id="apptSubmitBtn" disabled>Agendar</button>
             <button type="button" id="apptCancel" class="btn btn-outline btn-sm"
               onclick="clearApptForm()">Cancelar</button>
             <button type="button" id="apptCancelEdit" class="btn btn-outline btn-sm" style="display:none"
@@ -122,63 +135,44 @@
           </div>
         </form>
       </div>
-      <div class="card" style="margin-top:16px">
-        <h3>Minhas consultas</h3>
-        <div id="appts">
-          <div class="spinner"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- EXAMES -->
-    <section class="tabpanel" id="exames" role="tabpanel" aria-labelledby="tab-exames">
-      <div class="card">
+      <div class="card" id="examFormCard" style="margin-top:16px;display:none">
         <p class="edit-banner" id="examEditBanner" style="display:none">Você está editando este agendamento.</p>
-        <h3 id="examFormTitle">Agendar exame</h3>
-        <form id="examForm" class="grid grid-2">
+        <h2 id="examFormTitle">Agendar exame</h2>
+        <form id="examForm" class="grid grid-2" novalidate>
           <div class="field" style="grid-column:1/-1">
-            <label>Local *</label>
-            <select class="select" name="location" id="examLocationSelect" required>
-              <option value="">Carregando...</option>
+            <label for="examServiceSelect">Tipo de exame *</label>
+            <select class="select" id="examServiceSelect">
+              <option value="">Carregando serviços...</option>
             </select>
-          </div>
-          <div class="field">
-            <label>Tipo de exame *</label>
-            <select class="select" id="examTypeSelect">
-              <option value="">Escolha a unidade primeiro</option>
-            </select>
+            <label for="examTypeOutro" class="sr-only">Digite o tipo de exame</label>
             <input class="input" name="exam_type_outro" id="examTypeOutro" placeholder="Digite o tipo de exame"
               style="display:none;margin-top:8px">
             <small class="help-text" id="examServiceHelp" style="display:none"></small>
           </div>
-          <div class="field">
-            <label>Profissional *</label>
-            <select class="select" id="examDoctorSelect" disabled>
-              <option value="">Escolha o tipo de exame primeiro</option>
-            </select>
-            <input type="hidden" name="doctor" id="examDoctorName">
-            <small class="help-text" id="examDoctorHelp" style="display:none"></small>
+          <div class="field" style="grid-column:1/-1">
+            <div class="muted" id="examSlotsHint" style="font-size:.9rem">Escolha um serviço para ver as vagas livres.</div>
+            <div id="examSlotsPanel" class="slots-panel" aria-live="polite"></div>
           </div>
-          <div class="field">
-            <label>Dia *</label>
-            <select class="select" id="examDateSelect" disabled>
-              <option value="">Escolha o profissional primeiro</option>
-            </select>
+          <div id="examManualBlock" style="grid-column:1/-1;display:none">
+            <div class="grid grid-2">
+              <div class="field">
+                <label for="examManualUnit">Unidade *</label>
+                <select class="select" id="examManualUnit"><option value="">Selecione...</option></select>
+              </div>
+              <div class="field">
+                <label for="examManualDate">Data/hora *</label>
+                <input class="input" id="examManualDate" type="datetime-local">
+              </div>
+            </div>
+            <p class="muted" style="font-size:.9rem">Sem vaga na grade? A unidade aloca o atendimento e confirma depois.</p>
           </div>
-          <div class="field">
-            <label>Horário *</label>
-            <select class="select" id="examTimeSelect" disabled>
-              <option value="">Escolha o dia primeiro</option>
-            </select>
+          <div class="field" id="examSummaryField" style="grid-column:1/-1;display:none">
+            <div class="slot-summary" id="examSelectionSummary"></div>
           </div>
-          <div class="field" id="examManualDateField" style="grid-column:1/-1;display:none">
-            <label>Data/hora *</label>
-            <input class="input" id="examManualDate" type="datetime-local">
-          </div>
-          <div class="field" style="grid-column:1/-1"><label>Observações</label><textarea class="textarea"
-              name="notes"></textarea></div>
+          <div class="field" style="grid-column:1/-1"><label for="examNotes">Observações</label><textarea class="textarea"
+              name="notes" id="examNotes"></textarea></div>
           <div class="row" style="grid-column:1/-1">
-            <button class="btn btn-primary" type="submit">Agendar</button>
+            <button class="btn btn-primary" type="submit" id="examSubmitBtn" disabled>Agendar</button>
             <button type="button" id="examCancel" class="btn btn-outline btn-sm"
               onclick="clearExamForm()">Cancelar</button>
             <button type="button" id="examCancelEdit" class="btn btn-outline btn-sm" style="display:none"
@@ -186,25 +180,228 @@
           </div>
         </form>
       </div>
-      <div class="card" style="margin-top:16px">
-        <h3>Meus exames</h3>
-        <div id="exams">
-          <div class="spinner"></div>
-        </div>
-      </div>
     </section>
 
     <!-- ALERTAS -->
     <section class="tabpanel" id="alertas" role="tabpanel" aria-labelledby="tab-alertas">
       <div class="card">
-        <h3>Doenças em alerta na sua região</h3>
+        <h2>Doenças em alerta na sua região</h2>
         <div id="diseases">
-          <div class="spinner"></div>
+          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
     </section>
-  </main>
 
+    <!-- MINHA CONTA (perfil + LGPD + MFA + privacidade + DPO) -->
+    <section class="tabpanel" id="minha-conta" role="tabpanel" aria-labelledby="tab-minha-conta">
+      <div class="grid grid-2" style="align-items:start">
+      <div class="card">
+        <h2>Complete seu perfil</h2>
+        <p class="muted" style="margin-top:-8px">Quanto mais completo, melhor o atendimento — e alguns dados
+          (como o CNS) ligam seu histórico ao SUS.</p>
+        <div style="display:flex;align-items:center;gap:12px;margin:12px 0">
+          <div style="flex:1;height:10px;border-radius:var(--radius-xs);background:var(--border);overflow:hidden">
+            <div id="profileBar" style="height:100%;width:0%;background:var(--primary,#0F7A6B)"></div>
+          </div>
+          <strong id="profilePct">0%</strong>
+        </div>
+        <form id="profileForm" novalidate aria-label="Meu perfil">
+          <h3 style="margin-top:8px">Identificação</h3>
+          <div class="grid grid-2" style="gap:12px">
+            <div class="field" style="grid-column:1/-1">
+              <label for="p_full_name">Nome completo *</label>
+              <input class="input" id="p_full_name" required autocomplete="name">
+            </div>
+            <div class="field" style="grid-column:1/-1">
+              <label for="p_social_name">Nome social <span class="opt">(opcional)</span></label>
+              <input class="input" id="p_social_name" maxlength="150">
+            </div>
+            <div class="field">
+              <label for="p_birth_date">Data de nascimento *</label>
+              <input class="input" id="p_birth_date" type="date" required>
+            </div>
+            <div class="field">
+              <label for="p_gender">Gênero</label>
+              <select class="select" id="p_gender">
+                <option value="">Selecione...</option>
+                <option value="masculino">Masculino</option>
+                <option value="feminino">Feminino</option>
+                <option value="outro">Outro</option>
+                <option value="prefiro_nao_informar">Prefiro não informar</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="p_mother_name">Nome da mãe</label>
+              <input class="input" id="p_mother_name">
+            </div>
+            <div class="field">
+              <label for="p_father_name">Nome do pai <span class="opt">(opcional)</span></label>
+              <input class="input" id="p_father_name">
+            </div>
+            <div class="field" id="p_guardianField" style="grid-column:1/-1;display:none">
+              <label for="p_guardian">Responsável legal *</label>
+              <input class="input" id="p_guardian" maxlength="150">
+            </div>
+          </div>
+          <h3 style="margin-top:16px">Documentos</h3>
+          <div class="grid grid-2" style="gap:12px">
+            <div class="field">
+              <label for="p_cpf">CPF *</label>
+              <input class="input" id="p_cpf" placeholder="000.000.000-00" maxlength="14" required inputmode="numeric">
+            </div>
+            <div class="field">
+              <label for="p_rg">RG</label>
+              <input class="input" id="p_rg" placeholder="00.000.000-0" maxlength="12" oninput="maskRg(this)">
+            </div>
+            <div class="field" style="grid-column:1/-1">
+              <label for="p_cns">Cartão SUS (CNS)</label>
+              <input class="input" id="p_cns" inputmode="numeric" placeholder="000 0000 0000 0000" maxlength="18">
+              <small class="help-text">Liga seu histórico ao SUS. Opcional se não tiver em mãos.</small>
+            </div>
+          </div>
+          <h3 style="margin-top:16px">Contato e saúde</h3>
+          <div class="grid grid-2" style="gap:12px">
+            <div class="field">
+              <label for="p_mobile">Celular *</label>
+              <input class="input" id="p_mobile" placeholder="(00) 90000-0000" maxlength="16" required inputmode="tel">
+            </div>
+            <div class="field">
+              <label for="p_phone">Telefone fixo <span class="opt">(opcional)</span></label>
+              <input class="input" id="p_phone" placeholder="(00) 0000-0000" maxlength="15">
+            </div>
+            <div class="field">
+              <label for="p_blood_type">Tipo sanguíneo</label>
+              <select class="select" id="p_blood_type">
+                <option value="">Não sei / Prefiro não informar</option>
+                <option>A+</option><option>A-</option>
+                <option>B+</option><option>B-</option>
+                <option>AB+</option><option>AB-</option>
+                <option>O+</option><option>O-</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="p_priority">Prioridade legal</label>
+              <select class="select" id="p_priority">
+                <option value="">Selecione...</option>
+                <option value="nenhuma">Nenhuma</option>
+                <option value="idoso">Idoso(a) (60+)</option>
+                <option value="gestante">Gestante</option>
+                <option value="pcd">Pessoa com deficiência (PCD)</option>
+                <option value="lactante">Lactante</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="p_race">Cor ou raça (autodeclaração)</label>
+              <select class="select" id="p_race">
+                <option value="">Prefiro não responder</option>
+                <option value="branca">Branca</option>
+                <option value="preta">Preta</option>
+                <option value="parda">Parda</option>
+                <option value="amarela">Amarela</option>
+                <option value="indigena">Indígena</option>
+                <option value="nao_informar">Prefiro não informar</option>
+              </select>
+            </div>
+          </div>
+          <h3 style="margin-top:16px">Endereço</h3>
+          <div class="grid grid-2" style="gap:12px">
+            <div class="field">
+              <label for="p_cep">CEP</label>
+              <input class="input" id="p_cep" placeholder="00000-000" maxlength="9" oninput="maskCep(this)" onblur="lookupCep('p_cep',{street:'p_street',neighborhood:'p_neighborhood',city:'p_city',state:'p_state'})">
+            </div>
+            <div class="field">
+              <label for="p_number">Número</label>
+              <input class="input" id="p_number" placeholder="413">
+            </div>
+            <div class="field" style="grid-column:1/-1">
+              <label for="p_street">Rua / Logradouro</label>
+              <input class="input" id="p_street" placeholder="Preenchido pelo CEP (editável)">
+            </div>
+            <div class="field">
+              <label for="p_neighborhood">Bairro</label>
+              <input class="input" id="p_neighborhood">
+            </div>
+            <div class="field">
+              <label for="p_city">Cidade</label>
+              <input class="input" id="p_city">
+            </div>
+            <div class="field" style="flex:0 0 80px">
+              <label for="p_state">UF</label>
+              <input class="input" id="p_state" maxlength="2" placeholder="UF" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')">
+            </div>
+            <div class="field">
+              <label for="p_zone">Zona</label>
+              <select class="select" id="p_zone">
+                <option value="">Selecione...</option>
+                <option value="urbana">Urbana</option>
+                <option value="rural">Rural</option>
+              </select>
+            </div>
+            <div class="field" style="grid-column:1/-1">
+              <label for="p_reference">Ponto de referência</label>
+              <input class="input" id="p_reference" placeholder="Ex: Próximo à Igreja São José...">
+            </div>
+          </div>
+          <div class="row" style="margin-top:16px">
+            <button class="btn btn-primary" type="submit" id="profileSubmit">Salvar perfil</button>
+          </div>
+        </form>
+      </div>
+
+        <div class="grid" style="gap:16px">
+          <div class="card">
+            <h2>Meus dados (LGPD)</h2>
+            <p class="muted">Baixe tudo que o sistema guarda sobre você ou peça a exclusão da conta.</p>
+            <div id="consentLine" class="muted" style="font-size:.9rem">
+              <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+            </div>
+            <div class="row" style="margin-top:14px">
+              <button class="btn btn-outline btn-sm" type="button" onclick="downloadMyData()">Baixar meus dados (JSON)</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="deleteMyAccount()" style="color:var(--danger)">Excluir minha conta…</button>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Verificação em duas etapas (MFA)</h2>
+            <p class="muted" id="mfaStatus">Verificando…</p>
+            <div id="mfaSetup" style="display:none">
+              <p class="muted">1. Cadastre este segredo no app autenticador (Google/Microsoft Authenticator):</p>
+              <p><code id="mfaSecret" style="user-select:all"></code></p>
+              <div class="row">
+                <label for="mfaEnableCode" class="sr-only">Código de 6 dígitos do app autenticador</label>
+                <input class="input" id="mfaEnableCode" inputmode="numeric" maxlength="6" placeholder="Código de 6 dígitos" style="max-width:220px">
+                <button class="btn btn-primary btn-sm" type="button" onclick="enableMfa()">Ativar</button>
+              </div>
+            </div>
+            <div class="row" style="margin-top:8px">
+              <button class="btn btn-outline btn-sm" type="button" id="mfaSetupBtn" onclick="startMfaSetup()">Ativar verificação em 2 etapas</button>
+              <button class="btn btn-outline btn-sm" type="button" id="mfaDisableBtn" onclick="disableMfa()" style="display:none">Desativar</button>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Privacidade</h2>
+            <p class="muted">Coletamos o mínimo necessário para o atendimento público. A base legal é o dever legal do
+              SUS (art. 11, II, <em>f</em> da LGPD), não o consentimento — por isso não há caixa de aceite genérico.</p>
+            <ul class="muted" style="font-size:.9rem;padding-left:18px;margin:10px 0">
+              <li>Dados de saúde são sensíveis e ficam restritos à equipe que presta o atendimento.</li>
+              <li>CPF, RG e CNS são gravados criptografados no banco.</li>
+              <li>Cada acesso da equipe a documentos pessoais fica registrado na auditoria.</li>
+              <li>Você pode corrigir, exportar ou apagar seus dados a qualquer momento.</li>
+            </ul>
+            <a class="btn btn-outline btn-sm" href="privacy.html">Ler a Política de Privacidade</a>
+          </div>
+          <div class="card">
+            <h2>Encarregado (DPO)</h2>
+            <p class="muted">Canal oficial para qualquer assunto sobre seus dados pessoais (LGPD, art. 41).</p>
+            <p id="dpoLine" style="font-weight:600;margin:10px 0 0"><span class="spinner"></span></p>
+          </div>
+        </div>
+      </div><!-- /grid Minha conta -->
+    </section>
+  </main>
+  </div><!-- /app-main -->
+  </div><!-- /app-shell -->
+
+  <script src="assets/ui.js"></script>
   <script>
     let SESSION;
     let lastAppointments = [];
@@ -219,67 +416,67 @@
        unidade -> especialidade/tipo -> profissional -> dia -> horário
        (TAREFAS V3, itens 2.7 e 2.8)
        ====================================================================== */
-    const KIND_META = {
+    const BOOKING_FORMS = {
       appointments: {
-        kind: 'consulta',
-        list: () => lastAppointments,
-        form: 'apptForm',
-        location: 'apptLocationSelect',
-        service: 'specialtySelect',
-        other: 'specialtyOutra',
-        otherValue: '__outra',
+        tipo: 'consulta',
+        form: 'apptForm', title: 'apptFormTitle', banner: 'apptEditBanner',
+        cancelBtn: 'apptCancel', cancelEditBtn: 'apptCancelEdit', submit: 'apptSubmitBtn',
+        service: 'apptServiceSelect', other: 'specialtyOutra', otherValue: '__outra',
         serviceHelp: 'apptServiceHelp',
-        doctor: 'apptDoctorSelect',
-        doctorName: 'apptDoctorName',
-        doctorHelp: 'apptDoctorHelp',
-        date: 'apptDateSelect',
-        time: 'apptTimeSelect',
-        manualField: 'apptManualDateField',
-        manual: 'apptManualDate',
-        title: 'apptFormTitle',
-        banner: 'apptEditBanner',
-        cancelBtn: 'apptCancel',
-        cancelEditBtn: 'apptCancelEdit',
-        serviceName: 'a especialidade',
+        panel: 'apptSlotsPanel', hint: 'apptSlotsHint',
+        manualBlock: 'apptManualBlock', manualUnit: 'apptManualUnit', manualWhen: 'apptManualDate',
+        summaryField: 'apptSummaryField', summary: 'apptSelectionSummary',
         customMissing: 'Informe a especialidade.',
-        emptyService: 'Nenhuma especialidade cadastrada nesta unidade. Use "Outra (especificar)" se precisar.',
-        newTitle: 'Agendar consulta',
-        saveLabel: 'Salvar alterações',
-        submitLabel: 'Agendar',
+        emptyServices: 'Nenhuma especialidade com vaga no momento. Use "Outra (especificar)" se precisar.',
+        newTitle: 'Agendar consulta', saveLabel: 'Salvar alterações', submitLabel: 'Agendar',
       },
       exams: {
-        kind: 'exame',
-        list: () => lastExams,
-        form: 'examForm',
-        location: 'examLocationSelect',
-        service: 'examTypeSelect',
-        other: 'examTypeOutro',
-        otherValue: '__outro',
+        tipo: 'exame',
+        form: 'examForm', title: 'examFormTitle', banner: 'examEditBanner',
+        cancelBtn: 'examCancel', cancelEditBtn: 'examCancelEdit', submit: 'examSubmitBtn',
+        service: 'examServiceSelect', other: 'examTypeOutro', otherValue: '__outro',
         serviceHelp: 'examServiceHelp',
-        doctor: 'examDoctorSelect',
-        doctorName: 'examDoctorName',
-        doctorHelp: 'examDoctorHelp',
-        date: 'examDateSelect',
-        time: 'examTimeSelect',
-        manualField: 'examManualDateField',
-        manual: 'examManualDate',
-        title: 'examFormTitle',
-        banner: 'examEditBanner',
-        cancelBtn: 'examCancel',
-        cancelEditBtn: 'examCancelEdit',
-        serviceName: 'o tipo de exame',
+        panel: 'examSlotsPanel', hint: 'examSlotsHint',
+        manualBlock: 'examManualBlock', manualUnit: 'examManualUnit', manualWhen: 'examManualDate',
+        summaryField: 'examSummaryField', summary: 'examSelectionSummary',
         customMissing: 'Por favor, informe qual é o exame.',
-        emptyService: 'Nenhum tipo de exame cadastrado nesta unidade. Use "Outro (especificar)" se precisar.',
-        newTitle: 'Agendar exame',
-        saveLabel: 'Salvar alterações',
-        submitLabel: 'Agendar',
+        emptyServices: 'Nenhum exame com vaga no momento. Use "Outro (especificar)" se precisar.',
+        newTitle: 'Agendar exame', saveLabel: 'Salvar alterações', submitLabel: 'Agendar',
       }
     };
 
-    const formState = {
-      appointments: { availability: null, customLegacy: false },
-      exams: { availability: null, customLegacy: false }
-    };
+    function freshBookingState() {
+      return {
+        servicos: [], servico: '', carregandoServicos: false,
+        carregandoVagas: false, unidades: [], totalVagas: 0,
+        diaAberto: {}, selecao: null,
+        manual: false, manualService: '', manualUnitId: '', manualWhen: '',
+        erro: '',
+      };
+    }
+    const bookingState = { appointments: freshBookingState(), exams: freshBookingState() };
+    let bookingTipo = 'appointments';
+
+    function B() { return bookingState[bookingTipo]; }
+    function M() { return BOOKING_FORMS[bookingTipo]; }
+    function setBooking(patch) {
+      Object.assign(B(), patch);
+      renderBooking();
+    }
+    // Habilita/desabilita o submit a partir do estado (sem re-render completo,
+    // para não roubar o foco de quem digita no caminho manual).
+    function updateSubmitState() {
+      const m = M();
+      const btn = el(m.submit);
+      if (btn) btn.disabled = !bookingReady();
+    }
+    function bookingReady() {
+      const s = B();
+      if (s.manual) {
+        return !!(s.servico && (s.manualService || '').trim() && s.manualUnitId && s.manualWhen);
+      }
+      return !!(s.servico && s.selecao);
+    }
 
     const el = id => document.getElementById(id);
 
@@ -298,89 +495,12 @@
       help.style.display = message ? 'block' : 'none';
     }
 
-    /* ---- avisos de erro por campo (usados na validação do envio) ---- */
-    function setFieldError(fieldEl, message) {
-      if (!fieldEl) return;
-      fieldEl.classList.add('has-error');
-      let msg = fieldEl.querySelector('.field-msg');
-      if (!msg) { msg = document.createElement('small'); msg.className = 'field-msg'; fieldEl.appendChild(msg); }
-      msg.textContent = message;
-    }
-
-    function clearFieldError(fieldEl) {
-      if (!fieldEl) return;
-      fieldEl.classList.remove('has-error');
-      const msg = fieldEl.querySelector('.field-msg');
-      if (msg) msg.remove();
-    }
-
-    function fieldOf(controlEl) {
-      return controlEl ? controlEl.closest('.field') : null;
-    }
-
-    function showFirstError(controlEl) {
-      if (!controlEl) return;
-      const field = fieldOf(controlEl) || controlEl;
-      field.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      try { controlEl.focus({ preventScroll: true }); } catch (e) { try { controlEl.focus(); } catch (e2) { } }
-    }
-
-    function unitIdByName(name) {
-      const unit = healthUnits.find(u => u.name === name);
-      return unit ? unit.id : null;
-    }
-
-    function ensureLocationOption(selectEl, name) {
-      const exists = Array.from(selectEl.options).some(o => o.value === name);
-      if (!exists) {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name + ' (local anterior)';
-        selectEl.appendChild(opt);
-      }
-      selectEl.value = name;
-    }
-
-    function selectedText(selectEl) {
-      return selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex].text : '';
-    }
+    /* ---- avisos de erro por campo: ver assets/ui.js (P2a.2, compartilhado) ---- */
 
     function fmtDayLabel(dateStr) {
       const d = new Date(dateStr + 'T00:00:00');
       if (isNaN(d.getTime())) return dateStr;
       return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
-    }
-
-    function resetService(m) {
-      setSelect(el(m.service), [], 'Escolha a unidade primeiro', true);
-      el(m.other).style.display = 'none';
-      el(m.other).value = '';
-      setHelp(m.serviceHelp, '');
-      clearFieldError(fieldOf(el(m.service)));
-      clearFieldError(fieldOf(el(m.other)));
-    }
-
-    function resetDoctor(m) {
-      setSelect(el(m.doctor), [], 'Escolha a especialidade primeiro', true);
-      el(m.doctorName).value = '';
-      setHelp(m.doctorHelp, '');
-      clearFieldError(fieldOf(el(m.doctor)));
-      formState[m === KIND_META.appointments ? 'appointments' : 'exams'].availability = null;
-    }
-
-    function resetDateTime(m) {
-      setSelect(el(m.date), [], 'Escolha o profissional primeiro', true);
-      setSelect(el(m.time), [], 'Escolha o dia primeiro', true);
-      clearFieldError(fieldOf(el(m.date)));
-      clearFieldError(fieldOf(el(m.time)));
-    }
-
-    function showManualDate(m, show) {
-      const field = el(m.manualField);
-      field.style.display = show ? 'block' : 'none';
-      el(m.manual).required = !!show;
-      if (!show) el(m.manual).value = '';
-      clearFieldError(fieldOf(field));
     }
 
     // item 2.4 — calendário limitado a hoje + 1 ano em todos os campos
@@ -396,247 +516,332 @@
       });
     }
 
-    /* ---------------------- fluxo dos seletores dependentes ---------------------- */
+    /* ---------------------- render() do agendamento ---------------------- */
 
-    async function onUnitChange(kindKey) {
-      const m = KIND_META[kindKey];
-      resetService(m);
-      resetDoctor(m);
-      resetDateTime(m);
-      showManualDate(m, false);
-
-      const locationName = el(m.location).value;
-      if (!locationName) {
-        setSelect(el(m.service), [], 'Escolha a unidade primeiro', true);
-        return;
+    function slotsPanelHtml(s, kindKey) {
+      if (s.carregandoVagas) {
+        return '<div class="slot-empty"><span class="spinner"></span> Buscando vagas livres...</div>';
       }
-      setSelect(el(m.service), [], 'Carregando...', true);
-
-      const unitId = unitIdByName(locationName);
-      if (!unitId) {
-        setSelect(el(m.service), [], 'Unidade indisponível', true);
-        setHelp(m.serviceHelp, 'Esta unidade não está mais ativa. Escolha outra unidade.');
-        return;
+      if (!s.unidades.length) {
+        return `<div class="slot-empty">${esc(s.erro || 'Nenhuma vaga livre para este serviço nos próximos dias.')}</div>`;
       }
+      return `<p class="muted" style="font-size:.9rem;margin:0 0 4px">${s.totalVagas} horário(s) livre(s) em ${s.unidades.length} unidade(s).</p>` +
+        s.unidades.map((u) => unitCardHtml(s, kindKey, u)).join('');
+    }
+
+    function unitCardHtml(s, kindKey, u) {
+      const openDate = s.diaAberto[u.id] || (u.dias[0] && u.dias[0].date);
+      const days = u.dias.map((d) =>
+        `<button type="button" class="slot-day${d.date === openDate ? ' active' : ''}" onclick="toggleSlotDay('${kindKey}','${u.id}','${d.date}')" aria-pressed="${d.date === openDate ? 'true' : 'false'}">${esc(fmtDayLabel(d.date))}</button>`
+      ).join('');
+      const day = u.dias.find((d) => d.date === openDate) || u.dias[0];
+      const times = day.slots.map((t) => {
+        const selected = s.selecao && s.selecao.unit_id === u.id && s.selecao.date === day.date && s.selecao.hora === t.hora;
+        return `<button type="button" class="slot-time${selected ? ' selected' : ''}" onclick="pickSlot('${kindKey}','${u.id}','${day.date}','${t.hora}')" aria-pressed="${selected ? 'true' : 'false'}">${esc(t.hora)}<small>${esc(t.professional_name || '')}</small></button>`;
+      }).join('');
+      const meta = [u.type, u.neighborhood].filter(Boolean).join(' · ');
+      return `<div class="slot-unit"><div class="slot-unit-head"><div><div class="slot-unit-name">${esc(u.name)}</div>` +
+        (meta ? `<div class="slot-unit-meta">${esc(meta)}</div>` : '') +
+        `</div><span class="slot-count">${u.totalVagas} vaga(s)</span></div>` +
+        `<div class="slot-days">${days}</div><div class="slot-times">${times}</div></div>`;
+    }
+
+    function ensureManualUnitOptions(m) {
+      const sel = el(m.manualUnit);
+      const cur = sel.value || B().manualUnitId;
+      sel.innerHTML = '<option value="">Selecione...</option>' + healthUnits.map((u) =>
+        `<option value="${esc(u.id)}">${esc(u.name)}${u.neighborhood ? ' – ' + esc(u.neighborhood) : ''}</option>`
+      ).join('');
+      if (cur && [...sel.options].some((o) => o.value === cur)) sel.value = cur;
+    }
+
+    function renderBooking() {
+      const m = M();
+      const s = B();
+      const kindKey = bookingTipo;
+
+      // 1) select de serviços
+      const sel = el(m.service);
+      const otherLabel = m.tipo === 'consulta' ? 'Outra (especificar)' : 'Outro (especificar)';
+      if (s.carregandoServicos) {
+        sel.innerHTML = '<option value="">Carregando serviços...</option>';
+        sel.disabled = true;
+      } else {
+        sel.innerHTML = '<option value="">Selecione...</option>' +
+          s.servicos.map((o) =>
+            `<option value="${esc(o.name)}"${o.name === s.servico ? ' selected' : ''}>${esc(o.name)}${o.unidades > 1 ? ` (${o.unidades} unidades)` : ''}</option>`
+          ).join('') +
+          `<option value="${m.otherValue}"${s.servico === m.otherValue ? ' selected' : ''}>${otherLabel}</option>`;
+        sel.disabled = false;
+      }
+
+      // 2) caminho manual x vagas
+      el(m.other).style.display = s.manual ? 'block' : 'none';
+      if (document.activeElement !== el(m.other)) el(m.other).value = s.manualService || '';
+      el(m.manualBlock).style.display = s.manual ? 'block' : 'none';
+      if (s.manual) {
+        ensureManualUnitOptions(m);
+        el(m.manualUnit).value = s.manualUnitId || '';
+        if (document.activeElement !== el(m.manualWhen)) el(m.manualWhen).value = s.manualWhen || '';
+        setDateLimits();
+      }
+      el(m.panel).style.display = (!s.manual && s.servico) ? '' : 'none';
+      el(m.hint).style.display = (!s.manual && !s.servico) ? '' : 'none';
+      if (!s.manual && s.servico) el(m.panel).innerHTML = slotsPanelHtml(s, kindKey);
+      else el(m.panel).innerHTML = '';
+
+      // 3) resumo + submit
+      const showSummary = !!(s.selecao && !s.manual);
+      el(m.summaryField).style.display = showSummary ? 'block' : 'none';
+      if (showSummary) {
+        const c = s.selecao;
+        el(m.summary).innerHTML = `<div><strong>${esc(fmtDayLabel(c.date))} às ${esc(c.hora)}</strong><br>` +
+          `<span class="muted">${esc(c.unit_name)} · ${esc(c.professional_name || '')}</span></div>` +
+          `<button type="button" class="btn btn-outline btn-sm" onclick="clearSlotSelection('${kindKey}')">Trocar</button>`;
+      }
+      setHelp(m.serviceHelp, s.erro);
+      updateSubmitState();
+    }
+
+    /* ---------------------- eventos -> state ---------------------- */
+
+    async function loadBookingServices(kindKey) {
+      const s = bookingState[kindKey];
+      s.carregandoServicos = true;
+      if (kindKey === bookingTipo) renderBooking();
       try {
-        const names = await apiGet('/catalog/offers?unit_id=' + encodeURIComponent(unitId) + '&kind=' + m.kind);
-        const options = (Array.isArray(names) ? names : []).map(n => ({ value: n, text: n }));
-        options.push({ value: m.otherValue, text: m.kind === 'consulta' ? 'Outra (especificar)' : 'Outro (especificar)' });
-        if (!options.length - 1) { /* sempre fica ao menos a opção "Outra" */ }
-        const placeholder = (Array.isArray(names) && names.length) ? 'Selecione...' : 'Nenhum serviço cadastrado';
-        setSelect(el(m.service), options, placeholder, false);
-        if (!Array.isArray(names) || !names.length) {
-          setHelp(m.serviceHelp, m.emptyService);
-        }
+        const data = await apiGet('/catalog/services?tipo=' + BOOKING_FORMS[kindKey].tipo);
+        s.servicos = Array.isArray(data) ? data : [];
+        s.erro = s.servicos.length ? '' : BOOKING_FORMS[kindKey].emptyServices;
       } catch (err) {
-        setSelect(el(m.service), [], 'Erro ao carregar', true);
-        setHelp(m.serviceHelp, 'Não foi possível carregar os serviços da unidade. ' + (err.message || ''));
+        s.servicos = [];
+        s.erro = 'Não foi possível carregar os serviços. ' + (err.message || '');
+      } finally {
+        s.carregandoServicos = false;
+        if (kindKey === bookingTipo) renderBooking();
       }
     }
 
-    function enterCustomService(m) {
-      // "Outro": o atendimento é alocado pela unidade — sem profissional,
-      // data/hora preenchidas manualmente com limite de 1 ano.
-      el(m.other).style.display = 'block';
-      setSelect(el(m.doctor), [{ value: '', text: 'A definir pela unidade' }], '', false);
-      el(m.doctor).disabled = false;
-      setHelp(m.doctorHelp, '');
-      resetDateTime(m);
-      showManualDate(m, true);
-      setDateLimits();
-    }
-
-    async function onServiceChange(kindKey) {
-      const m = KIND_META[kindKey];
-      const stateKey = kindKey;
-      resetDoctor(m);
-      resetDateTime(m);
-      showManualDate(m, false);
-
-      const service = el(m.service).value;
-      if (!service) return;
-
-      if (service === m.otherValue) {
-        enterCustomService(m);
-        return;
-      }
-
-      el(m.other).style.display = 'none';
-      el(m.other).value = '';
-
-      const unitId = unitIdByName(el(m.location).value);
-      if (!unitId) {
-        setSelect(el(m.doctor), [], 'Unidade indisponível', true);
-        setHelp(m.doctorHelp, 'A unidade escolhida não está mais ativa.');
-        return;
-      }
-      setSelect(el(m.doctor), [], 'Carregando...', true);
+    async function fetchSlotsFor(kindKey, excludeId) {
+      const m = BOOKING_FORMS[kindKey];
+      const s = bookingState[kindKey];
+      s.carregandoVagas = true;
+      s.erro = '';
+      if (kindKey === bookingTipo) renderBooking();
       try {
-        const profs = await apiGet(
-          '/catalog/professionals?unit_id=' + encodeURIComponent(unitId) +
-          '&kind=' + m.kind + '&name=' + encodeURIComponent(service)
-        );
-        if (!Array.isArray(profs) || !profs.length) {
-          setSelect(el(m.doctor), [], 'Nenhum profissional disponível', true);
-          setHelp(m.doctorHelp, 'Nenhum profissional está habilitado para "' + service + '" nesta unidade. Tente outra unidade.');
-          return;
-        }
-        setSelect(el(m.doctor), profs.map(p => ({
-          value: p.id,
-          text: p.name + (p.job_title ? ' · ' + p.job_title : '')
-        })), 'Selecione...', false);
-        setHelp(m.doctorHelp, '');
-      } catch (err) {
-        setSelect(el(m.doctor), [], 'Erro ao carregar', true);
-        setHelp(m.doctorHelp, 'Não foi possível carregar os profissionais. ' + (err.message || ''));
-      }
-      formState[stateKey].availability = null;
-    }
-
-    async function onDoctorChange(kindKey) {
-      const m = KIND_META[kindKey];
-      resetDateTime(m);
-      formState[kindKey].availability = null;
-
-      const professionalId = el(m.doctor).value;
-      if (!professionalId) return;
-
-      const unitId = unitIdByName(el(m.location).value);
-      const service = el(m.service).value;
-      if (!unitId || !service) return;
-
-      setSelect(el(m.date), [], 'Carregando...', true);
-      const excludeId = kindKey === 'appointments' ? editingApptId : editingExamId;
-      try {
-        const params = new URLSearchParams({
-          unit_id: unitId, kind: m.kind, name: service,
-          professional_id: professionalId, days: '30'
-        });
+        const params = new URLSearchParams({ tipo: m.tipo, name: s.servico, days: '30' });
         if (excludeId) params.set('exclude_id', excludeId);
-        const data = await apiGet('/catalog/availability?' + params.toString());
-        if (!data.days || !data.days.length) {
-          setSelect(el(m.date), [], 'Sem horários disponíveis', true);
-          setHelp(m.doctorHelp, data.reason || 'Nenhum horário livre nos próximos dias.');
-          return;
-        }
-        formState[kindKey].availability = data;
-        setSelect(el(m.date), data.days.map(d => ({ value: d.date, text: fmtDayLabel(d.date) })), 'Selecione o dia...', false);
-        setHelp(m.doctorHelp, '');
+        const data = await apiGet('/catalog/slots?' + params.toString());
+        s.unidades = Array.isArray(data.unidades) ? data.unidades : [];
+        s.totalVagas = Number((data && data.totalVagas) || 0);
+        if (!s.unidades.length) s.erro = (data && data.reason) || 'Nenhuma vaga livre para este serviço.';
       } catch (err) {
-        setSelect(el(m.date), [], 'Erro ao carregar', true);
-        setHelp(m.doctorHelp, 'Não foi possível carregar os horários. ' + (err.message || ''));
+        s.unidades = [];
+        s.erro = 'Não foi possível buscar as vagas. ' + (err.message || '');
+      } finally {
+        s.carregandoVagas = false;
+        if (kindKey === bookingTipo) renderBooking();
       }
     }
 
-    function onDateChange(kindKey) {
-      const m = KIND_META[kindKey];
-      setSelect(el(m.time), [], 'Escolha o dia primeiro', true);
-      const date = el(m.date).value;
-      const availability = formState[kindKey].availability;
-      if (!date || !availability) return;
-      const day = availability.days.find(d => d.date === date);
-      if (!day || !day.slots.length) {
-        setSelect(el(m.time), [], 'Sem horários neste dia', true);
-        return;
-      }
-      setSelect(el(m.time), day.slots.map(s => ({ value: s, text: s })), 'Selecione o horário...', false);
+    async function onServicePick(kindKey) {
+      const m = BOOKING_FORMS[kindKey];
+      const s = bookingState[kindKey];
+      const value = el(m.service).value;
+      Object.assign(s, {
+        servico: value, selecao: null, unidades: [], totalVagas: 0,
+        diaAberto: {}, erro: '', manual: value === m.otherValue,
+        manualService: '', manualUnitId: '', manualWhen: '',
+      });
+      clearFieldError(fieldOf(el(m.service)));
+      if (kindKey === bookingTipo) renderBooking();
+      scheduleDraftSave(kindKey);
+      if (!value || value === m.otherValue) return;
+      await fetchSlotsFor(kindKey, kindKey === 'appointments' ? editingApptId : editingExamId);
+      scheduleDraftSave(kindKey);
+    }
+
+    function findSlot(s, unitId, scheduledAt) {
+      const date = (scheduledAt || '').slice(0, 10);
+      const hora = (scheduledAt || '').slice(11, 16);
+      const u = (s.unidades || []).find((x) => x.id === unitId);
+      if (!u) return null;
+      const day = u.dias.find((d) => d.date === date);
+      if (!day) return null;
+      const t = day.slots.find((x) => x.hora === hora);
+      if (!t) return null;
+      return {
+        unit_id: u.id, unit_name: u.name,
+        professional_id: t.professional_id, professional_name: t.professional_name, job_title: t.job_title,
+        date, hora, scheduled_at: `${date} ${hora}:00`,
+      };
+    }
+
+    window.pickSlot = function (kindKey, unitId, date, hora) {
+      const s = bookingState[kindKey];
+      const u = s.unidades.find((x) => x.id === unitId);
+      if (!u) return;
+      const day = u.dias.find((d) => d.date === date);
+      if (!day) return;
+      const t = day.slots.find((x) => x.hora === hora);
+      if (!t) return;
+      Object.assign(s, {
+        diaAberto: { ...s.diaAberto, [unitId]: date },
+        selecao: {
+          unit_id: u.id, unit_name: u.name,
+          professional_id: t.professional_id, professional_name: t.professional_name, job_title: t.job_title,
+          date, hora, scheduled_at: `${date} ${hora}:00`,
+        },
+        erro: '',
+      });
+      if (kindKey === bookingTipo) renderBooking();
+      scheduleDraftSave(kindKey);
+      const sum = el(BOOKING_FORMS[kindKey].summaryField);
+      if (sum) sum.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
+    window.toggleSlotDay = function (kindKey, unitId, date) {
+      const s = bookingState[kindKey];
+      s.diaAberto = { ...s.diaAberto, [unitId]: date };
+      if (kindKey === bookingTipo) renderBooking();
+    };
+
+    window.clearSlotSelection = function (kindKey) {
+      const s = bookingState[kindKey];
+      s.selecao = null;
+      if (kindKey === bookingTipo) renderBooking();
+      scheduleDraftSave(kindKey);
+    };
+
+    // Liga os eventos do formulário ao state. Campos manuais só atualizam o
+    // state + submit (sem re-render, para não roubar o foco da digitação).
+    function wireBookingForm(kindKey) {
+      const m = BOOKING_FORMS[kindKey];
+      const s = bookingState[kindKey];
+      el(m.service).addEventListener('change', () => onServicePick(kindKey));
+      el(m.other).addEventListener('input', (e) => {
+        s.manualService = e.target.value;
+        updateSubmitStateFor(kindKey);
+        scheduleDraftSave(kindKey);
+      });
+      el(m.manualUnit).addEventListener('change', (e) => {
+        s.manualUnitId = e.target.value;
+        clearFieldError(fieldOf(el(m.manualUnit)));
+        updateSubmitStateFor(kindKey);
+        scheduleDraftSave(kindKey);
+      });
+      el(m.manualWhen).addEventListener('change', (e) => {
+        s.manualWhen = e.target.value;
+        clearFieldError(fieldOf(el(m.manualWhen)));
+        updateSubmitStateFor(kindKey);
+        scheduleDraftSave(kindKey);
+      });
+    }
+
+    function updateSubmitStateFor(kindKey) {
+      if (kindKey !== bookingTipo) return;
+      updateSubmitState();
     }
 
     /* ---------------------- montagem e validação do envio ---------------------- */
 
-    function validateBookingForm(kindKey) {
-      const m = KIND_META[kindKey];
-      const serviceValue = el(m.service).value;
+    function buildBookingPayload(kindKey) {
+      const m = BOOKING_FORMS[kindKey];
+      const s = bookingState[kindKey];
       let firstError = null;
 
       const fail = (control, message) => {
-        const field = fieldOf(control);
-        setFieldError(field, message);
+        setFieldError(fieldOf(control), message);
         if (!firstError) firstError = control;
       };
 
-      [el(m.location), el(m.service), el(m.other), el(m.doctor), el(m.date), el(m.time), fieldOf(el(m.manual))]
-        .forEach(clearFieldError);
+      [el(m.service), el(m.other), el(m.manualUnit), el(m.manualWhen)]
+        .forEach((c) => clearFieldError(fieldOf(c)));
 
-      if (!el(m.location).value) fail(el(m.location), 'Selecione a unidade de saúde.');
-      if (!serviceValue) fail(el(m.service), 'Selecione ' + m.serviceName + '.');
+      if (!s.servico) fail(el(m.service), 'Escolha o serviço.');
 
-      let serviceName = serviceValue;
-      let isCustom = serviceValue === m.otherValue;
+      let serviceName = '', location = '', unit_id = null;
+      let professional_id = null, doctor = null, scheduled_at = '';
+      const isCustom = s.servico === m.otherValue;
+
       if (isCustom) {
-        serviceName = el(m.other).value.trim();
+        serviceName = (s.manualService || '').trim();
         if (!serviceName) fail(el(m.other), m.customMissing);
-      }
-
-      let scheduledAt = '';
-      if (isCustom) {
-        if (!el(m.manual).value) fail(el(m.manual), 'Escolha a data e a hora do atendimento.');
-        else scheduledAt = el(m.manual).value.replace('T', ' ');
-      } else {
-        if (serviceValue && !el(m.doctor).value) fail(el(m.doctor), 'Selecione o profissional.');
-        if (!el(m.date).value) fail(el(m.date), 'Escolha o dia.');
-        if (!el(m.time).value) fail(el(m.time), 'Escolha o horário.');
-        if (el(m.date).value && el(m.time).value) scheduledAt = el(m.date).value + ' ' + el(m.time).value + ':00';
+        if (!s.manualUnitId) fail(el(m.manualUnit), 'Selecione a unidade.');
+        if (!s.manualWhen) fail(el(m.manualWhen), 'Escolha a data e a hora do atendimento.');
+        else scheduled_at = s.manualWhen.replace('T', ' ');
+        const mu = healthUnits.find((u) => u.id === s.manualUnitId);
+        location = mu ? mu.name : '';
+        unit_id = s.manualUnitId || null;
+      } else if (s.selecao) {
+        serviceName = s.servico;
+        location = s.selecao.unit_name;
+        unit_id = s.selecao.unit_id;
+        professional_id = s.selecao.professional_id;
+        doctor = s.selecao.professional_name || null;
+        scheduled_at = s.selecao.scheduled_at;
+      } else if (s.servico) {
+        fail(el(m.service), 'Escolha um horário livre abaixo.');
       }
 
       if (firstError) { showFirstError(firstError); return null; }
-
-      const customLegacy = formState[kindKey].customLegacy && !el(m.location).options.length ? false : false;
       return {
-        serviceName,
-        location: el(m.location).value,
-        unit_id: isCustom && customLegacy ? null : unitIdByName(el(m.location).value),
-        professional_id: isCustom ? null : el(m.doctor).value,
-        doctor: el(m.doctorName).value || null,
-        scheduled_at: scheduledAt,
-        notes: el(m.form).notes ? el(m.form).notes.value : '',
+        serviceName, location, unit_id, professional_id, doctor,
+        scheduled_at, notes: el(m.form).notes ? el(m.form).notes.value : '',
         isCustom,
       };
     }
 
     function startEditingUI(kindKey) {
-      const m = KIND_META[kindKey];
+      const m = BOOKING_FORMS[kindKey];
       el(m.form).classList.add('form-editing');
       el(m.banner).style.display = 'block';
       el(m.title).textContent = kindKey === 'appointments' ? 'Editar consulta' : 'Editar exame';
-      el(m.form).querySelector('button[type=submit]').textContent = m.saveLabel;
+      el(m.submit).textContent = m.saveLabel;
       el(m.cancelBtn).style.display = 'none';
       el(m.cancelEditBtn).style.display = 'inline-flex';
-      switchTab(kindKey === 'appointments' ? 'consultas' : 'exames');
+      switchTab('agendar');
+      setBookingKind(kindKey);
     }
 
+    // Alterna entre os formulários de consulta e exame dentro da aba Agendar.
+    window.setBookingKind = function (kindKey) {
+      bookingTipo = kindKey;
+      const isAppt = kindKey !== 'exams';
+      document.getElementById('apptFormCard').style.display = isAppt ? '' : 'none';
+      document.getElementById('examFormCard').style.display = isAppt ? 'none' : '';
+      document.getElementById('kindAppt').classList.toggle('active', isAppt);
+      document.getElementById('kindExam').classList.toggle('active', !isAppt);
+      renderBooking();
+    };
+
     function stopEditingUI(kindKey, { keepValues } = {}) {
-      const m = KIND_META[kindKey];
+      const m = BOOKING_FORMS[kindKey];
       el(m.form).classList.remove('form-editing');
       el(m.banner).style.display = 'none';
       el(m.title).textContent = m.newTitle;
-      el(m.form).querySelector('button[type=submit]').textContent = m.submitLabel;
+      el(m.submit).textContent = m.submitLabel;
       el(m.cancelBtn).style.display = 'inline-flex';
       el(m.cancelEditBtn).style.display = 'none';
       if (!keepValues) resetBookingForm(kindKey);
     }
 
     function resetBookingForm(kindKey) {
-      const m = KIND_META[kindKey];
-      const form = el(m.form);
-      form.reset();
-      formState[kindKey].availability = null;
-      formState[kindKey].customLegacy = false;
+      const m = BOOKING_FORMS[kindKey];
+      // Preserva o catálogo de serviços (dado estático já carregado);
+      // zera só o estado do fluxo em andamento.
+      const keepServicos = bookingState[kindKey].servicos;
+      const keepLoading = bookingState[kindKey].carregandoServicos;
+      Object.assign(bookingState[kindKey], freshBookingState());
+      bookingState[kindKey].servicos = keepServicos;
+      bookingState[kindKey].carregandoServicos = keepLoading;
+      if (el(m.form).notes) el(m.form).notes.value = '';
+      clearDraft(kindKey); // P5.3: descarte explícito limpa o rascunho
       if (kindKey === 'appointments') editingApptId = null; else editingExamId = null;
-      setSelect(el(m.location), healthUnits.map(u => ({
-        value: u.name,
-        text: u.name + (u.neighborhood ? ' – ' + u.neighborhood : '')
-      })), healthUnits.length ? 'Selecione...' : 'Nenhuma unidade cadastrada', false);
-      resetService(m);
-      el(m.service).innerHTML = '<option value="">Escolha a unidade primeiro</option>';
-      el(m.service).disabled = true;
-      resetDoctor(m);
-      el(m.doctor).innerHTML = '<option value="">Escolha a especialidade primeiro</option>';
-      resetDateTime(m);
-      showManualDate(m, false);
-      [fieldOf(el(m.location)), fieldOf(el(m.service)), fieldOf(el(m.other)),
-      fieldOf(el(m.doctor)), fieldOf(el(m.date)), fieldOf(el(m.time)), fieldOf(el(m.manual))]
+      [fieldOf(el(m.service)), fieldOf(el(m.other)),
+      fieldOf(el(m.manualUnit)), fieldOf(el(m.manualWhen))]
         .forEach(clearFieldError);
+      if (kindKey === bookingTipo) renderBooking();
     }
 
     window.addEventListener('load', async () => {
@@ -648,27 +853,37 @@
         if (role === 'atendente') { location.replace('atendente.html'); return; }
 
         document.getElementById('userEmail').textContent = SESSION.user.email;
+        document.getElementById('userName').textContent = SESSION.user.full_name || '';
 
+        // Só abas principais (com data-tab) usam o switchTab genérico;
+        // o alternador Consulta/Exame tem onclick próprio (setBookingKind).
         document.querySelectorAll('.tab').forEach(t =>
-          t.addEventListener('click', () => switchTab(t.dataset.tab))
+          t.addEventListener('click', () => { if (t.dataset.tab) switchTab(t.dataset.tab); })
         );
         document.getElementById('apptForm').addEventListener('submit', addAppt);
         document.getElementById('examForm').addEventListener('submit', addExam);
 
-        // Seletores dependentes (itens 2.7 / 2.8)
-        el('apptLocationSelect').addEventListener('change', () => onUnitChange('appointments'));
-        el('examLocationSelect').addEventListener('change', () => onUnitChange('exams'));
-        el('specialtySelect').addEventListener('change', () => onServiceChange('appointments'));
-        el('examTypeSelect').addEventListener('change', () => onServiceChange('exams'));
-        el('apptDoctorSelect').addEventListener('change', () => onDoctorChange('appointments'));
-        el('examDoctorSelect').addEventListener('change', () => onDoctorChange('exams'));
-        el('apptDateSelect').addEventListener('change', () => onDateChange('appointments'));
-        el('examDateSelect').addEventListener('change', () => onDateChange('exams'));
+        // P5.3: rascunho local — salva a cada digitação (só criação, não edição).
+        document.getElementById('apptForm').addEventListener('input', () => scheduleDraftSave('appointments'));
+        document.getElementById('apptForm').addEventListener('change', () => scheduleDraftSave('appointments'));
+        document.getElementById('examForm').addEventListener('input', () => scheduleDraftSave('exams'));
+        document.getElementById('examForm').addEventListener('change', () => scheduleDraftSave('exams'));
+
+        // Agendamento por vagas (Fase 4): serviço -> vagas -> seleção.
+        wireBookingForm('appointments');
+        wireBookingForm('exams');
 
         setDateLimits(); // item 2.4 — limite de 1 ano ativo em todos os campos
 
         await loadHealthUnits();
+        await loadBookingServices('appointments');
+        await loadBookingServices('exams');
         await loadAll();
+        refreshMfaStatus();
+        initProfile();
+        // P5.3: restaura rascunhos (precisa das unidades já carregadas).
+        await restoreDraft('appointments');
+        await restoreDraft('exams');
       } catch (err) {
         console.error(err);
         toast(err.message || 'Erro ao carregar o painel', 'error');
@@ -676,7 +891,8 @@
     });
 
     function switchTab(name) {
-      document.querySelectorAll('.tab').forEach(t => {
+      // Escopo: só abas principais — não apaga o destaque Consulta/Exame.
+      document.querySelectorAll('.tab[data-tab]').forEach(t => {
         const active = t.dataset.tab === name;
         t.classList.toggle('active', active);
         t.setAttribute('aria-selected', active ? 'true' : 'false');
@@ -684,6 +900,32 @@
       document.querySelectorAll('.tabpanel').forEach(p =>
         p.classList.toggle('active', p.id === name)
       );
+      if (name === 'minha-conta') loadMyAccountExtras();
+    }
+
+    let myAccountExtrasLoaded = false;
+    async function loadMyAccountExtras() {
+      if (myAccountExtrasLoaded) return;
+      myAccountExtrasLoaded = true;
+      try {
+        // /auth/me/export é a única leitura que traz privacy_version/consent_at do titular.
+        const data = await apiGet('/auth/me/export');
+        const p = data.profile || {};
+        const quando = p.consent_at ? fmtDate(p.consent_at) : 'não registrado';
+        document.getElementById('consentLine').innerHTML =
+          `<p style="margin:0">Política de privacidade na versão <strong>${esc(data.privacy_version || p.privacy_version || '—')}</strong></p>` +
+          `<p style="margin:4px 0 0">Consentimento registrado em: <strong>${esc(quando)}</strong></p>`;
+      } catch (err) {
+        document.getElementById('consentLine').textContent = err.message || 'Não foi possível ler os registros de consentimento.';
+      }
+      try {
+        const dpo = await (await fetch(window.API_BASE + '/public/dpo')).json();
+        document.getElementById('dpoLine').textContent = (dpo && dpo.configured && dpo.email)
+          ? `${dpo.name} — ${dpo.email}`
+          : 'a definir pela Secretaria (configure DPO_NAME/DPO_EMAIL na API)';
+      } catch (err) {
+        document.getElementById('dpoLine').textContent = 'indisponível no momento — tente mais tarde.';
+      }
     }
 
     function nowLocalForInput() {
@@ -694,24 +936,14 @@
     function isOverdue(at, status) { return new Date(at) < new Date() && status === 'pendente'; }
 
     async function loadHealthUnits() {
-      const selects = [el('apptLocationSelect'), el('examLocationSelect')];
-      selects.forEach(s => { if (s) s.innerHTML = '<option value="">Carregando...</option>'; });
-
+      // Fase 4: unidades alimentam o caminho manual ("Outra/Outro") por ID.
+      // As vagas guiadas vêm de /catalog/slots por serviço.
       try {
         const units = await apiGet('/health-units');
         healthUnits = Array.isArray(units) ? units : [];
-        if (!healthUnits.length) {
-          selects.forEach(s => { if (s) s.innerHTML = '<option value="">Nenhuma unidade cadastrada</option>'; });
-          return;
-        }
-        const opts = '<option value="">Selecione...</option>' + healthUnits.map(u => {
-          const neighborhood = u.neighborhood ? ' – ' + u.neighborhood : '';
-          return `<option value="${esc(u.name)}">${esc(u.name)}${esc(neighborhood)}</option>`;
-        }).join('');
-        selects.forEach(s => { if (s) s.innerHTML = opts; });
       } catch (err) {
         console.error('GET /health-units:', err);
-        selects.forEach(s => { if (s) s.innerHTML = '<option value="">Erro ao carregar unidades</option>'; });
+        healthUnits = [];
         toast(err.message || 'Erro ao carregar unidades de saúde', 'error');
       }
     }
@@ -731,8 +963,8 @@
         document.getElementById('welcomeBanner').innerHTML =
           (A.length === 0 && E.length === 0)
             ? `<div class="card" style="margin-bottom:16px;background:var(--primary-100);border-color:var(--primary)">
-           <h3 style="margin-bottom:4px">Bem-vindo(a) ao Saúde+</h3>
-           <p style="margin:0">Use as abas <strong>Consultas</strong> ou <strong>Exames</strong> para fazer seu primeiro agendamento.</p>
+           <h2 style="margin-bottom:4px">Bem-vindo(a) ao Saúde+</h2>
+            <p style="margin:0">Use a aba <strong>Agendar</strong> para fazer seu primeiro agendamento.</p>
          </div>` : '';
 
         document.getElementById('stats').innerHTML =
@@ -746,11 +978,11 @@
           .sort((a, b) => new Date(a.at) - new Date(b.at)).slice(0, 5);
 
         document.getElementById('upcoming').innerHTML = upcoming.length
-          ? upcoming.map(x => `<div class="item"><div><h4><span class="badge" style="margin-right:6px">${esc(x.type)}</span>${esc(x.title)}</h4><p>${esc(x.sub)}</p></div><span class="muted">${fmtDate(x.at)}</span></div>`).join('')
+          ? upcoming.map(x => `<div class="item"><div><h3><span class="badge" style="margin-right:6px">${esc(x.type)}</span>${esc(x.title)}</h3><p>${esc(x.sub)}</p></div><span class="muted">${fmtDate(x.at)}</span></div>`).join('')
           : '<div class="empty">Nenhum evento futuro agendado.</div>';
 
         document.getElementById('reminders').innerHTML = R.length
-          ? R.slice(0, 5).map(r => `<div class="item"><div><h4>${esc(r.title)}</h4><p>${esc(r.message || '')}</p></div><span class="badge ${r.read ? '' : 'badge-warning'}">${r.read ? 'Lido' : 'Novo'}</span></div>`).join('')
+          ? R.slice(0, 5).map(r => `<div class="item"><div><h3>${esc(r.title)}</h3><p>${esc(r.message || '')}</p></div><span class="badge ${r.read ? '' : 'badge-warning'}">${r.read ? 'Lido' : 'Novo'}</span></div>`).join('')
           : '<div class="empty">Nenhum lembrete no momento.</div>';
 
         const allItems = [
@@ -760,7 +992,7 @@
 
         document.getElementById('allScheduled').innerHTML = allItems.length
           ? allItems.map(r => `<div class="item"><div>
-          <h4><span class="badge" style="margin-right:6px">${esc(r._type)}</span>${esc(r._title)}</h4>
+          <h3><span class="badge" style="margin-right:6px">${esc(r._type)}</span>${esc(r._title)}</h3>
           <p>${esc(r._sub)} · <span class="badge ${statusClass(r.status)}">${esc(r.status)}</span>
           ${isOverdue(r.scheduled_at, r.status) ? ' <span class="badge badge-warning">atrasado</span>' : ''}</p>
         </div><div class="row">
@@ -770,19 +1002,19 @@
           : '<div class="empty">Nenhum agendamento encontrado.</div>';
 
         renderList('appts', A,
-          a => `<h4>${esc(a.specialty)} ${a.doctor ? 'com ' + esc(a.doctor) : ''}</h4>
+          a => `<h3>${esc(a.specialty)} ${a.doctor ? 'com ' + esc(a.doctor) : ''}</h3>
           <p>${esc(a.location)} · <span class="badge ${statusClass(a.status)}">${esc(a.status)}</span>
           ${isOverdue(a.scheduled_at, a.status) ? ' <span class="badge badge-warning">atrasado</span>' : ''}</p>`,
           a => fmtDate(a.scheduled_at), 'appointments', 'editAppt');
 
         renderList('exams', E,
-          e => `<h4>${esc(e.exam_type)}</h4>
+          e => `<h3>${esc(e.exam_type)}</h3>
           <p>${esc(e.location)} · <span class="badge ${statusClass(e.status)}">${esc(e.status)}</span>
           ${isOverdue(e.scheduled_at, e.status) ? ' <span class="badge badge-warning">atrasado</span>' : ''}</p>`,
           e => fmtDate(e.scheduled_at), 'exams', 'editExam');
 
         document.getElementById('diseases').innerHTML = D.length
-          ? D.map(d => `<div class="item"><div><h4>${esc(d.name)} <span class="badge ${levelClass(d.alert_level)}">${esc(d.alert_level)}</span></h4><p>${esc(d.description || '')} ${d.region ? '· ' + esc(d.region) : ''}</p></div></div>`).join('')
+          ? D.map(d => `<div class="item"><div><h3>${esc(d.name)} <span class="badge ${levelClass(d.alert_level)}">${esc(d.alert_level)}</span></h3><p>${esc(d.description || '')} ${d.region ? '· ' + esc(d.region) : ''}</p></div></div>`).join('')
           : '<div class="empty">Sem alertas ativos.</div>';
       } catch (err) {
         console.error(err);
@@ -806,15 +1038,154 @@
       }).join('');
     }
 
+    /* ---- Revisão antes de confirmar (P5.1) ----
+       O paciente vê "UBS · serviço · profissional · data/hora" e confirma —
+       em vez de 5 selects encadeados sem resumo. Reusa o padrão visual do
+       #cancelModal. Vale para criar e para editar. */
+    let pendingBooking = null;
+    function ensureReviewModal() {
+      if (document.getElementById('reviewModal')) return;
+      const style = document.createElement('style');
+      style.textContent = `#reviewModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
+  #reviewModal.show{display:flex}#reviewModal .cancel-modal-card{width:min(480px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
+  #reviewModal h2{margin:0 0 10px}#reviewModal .review-lines{margin:0 0 6px;line-height:1.7}#reviewModal .cancel-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}`;
+      document.head.appendChild(style);
+      document.body.insertAdjacentHTML('beforeend', `<div id="reviewModal" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
+    <div class="cancel-modal-card"><h2 id="reviewModalTitle">Confirmar agendamento</h2>
+    <div class="review-lines" id="reviewModalLines"></div>
+    <div class="cancel-modal-actions"><button type="button" class="btn btn-outline" id="reviewModalBack">Voltar</button>
+    <button type="button" class="btn btn-primary" id="reviewModalConfirm">Confirmar</button></div></div></div>`);
+      document.getElementById('reviewModalBack').addEventListener('click', closeReviewModal);
+      document.getElementById('reviewModal').addEventListener('click', e => { if (e.target.id === 'reviewModal') closeReviewModal(); });
+      document.getElementById('reviewModalConfirm').addEventListener('click', confirmBooking);
+    }
+    function reviewLines(kindKey, data) {
+      const isAppt = kindKey === 'appointments';
+      const when = fmtDate(data.scheduled_at);
+      const who = data.doctor ? data.doctor : 'A definir pela unidade';
+      const rows = [
+        ['Tipo', isAppt ? 'Consulta' : 'Exame'],
+        [isAppt ? 'Especialidade' : 'Exame', (isAppt ? data.specialty : data.exam_type) || '—'],
+        ['Local', data.location || '—'],
+        ['Profissional', who],
+        ['Data e hora', when],
+      ];
+      if (data.notes) rows.push(['Observações', data.notes]);
+      return rows.map(([k, v]) => `<p style="margin:2px 0"><span class="muted">${esc(k)}:</span> <strong>${esc(String(v))}</strong></p>`).join('');
+    }
+    // Abre a revisão; o envio real acontece em confirmBooking().
+    // submitFn: async () => void — já com botão em estado "Enviando...".
+    function openReviewModal({ title, linesHtml, confirmLabel, submitFn }) {
+      ensureReviewModal();
+      pendingBooking = { submitFn };
+      document.getElementById('reviewModalTitle').textContent = title;
+      document.getElementById('reviewModalLines').innerHTML = linesHtml;
+      document.getElementById('reviewModalConfirm').textContent = confirmLabel;
+      document.getElementById('reviewModal').classList.add('show');
+    }
+    function closeReviewModal() {
+      const m = document.getElementById('reviewModal');
+      if (m) m.classList.remove('show');
+      pendingBooking = null;
+    }
+    async function confirmBooking() {
+      if (!pendingBooking) return;
+      const { submitFn } = pendingBooking;
+      const b = document.getElementById('reviewModalConfirm');
+      b.disabled = true;
+      try {
+        await submitFn();
+        closeReviewModal();
+      } catch (err) {
+        toast(err.message || 'Erro ao salvar', 'error');
+      } finally {
+        b.disabled = false;
+      }
+    }
+
+    /* ---- Rascunho local (P5.3, formato v2) ----
+       Salva o `bookingState` em andamento no localStorage; se a sessão cair
+       ou a página recarregar, restaura serviço + vaga (se ainda existir) ou
+       o caminho manual. Rascunhos antigos (cascata, sem `v:2`) são ignorados.
+       Só para novos agendamentos — edição usa o registro do servidor. */
+    let restoringDraft = false;
+    function draftKey(kindKey) {
+      const uid = (SESSION && SESSION.user && SESSION.user.id) || 'anon';
+      return `saude_draft_${uid}_${kindKey}`;
+    }
+    function isEditing(kindKey) {
+      return kindKey === 'appointments' ? !!editingApptId : !!editingExamId;
+    }
+    function saveDraft(kindKey) {
+      try {
+        if (restoringDraft || isEditing(kindKey)) return;
+        const s = bookingState[kindKey];
+        const m = BOOKING_FORMS[kindKey];
+        const draft = {
+          v: 2, servico: s.servico || '', manual: !!s.manual,
+          manualService: s.manualService || '', manualUnitId: s.manualUnitId || '',
+          manualWhen: s.manualWhen || '', selecao: s.selecao || null,
+          notes: el(m.form).notes ? el(m.form).notes.value || '' : '',
+        };
+        if (!draft.servico && !draft.notes) {
+          localStorage.removeItem(draftKey(kindKey));
+          return;
+        }
+        localStorage.setItem(draftKey(kindKey), JSON.stringify(draft));
+      } catch (e) { /* storage cheio/bloqueado: ignora */ }
+    }
+    function clearDraft(kindKey) {
+      try { localStorage.removeItem(draftKey(kindKey)); } catch (e) { /* ignora */ }
+    }
+    let draftTimer = null;
+    function scheduleDraftSave(kindKey) {
+      clearTimeout(draftTimer);
+      draftTimer = setTimeout(() => saveDraft(kindKey), 500);
+    }
+    async function restoreDraft(kindKey) {
+      let draft = null;
+      try { draft = JSON.parse(localStorage.getItem(draftKey(kindKey)) || 'null'); } catch (e) { return; }
+      if (!draft || draft.v !== 2 || (!draft.servico && !draft.notes)) return;
+      const m = BOOKING_FORMS[kindKey];
+      const s = bookingState[kindKey];
+      restoringDraft = true;
+      try {
+        if (draft.servico && draft.servico !== m.otherValue &&
+            !bookingState[kindKey].servicos.some((o) => o.name === draft.servico)) return;
+        s.servico = draft.servico || '';
+        s.manual = !!draft.manual || draft.servico === m.otherValue;
+        s.manualService = draft.manualService || '';
+        s.manualUnitId = draft.manualUnitId || '';
+        s.manualWhen = draft.manualWhen || '';
+        s.selecao = null;
+        if (kindKey === bookingTipo) renderBooking();
+        if (s.servico && !s.manual) {
+          await fetchSlotsFor(kindKey, null);
+          if (draft.selecao) {
+            const still = findSlot(s, draft.selecao.unit_id, draft.selecao.scheduled_at);
+            if (still) {
+              s.selecao = still;
+              if (kindKey === bookingTipo) renderBooking();
+            }
+          }
+        } else if (kindKey === bookingTipo) {
+          renderBooking();
+        }
+        if (el(m.form).notes) el(m.form).notes.value = draft.notes || '';
+        toast('Rascunho recuperado — confira e confirme.', 'success');
+      } catch (e) { /* rascunho parcial: mantém o que deu */ }
+      finally { restoringDraft = false; }
+    }
+
     function ensureCancelModal() {
       if (document.getElementById('cancelModal')) return;
       const style = document.createElement('style');
       style.textContent = `#cancelModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
-  #cancelModal.show{display:flex}#cancelModal .cancel-modal-card{width:min(460px,100%);background:var(--surface,#fff);border:1px solid var(--border,#ddd);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
-  #cancelModal h3{margin:0 0 10px}#cancelModal p{margin:0;line-height:1.55}#cancelModal .cancel-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}`;
+  #cancelModal.show{display:flex}#cancelModal .cancel-modal-card{width:min(460px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
+  #cancelModal h2{margin:0 0 10px}#cancelModal p{margin:0;line-height:1.55}#cancelModal .cancel-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}`;
       document.head.appendChild(style);
       document.body.insertAdjacentHTML('beforeend', `<div id="cancelModal" role="dialog" aria-modal="true" aria-labelledby="cancelModalTitle">
-    <div class="cancel-modal-card"><h3 id="cancelModalTitle">Cancelar agendamento?</h3>
+    <div class="cancel-modal-card"><h2 id="cancelModalTitle">Cancelar agendamento?</h2>
     <p id="cancelModalText">Se você cancelar, pode não haver outra vaga disponível tão cedo.</p>
     <div class="cancel-modal-actions"><button type="button" class="btn btn-outline" id="cancelModalBack">Voltar</button>
     <button type="button" class="btn btn-primary" id="cancelModalConfirm" style="background:var(--danger);border-color:var(--danger)">Sim, cancelar</button></div></div></div>`);
@@ -845,9 +1216,12 @@
     /* ---------------------- abrir formulário para editar / reagendar ---------------------- */
 
     async function openBookingForm(kindKey, record, { rebook } = {}) {
-      const m = KIND_META[kindKey];
-      // limpa qualquer edição anterior mantendo as unidades carregadas
+      const m = BOOKING_FORMS[kindKey];
+      const s = bookingState[kindKey];
+      // limpa qualquer edição anterior
       resetBookingForm(kindKey);
+      switchTab('agendar');
+      setBookingKind(kindKey);
 
       if (rebook) {
         toast('Escolha uma nova data e horário para concluir o agendamento.', 'success');
@@ -856,79 +1230,45 @@
         startEditingUI(kindKey);
       }
 
-      // 1) local
-      ensureLocationOption(el(m.location), record.location || '');
-
-      // 2) registros antigos (sem unit_id) entram pelo caminho "Outro",
-      //    preservando especialidade/local em texto livre.
-      const hasUnit = !!record.unit_id && !!unitIdByName(record.location || '');
-      if (!hasUnit) {
-        formState[kindKey].customLegacy = true;
-        setSelect(el(m.service), [{ value: m.otherValue, text: 'Outro (especificar)' }], '', false);
-        el(m.service).value = m.otherValue;
-        enterCustomService(m);
-        el(m.other).value = kindKey === 'appointments' ? (record.specialty || '') : (record.exam_type || '');
-        el(m.doctorName).value = record.doctor || '';
-        if (!rebook) el(m.manual).value = toDatetimeLocalValue(record.scheduled_at);
-        if (rebook) { el(m.location).focus(); }
-        el(m.form).scrollIntoView({ behavior: 'smooth', block: 'start' });
-        return;
-      }
-
-      formState[kindKey].customLegacy = false;
-      await onUnitChange(kindKey);
-      el(m.location).value = record.location;
-
-      const offers = await (async () => {
-        try {
-          return await apiGet('/catalog/offers?unit_id=' + encodeURIComponent(record.unit_id) + '&kind=' + m.kind);
-        } catch (e) { return []; }
-      })();
       const serviceName = kindKey === 'appointments' ? record.specialty : record.exam_type;
-      const known = Array.isArray(offers) && offers.includes(serviceName) && record.professional_id;
+      const editingId = rebook ? null : record.id;
 
-      if (!known) {
-        // serviço fora da oferta atual da unidade ou sem profissional vinculado
-        if (Array.isArray(offers) && offers.includes(serviceName) && !record.professional_id) {
-          // registro com serviço conhecido mas alocado sem profissional: mantém texto
-          formState[kindKey].customLegacy = true;
-          setSelect(el(m.service), (offers || []).map(n => ({ value: n, text: n }))
-            .concat([{ value: m.otherValue, text: 'Outro (especificar)' }]), 'Selecione...', false);
-          el(m.service).value = m.otherValue;
-          enterCustomService(m);
-          el(m.other).value = serviceName;
-        } else {
-          formState[kindKey].customLegacy = true;
-          setSelect(el(m.service), [{ value: m.otherValue, text: 'Outro (especificar)' }], '', false);
-          el(m.service).value = m.otherValue;
-          enterCustomService(m);
-          el(m.other).value = serviceName;
-        }
-        el(m.doctorName).value = record.doctor || '';
-        if (!rebook) el(m.manual).value = toDatetimeLocalValue(record.scheduled_at);
-        el(m.form).scrollIntoView({ behavior: 'smooth', block: 'start' });
-        return;
-      }
-
-      // caminho guiado: unidade -> serviço -> profissional -> dia -> horário
-      el(m.service).value = serviceName;
-      await onServiceChange(kindKey);
-      el(m.doctor).value = record.professional_id;
-      el(m.doctorName).value = record.doctor || '';
-      await onDoctorChange(kindKey);
-
-      if (!rebook) {
-        const datePart = (record.scheduled_at || '').slice(0, 10);
-        const timePart = (record.scheduled_at || '').slice(11, 16);
-        if (el(m.date).value !== datePart && Array.from(el(m.date).options).some(o => o.value === datePart)) {
-          el(m.date).value = datePart;
-        }
-        if (el(m.date).value) {
-          onDateChange(kindKey);
-          if (Array.from(el(m.time).options).some(o => o.value === timePart)) el(m.time).value = timePart;
+      // 1) caminho guiado: serviço conhecido no catálogo atual?
+      let guided = false;
+      if (serviceName && s.servicos.some((o) => o.name === serviceName)) {
+        s.servico = serviceName;
+        s.manual = false;
+        renderBooking();
+        await fetchSlotsFor(kindKey, editingId);
+        guided = true;
+        if (!rebook) {
+          // pré-seleciona a vaga atual se ainda existir
+          const still = record.unit_id ? findSlot(s, record.unit_id, record.scheduled_at) : null;
+          if (still) {
+            s.selecao = still;
+            s.diaAberto = { [still.unit_id]: still.date };
+          } else {
+            s.erro = 'A vaga original não está mais livre — escolha outro horário.';
+          }
+          renderBooking();
         }
       }
+
+      // 2) caminho manual: serviço fora do catálogo ou registro sem vínculo
+      if (!guided) {
+        s.servico = m.otherValue;
+        s.manual = true;
+        s.manualService = serviceName || '';
+        const mu = healthUnits.find((u) => u.name === (record.location || ''));
+        s.manualUnitId = (record.unit_id && healthUnits.some((u) => u.id === record.unit_id)) ? record.unit_id : (mu ? mu.id : '');
+        s.manualWhen = rebook ? '' : toDatetimeLocalValue(record.scheduled_at);
+        s.selecao = null;
+        s.erro = '';
+        renderBooking();
+      }
+
       el(m.form).scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scheduleDraftSave(kindKey);
     }
 
     window.editAppt = function (id) {
@@ -966,7 +1306,7 @@
       const btn = form.querySelector('button[type=submit]');
       if (btn.disabled) return;
 
-      const payload = validateBookingForm('appointments');
+      const payload = buildBookingPayload('appointments');
       if (!payload) return;
 
       const data = {
@@ -979,23 +1319,25 @@
         professional_id: payload.professional_id || null,
       };
 
-      btn.disabled = true; const old = btn.textContent; btn.textContent = 'Enviando...';
-      try {
-        if (editingApptId) {
-          await apiPut('/me/appointments/' + encodeURIComponent(editingApptId), data);
-          toast('Consulta atualizada', 'success');
-          stopEditingUI('appointments');
-        } else {
-          await apiPost('/me/appointments', data);
-          resetBookingForm('appointments');
-          toast('Consulta agendada', 'success');
-        }
-        await loadAll();
-      } catch (err) {
-        toast(err.message || 'Erro ao agendar consulta', 'error');
-      } finally {
-        btn.disabled = false; btn.textContent = old;
-      }
+      // P5.1: revisão antes de confirmar (criar ou editar).
+      openReviewModal({
+        title: editingApptId ? 'Salvar alterações?' : 'Confirmar agendamento',
+        linesHtml: reviewLines('appointments', data),
+        confirmLabel: editingApptId ? 'Salvar alterações' : 'Confirmar agendamento',
+        submitFn: async () => {
+          if (editingApptId) {
+            await apiPut('/me/appointments/' + encodeURIComponent(editingApptId), data);
+            toast('Consulta atualizada', 'success');
+            stopEditingUI('appointments');
+          } else {
+            await apiPost('/me/appointments', data);
+            resetBookingForm('appointments');
+            clearDraft('appointments');
+            toast('Consulta agendada', 'success');
+          }
+          await loadAll();
+        },
+      });
     }
 
     async function addExam(e) {
@@ -1004,7 +1346,7 @@
       const btn = form.querySelector('button[type=submit]');
       if (btn.disabled) return;
 
-      const payload = validateBookingForm('exams');
+      const payload = buildBookingPayload('exams');
       if (!payload) return;
 
       const data = {
@@ -1014,25 +1356,308 @@
         notes: payload.notes,
         unit_id: payload.unit_id,
         professional_id: payload.professional_id || null,
-        doctor: payload.doctor,
       };
 
-      btn.disabled = true; const old = btn.textContent; btn.textContent = 'Enviando...';
+      // P5.1: revisão antes de confirmar (criar ou editar).
+      openReviewModal({
+        title: editingExamId ? 'Salvar alterações?' : 'Confirmar agendamento',
+        linesHtml: reviewLines('exams', data),
+        confirmLabel: editingExamId ? 'Salvar alterações' : 'Confirmar agendamento',
+        submitFn: async () => {
+          if (editingExamId) {
+            await apiPut('/me/exams/' + encodeURIComponent(editingExamId), data);
+            toast('Exame atualizado', 'success');
+            stopEditingUI('exams');
+          } else {
+            await apiPost('/me/exams', data);
+            resetBookingForm('exams');
+            clearDraft('exams');
+            toast('Exame agendado', 'success');
+          }
+          await loadAll();
+        },
+      });
+    }
+
+    // ---- MFA (Aulas 1/6): ativação e estado ----
+    async function refreshMfaStatus() {
       try {
-        if (editingExamId) {
-          await apiPut('/me/exams/' + encodeURIComponent(editingExamId), data);
-          toast('Exame atualizado', 'success');
-          stopEditingUI('exams');
-        } else {
-          await apiPost('/me/exams', data);
-          resetBookingForm('exams');
-          toast('Exame agendado', 'success');
+        const { user } = await apiGet('/auth/me');
+        const on = !!Number(user.totp_enabled);
+        document.getElementById('mfaStatus').textContent = on
+          ? 'Ativada. O login exige o código do app autenticador.'
+          : 'Desativada. Recomendado para atendentes e administradores.';
+        document.getElementById('mfaSetupBtn').style.display = on ? 'none' : '';
+        document.getElementById('mfaDisableBtn').style.display = on ? '' : 'none';
+        if (!on) document.getElementById('mfaSetup').style.display = 'none';
+      } catch (err) { document.getElementById('mfaStatus').textContent = 'Não foi possível verificar.'; }
+    }
+    async function startMfaSetup() {
+      try {
+        const data = await apiPost('/auth/mfa/setup', {});
+        document.getElementById('mfaSecret').textContent = data.secret;
+        document.getElementById('mfaSetup').style.display = 'block';
+        toast('Segredo gerado — cadastre no app autenticador', 'success');
+      } catch (err) { toast(err.message || 'Erro', 'error'); }
+    }
+    async function enableMfa() {
+      const code = document.getElementById('mfaEnableCode').value.trim();
+      try {
+        await apiPost('/auth/mfa/enable', { code });
+        toast('Verificação em 2 etapas ativada', 'success');
+        refreshMfaStatus();
+      } catch (err) { toast(err.message || 'Código inválido', 'error'); }
+    }
+    /* ---- Meu perfil (P4: completa o cadastro mínimo) ----
+       Campos opcionais rastreados para a barra de progresso. */
+    const PROFILE_TRACKED = ['social_name', 'gender', 'mother_name', 'father_name',
+      'rg', 'cns', 'phone', 'blood_type', 'priority', 'race', 'cep', 'zone'];
+    const PROFILE_IDS = {
+      full_name: 'p_full_name', social_name: 'p_social_name', birth_date: 'p_birth_date',
+      gender: 'p_gender', mother_name: 'p_mother_name', father_name: 'p_father_name',
+      guardian_name: 'p_guardian', cpf: 'p_cpf', rg: 'p_rg', cns: 'p_cns',
+      mobile: 'p_mobile', phone: 'p_phone', blood_type: 'p_blood_type',
+      priority: 'p_priority', race: 'p_race', cep: 'p_cep', street: 'p_street',
+      address_number: 'p_number', neighborhood: 'p_neighborhood', city: 'p_city',
+      state: 'p_state', zone: 'p_zone', reference_point: 'p_reference',
+    };
+    function profileCompleteness(user) {
+      const filled = PROFILE_TRACKED.filter(k => user[k] !== null && user[k] !== undefined && String(user[k]).trim() !== '').length;
+      return Math.round((filled / PROFILE_TRACKED.length) * 100);
+    }
+    async function initProfile() {
+      try {
+        const { user } = await apiGet('/auth/me');
+        for (const [key, id] of Object.entries(PROFILE_IDS)) {
+          const el = document.getElementById(id);
+          if (el && user[key] !== null && user[key] !== undefined) el.value = user[key];
         }
-        await loadAll();
+        // Responsável aparece se menor de 18.
+        if (user.birth_date) {
+          const birth = new Date(user.birth_date + 'T00:00:00');
+          let age = new Date().getFullYear() - birth.getFullYear();
+          const m = new Date().getMonth() - birth.getMonth();
+          if (m < 0 || (m === 0 && new Date().getDate() < birth.getDate())) age--;
+          if (age < 18) document.getElementById('p_guardianField').style.display = '';
+        }
+        const pct = profileCompleteness(user);
+        document.getElementById('profileBar').style.width = pct + '%';
+        document.getElementById('profilePct').textContent = pct + '%';
+        if (pct < 100) {
+          document.getElementById('profileBanner').innerHTML =
+            `<div class="card" style="margin-bottom:16px;background:var(--primary-100);border-color:var(--primary)">
+               <h2 style="margin-bottom:4px">Complete seu perfil (${pct}%)</h2>
+               <p style="margin:0 0 12px">Faltam dados como CNS e endereço — eles melhoram seu atendimento.</p>
+               <button class="btn btn-primary btn-sm" type="button" onclick="switchTab('minha-conta')">Completar agora</button>
+             </div>`;
+        }
+        document.getElementById('p_cpf').addEventListener('input', e => maskCpf(e.target));
+        document.getElementById('p_cns').addEventListener('input', e => maskCns(e.target));
+        document.getElementById('p_mobile').addEventListener('input', e => maskPhone(e.target, true));
+        document.getElementById('p_phone').addEventListener('input', e => maskPhone(e.target, false));
+        document.getElementById('profileForm').addEventListener('submit', saveProfile);
+      } catch (err) { console.error('perfil:', err); }
+    }
+    async function saveProfile(e) {
+      e.preventDefault();
+      const btn = document.getElementById('profileSubmit');
+      const get = (id) => document.getElementById(id).value.trim();
+      // Validação local dos documentos (mesmas regras do back).
+      if (get('p_cpf') && !isValidCPF(get('p_cpf'))) {
+        setFieldError(document.getElementById('p_cpf'), 'CPF inválido. Confira os números digitados.');
+        showFirstError(document.getElementById('p_cpf'));
+        return;
+      }
+      const cnsDigits = get('p_cns').replace(/\D/g, '');
+      if (cnsDigits && !isValidCNS(get('p_cns'))) {
+        setFieldError(document.getElementById('p_cns'), 'Cartão SUS inválido. Confira os 15 números do cartão.');
+        showFirstError(document.getElementById('p_cns'));
+        return;
+      }
+      if (get('p_cep') && get('p_cep').replace(/\D/g, '').length !== 8) {
+        setFieldError(document.getElementById('p_cep'), 'O CEP precisa ter 8 dígitos.');
+        showFirstError(document.getElementById('p_cep'));
+        return;
+      }
+      btn.disabled = true;
+      try {
+        await apiPut('/auth/me', {
+          full_name: get('p_full_name') || undefined,
+          social_name: get('p_social_name'), birth_date: get('p_birth_date') || undefined,
+          gender: get('p_gender'), mother_name: get('p_mother_name'), father_name: get('p_father_name'),
+          guardian_name: get('p_guardian'), cpf: get('p_cpf') || undefined,
+          rg: get('p_rg'), cns: get('p_cns'),
+          mobile: get('p_mobile') || undefined, phone: get('p_phone'),
+          blood_type: get('p_blood_type'), priority: get('p_priority'), race: get('p_race'),
+          cep: get('p_cep'), street: get('p_street'), address_number: get('p_number'),
+          neighborhood: get('p_neighborhood'), city: get('p_city'), state: get('p_state'),
+          zone: get('p_zone'), reference_point: get('p_reference'),
+        });
+        toast('Perfil salvo', 'success');
+        initProfile();
+      } catch (err) { toast(err.message || 'Erro ao salvar perfil', 'error'); }
+      finally { btn.disabled = false; }
+    }
+    /* ---- Modal de senha (P2a.1: substitui prompt()/confirm() nativos) ----
+       Senha em <input type="password"> (nunca em texto claro), com nome
+       acessível e foco gerenciado — mesmo padrão do #cancelModal. */
+    let passwordResolve = null;
+    function ensurePasswordModal() {
+      if (document.getElementById('passwordModal')) return;
+      const style = document.createElement('style');
+      style.textContent = `#passwordModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
+  #passwordModal.show{display:flex}#passwordModal .cancel-modal-card{width:min(460px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
+  #passwordModal h2{margin:0 0 10px}#passwordModal p{margin:0 0 12px;line-height:1.55}#passwordModal .cancel-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+  #passwordModalError{color:var(--danger);font-size:.85rem;margin:8px 0 0}`;
+      document.head.appendChild(style);
+      document.body.insertAdjacentHTML('beforeend', `<div id="passwordModal" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
+    <div class="cancel-modal-card"><h2 id="passwordModalTitle">Confirme sua senha</h2>
+    <p id="passwordModalText"></p>
+    <div class="field" id="passwordModalField"><label for="passwordModalInput">Senha</label><input class="input" id="passwordModalInput" type="password" autocomplete="current-password"></div>
+    <p id="passwordModalError" style="display:none"></p>
+    <div class="cancel-modal-actions"><button type="button" class="btn btn-outline" id="passwordModalBack">Voltar</button>
+    <button type="button" class="btn btn-primary" id="passwordModalConfirm">Confirmar</button></div></div></div>`);
+      document.getElementById('passwordModalBack').addEventListener('click', () => finishPassword(null));
+      document.getElementById('passwordModal').addEventListener('click', e => { if (e.target.id === 'passwordModal') finishPassword(null); });
+      document.getElementById('passwordModalConfirm').addEventListener('click', () => {
+        if (document.getElementById('passwordModalField').style.display === 'none') {
+          finishPassword(true); // etapa de confirmação (sem senha): devolve true
+        } else {
+          finishPassword(document.getElementById('passwordModalInput').value);
+        }
+      });
+      document.getElementById('passwordModalInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') document.getElementById('passwordModalConfirm').click();
+        if (e.key === 'Escape') finishPassword(null);
+      });
+    }
+    function finishPassword(value) {
+      document.getElementById('passwordModal').classList.remove('show');
+      const resolve = passwordResolve;
+      passwordResolve = null;
+      if (resolve) resolve(value);
+    }
+    // Etapa 1: pede a senha. Resolve com a senha digitada (string, pode ser '')
+    // ou null se o usuário voltar/fechar.
+    function askPassword({ title, text, confirmLabel, error }) {
+      ensurePasswordModal();
+      document.getElementById('passwordModalTitle').textContent = title || 'Confirme sua senha';
+      document.getElementById('passwordModalText').textContent = text || '';
+      document.getElementById('passwordModalField').style.display = '';
+      document.getElementById('passwordModalInput').value = '';
+      passwordModalError(error || '');
+      const btn = document.getElementById('passwordModalConfirm');
+      btn.textContent = confirmLabel || 'Confirmar';
+      btn.style.background = ''; btn.style.borderColor = '';
+      return new Promise((resolve) => {
+        passwordResolve = resolve;
+        document.getElementById('passwordModal').classList.add('show');
+        setTimeout(() => document.getElementById('passwordModalInput').focus(), 50);
+      });
+    }
+    // Etapa 2 (ações destrutivas): confirmação explícita, sem senha.
+    function askConfirm({ title, text, confirmLabel }) {
+      ensurePasswordModal();
+      document.getElementById('passwordModalTitle').textContent = title;
+      document.getElementById('passwordModalText').textContent = text;
+      document.getElementById('passwordModalField').style.display = 'none';
+      document.getElementById('passwordModalError').style.display = 'none';
+      const btn = document.getElementById('passwordModalConfirm');
+      btn.textContent = confirmLabel;
+      btn.style.background = 'var(--danger)'; btn.style.borderColor = 'var(--danger)';
+      return new Promise((resolve) => {
+        passwordResolve = resolve;
+        document.getElementById('passwordModal').classList.add('show');
+        setTimeout(() => btn.focus(), 50);
+      });
+    }
+    function passwordModalError(message) {
+      const el = document.getElementById('passwordModalError');
+      el.textContent = message;
+      el.style.display = message ? '' : 'none';
+    }
+
+    async function disableMfa() {
+      let error = '';
+      for (;;) {
+        const pwd = await askPassword({
+          title: 'Desativar verificação em duas etapas',
+          text: 'Digite sua senha para confirmar.',
+          confirmLabel: 'Desativar',
+          error,
+        });
+        if (pwd === null) return; // usuário voltou/fechou
+        try {
+          await apiPost('/auth/mfa/disable', { password: pwd });
+          toast('MFA desativado', 'success');
+          refreshMfaStatus();
+          return;
+        } catch (err) {
+          if (/senha/i.test(err.message || '')) { error = err.message; continue; }
+          toast(err.message || 'Erro', 'error');
+          return;
+        }
+      }
+    }
+
+    // ---- Meus dados (LGPD, Fase 1): portabilidade e eliminação ----
+    async function downloadMyData() {
+      try {
+        const data = await apiGet('/auth/me/export');
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'meus-dados-saude-mais.json';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        toast('Dados baixados', 'success');
       } catch (err) {
-        toast(err.message || 'Erro ao agendar exame', 'error');
-      } finally {
-        btn.disabled = false; btn.textContent = old;
+        toast(err.message || 'Erro ao baixar dados', 'error');
+      }
+    }
+
+    async function deleteMyAccount() {
+      // Etapa 1: senha. Etapa 2: confirmação. Se a senha estiver errada, o
+      // DELETE devolve 401 e o fluxo volta para a etapa 1 com o erro visível.
+      let pwd = null;
+      let error = '';
+      for (;;) {
+        pwd = await askPassword({
+          title: 'Excluir minha conta',
+          text: 'Digite sua senha para continuar. Na próxima tela você confirma a exclusão.',
+          confirmLabel: 'Continuar',
+          error,
+        });
+        if (pwd === null) return;
+        // Etapa 2: confirmação explícita (substitui o confirm() nativo).
+        const ok = await askConfirm({
+          title: 'Tem certeza?',
+          text: 'Seu perfil será anonimizado, agendamentos futuros cancelados e você sairá do sistema.',
+          confirmLabel: 'Sim, excluir minha conta',
+        });
+        if (!ok) return;
+        try {
+          // apiDelete não envia corpo; usa fetch direto com a senha de confirmação.
+          var token = localStorage.getItem('saude_token');
+          var res = await fetch(window.API_BASE + '/auth/me', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ password: pwd })
+          });
+          if (!res.ok) {
+            var body = null;
+            try { body = await res.json(); } catch (_e) { /* sem corpo */ }
+            throw new Error((body && body.error) || ('Erro inesperado (' + res.status + ')'));
+          }
+          toast('Conta excluída. Até logo!', 'success');
+          setTimeout(signOut, 1200);
+          return;
+        } catch (err) {
+          if (/senha/i.test(err.message || '')) { error = err.message; continue; }
+          toast(err.message || 'Erro ao excluir conta', 'error');
+          return;
+        }
       }
     }
 
@@ -1060,6 +1685,7 @@
     });
 
     ensureCancelModal();
+    ensureReviewModal();
   </script>
 </body>
 

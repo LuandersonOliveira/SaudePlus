@@ -3,12 +3,15 @@
 
    Alimenta os seletores dependentes do painel do paciente:
    unidade -> especialidades/tipos de exame -> profissionais -> dias/horários.
+   E o fluxo "serviço primeiro" (Fase 1, item 1): /services lista os serviços
+   de todas as unidades; /slots devolve os cartões de unidades/dias com
+   vagas livres de verdade para o serviço escolhido.
    Tudo lido do cadastro administrativo; nada de texto livre.
    ========================================================================== */
 const express = require('express');
 const pool = require('../db');
 const { verifyToken } = require('../middleware/auth');
-const { KINDS, getAvailability } = require('../utils/booking');
+const { KINDS, TIPOS, getAvailability, findAvailabilityByService } = require('../utils/booking');
 
 const router = express.Router();
 router.use(verifyToken);
@@ -69,6 +72,57 @@ router.get('/availability', async (req, res, next) => {
       professionalId: professionalId || null,
       kind,
       serviceName: name || '',
+      fromDate,
+      days,
+      excludeId,
+    });
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+// GET /catalog/services?tipo=consulta|exame
+// Catálogo de serviços (todas as unidades ativas) — 1º passo do fluxo
+// "serviço primeiro" (Fase 1, item 1). Não depende de unidade.
+router.get('/services', async (req, res, next) => {
+  try {
+    const tipo = req.query.tipo || req.query.kind;
+    if (!TIPOS[tipo]) {
+      return res.status(400).json({ error: 'tipo deve ser consulta ou exame.' });
+    }
+    const [rows] = await pool.query(
+      `SELECT o.name, COUNT(DISTINCT o.unit_id) AS unidades
+       FROM unit_offers o
+       JOIN health_units u ON u.id = o.unit_id
+       WHERE o.kind = ? AND o.active = 1 AND u.active = 1
+       GROUP BY o.name
+       ORDER BY o.name`,
+      [tipo]
+    );
+    res.json(rows.map((r) => ({ name: r.name, unidades: Number(r.unidades) })));
+  } catch (err) { next(err); }
+});
+
+// GET /catalog/slots?tipo=&name=&days=30&exclude_id=
+// Cartões de unidades e dias com VAGAS LIVRES DE VERDADE para o serviço
+// (Fase 1, item 1). Agrega todos os profissionais; conflitos de 30 min e
+// bloqueios já vêm removidos. Só retorna unidades/dias com pelo menos 1 vaga.
+router.get('/slots', async (req, res, next) => {
+  try {
+    const tipo = req.query.tipo || req.query.kind;
+    const name = String(req.query.name || '').trim();
+    const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 60);
+    const excludeId = String(req.query.exclude_id || '').trim() || null;
+    if (!TIPOS[tipo]) {
+      return res.status(400).json({ error: 'tipo deve ser consulta ou exame.' });
+    }
+    if (!name) {
+      return res.status(400).json({ error: 'name (nome do serviço) é obrigatório.' });
+    }
+    const from = new Date();
+    const fromDate = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`;
+    const result = await findAvailabilityByService(pool, {
+      tipo,
+      servico: name,
       fromDate,
       days,
       excludeId,

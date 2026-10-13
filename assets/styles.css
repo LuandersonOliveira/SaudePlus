@@ -1,9 +1,21 @@
 /* ==========================================================================
    Saúde+ — Design system
+   Fonte Inter autohospedada (latin, variável 100–900): zero dependência
+   de rede — primeiro paint funciona com 3G instável ou offline. */
+
+/* latin */
+@font-face{
+  font-family:'Inter'; font-style:normal; font-weight:100 900; font-display:swap;
+  src:url('fonts/inter-latin.woff2') format('woff2');
+}
    Identidade: a "lagoa" (Lagoa de Itaenga) como fio condutor — água, ondas,
    conexão que se espalha. Paleta de alto contraste e tipografia generosa
    porque o público inclui pessoas com baixa familiaridade digital.
    ========================================================================== */
+
+/* P1 acessibilidade: texto visível só para leitor de tela (rótulos que o
+   layout dispensa visualmente, mas a WCAG/e-MAG exige). */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 :root{
   /* Cor — paleta "lagoa" */
@@ -20,6 +32,9 @@
   --danger-bg:  #FBE7E4;
   --warning:    #B9790F;
   --warning-bg: #FBF0DC;
+  --warning-ink:#6B4A00;   /* texto sobre warning-bg — AA 4.5:1 (Fase 1) */
+  --brand-dot-hi:#5FC9B8;  /* brilho do brand-dot — Fase 1 */
+  --radius-xs: 6px;        /* anel de foco — Fase 1 */
   --success:    #1E8F5E;
   --success-bg: #E1F3EA;
 
@@ -59,11 +74,12 @@ a:focus-visible, button:focus-visible, input:focus-visible,
 textarea:focus-visible, select:focus-visible, .tab:focus-visible{
   outline:3px solid var(--primary);
   outline-offset:2px;
-  border-radius:6px;
+  border-radius:var(--radius-xs);
 }
 
 @media (prefers-reduced-motion: reduce){
-  *{ animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  *, *::before, *::after{ animation-duration:.001ms !important; transition-duration:.001ms !important; scroll-behavior:auto !important; }
+  .hero::after{ display:none; }
 }
 
 /* ---------- Topbar ---------- */
@@ -80,7 +96,7 @@ textarea:focus-visible, select:focus-visible, .tab:focus-visible{
 }
 .brand-dot{
   width:14px; height:14px; border-radius:50%;
-  background:radial-gradient(circle at 30% 30%, #5FC9B8, var(--primary) 70%);
+  background:radial-gradient(circle at 30% 30%, var(--brand-dot-hi), var(--primary) 70%);
   box-shadow:0 0 0 4px var(--primary-100);
   flex:none;
 }
@@ -181,6 +197,15 @@ textarea:focus-visible, select:focus-visible, .tab:focus-visible{
 @media (min-width:761px) and (max-width:1000px){
   .grid-5{ grid-template-columns:repeat(3,1fr); }
 }
+/* Telas com sidebar: o conteúdo perde ~256px em relação à janela.
+   As media queries medem a JANELA, então os grids colapsam mais cedo
+   só dentro do shell — as páginas sem rail não são afetadas. */
+@media (min-width:761px) and (max-width:1300px){
+  .app-shell .grid-5{ grid-template-columns:repeat(3,1fr); }
+}
+@media (min-width:761px) and (max-width:1150px){
+  .app-shell .grid-4{ grid-template-columns:repeat(2,1fr); }
+}
 
 /* ---------- Cards ---------- */
 .card{
@@ -198,6 +223,88 @@ textarea:focus-visible, select:focus-visible, .tab:focus-visible{
 .tab.active{ color:var(--primary-600); border-bottom-color:var(--primary); }
 .tabpanel{ display:none; }
 .tabpanel.active{ display:block; }
+
+/* ---------- Sidebar fixa (painéis com rail lateral) ---------- */
+.app-shell{
+  display:grid; grid-template-columns:256px minmax(0,1fr); min-height:100vh;
+}
+.app-rail{
+  display:flex; flex-direction:column; gap:18px;
+  padding:18px 14px; background:var(--surface);
+  border-right:1px solid var(--border);
+  position:sticky; top:0; height:100vh; overflow-y:auto;
+}
+.app-main{ min-width:0; display:flex; flex-direction:column; }
+.rail-brand{ display:flex; align-items:center; gap:8px; padding:0 6px; }
+/* Rodapé do rail: quem está logado + sair */
+.rail-user{
+  display:flex; flex-direction:column; gap:10px;
+  padding:14px 12px 2px; border-top:1px solid var(--border);
+}
+.rail-user-head{ display:flex; flex-direction:column; gap:6px; }
+.rail-user-head .badge{
+  align-self:flex-start; text-transform:uppercase; letter-spacing:.04em; margin:0;
+}
+.rail-user-name{ font-weight:700; line-height:1.3; overflow-wrap:anywhere; }
+.rail-user-email{
+  font-size:.82rem; color:var(--muted); word-break:break-all; line-height:1.35;
+}
+.rail-signout{ width:100%; }
+.sidebar.tabs{
+  flex:1; display:flex; flex-direction:column; align-items:stretch; gap:6px;
+  margin:0; padding:0; border:0; background:none; overflow-x:visible;
+}
+.sidebar .tab{
+  text-align:left; white-space:normal;
+  border-bottom:none; border-left:3px solid transparent; border-radius:var(--radius-sm);
+  padding:11px 14px;
+}
+.sidebar .tab:hover{ background:var(--primary-100); }
+.sidebar .tab.active{
+  color:var(--primary-600); border-bottom:none; border-left-color:var(--primary);
+  background:var(--primary-100);
+}
+/* Aba com contador (ex.: atendente — badge vai para a direita, texto à esquerda).
+   Escopo opt-in: não vira flex global para não quebrar o ::before da Minha conta. */
+.sidebar .tab.has-badge{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+/* "Minha conta" sempre no fim da lista, separada das seções de gestão */
+.sidebar .tab[data-tab="minha-conta"]{ margin-top:auto; }
+.sidebar .tab[data-tab="minha-conta"]::before{
+  content:""; display:block; height:1px; background:var(--border);
+  margin:-6px -14px 12px;
+}
+@media(max-width:980px){
+  .app-shell{ grid-template-columns:1fr; }
+  .app-rail{
+    position:static; height:auto; border-right:none;
+    border-bottom:1px solid var(--border); padding:12px;
+    display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px;
+  }
+  .app-rail .sidebar.tabs{
+    flex-direction:row; overflow-x:auto; padding-bottom:2px;
+  }
+  .app-rail .sidebar .tab{
+    white-space:nowrap; border-left:none;
+    border-bottom:2.5px solid transparent; border-radius:0; padding:9px 12px;
+  }
+  .app-rail .sidebar .tab.active{ border-bottom-color:var(--primary); background:none; }
+  .app-rail .sidebar .tab[data-tab="minha-conta"]{ margin-top:0; }
+  .app-rail .sidebar .tab[data-tab="minha-conta"]::before{ display:none; }
+  .rail-user{
+    flex-direction:row; align-items:center; gap:10px;
+    padding:0 0 0 12px; border-top:none; border-left:1px solid var(--border);
+  }
+  .rail-signout{ width:auto; }
+}
+@media(max-width:620px){
+  .app-rail{ grid-template-columns:minmax(0,1fr); }
+  .rail-user{
+    border-left:none; border-top:1px solid var(--border); padding:10px 0 0;
+  }
+  .rail-user-email{ font-size:.78rem; }
+}
 
 /* ---------- Forms ---------- */
 .field{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
@@ -218,9 +325,10 @@ textarea:focus-visible, select:focus-visible, .tab:focus-visible{
 }
 .btn:active{ transform:translateY(1px); }
 .btn-primary{ background:var(--primary); color:#fff; }
-.btn-primary:hover{ background:var(--primary-600); }
+.btn-primary:hover{ background:var(--primary-600); color:#fff; }
 .btn-outline{ background:transparent; border-color:var(--border); color:var(--ink); }
 .btn-outline:hover{ border-color:var(--primary); color:var(--primary-600); }
+.btn, .btn-sm{ min-height:44px; }
 .btn-sm{ padding:7px 14px; font-size:.85rem; }
 
 /* ---------- Badges ---------- */
@@ -230,7 +338,7 @@ textarea:focus-visible, select:focus-visible, .tab:focus-visible{
   background:var(--primary-100); color:var(--primary-600);
 }
 .badge-danger{ background:var(--danger-bg); color:var(--danger); }
-.badge-warning{ background:var(--warning-bg); color:var(--warning); }
+.badge-warning{ background:var(--warning-bg); color:var(--warning-ink); }
 .badge-success{ background:var(--success-bg); color:var(--success); }
 
 /* ---------- List items ---------- */
@@ -239,7 +347,14 @@ textarea:focus-visible, select:focus-visible, .tab:focus-visible{
   padding:14px 4px; border-bottom:1px solid var(--border);
 }
 .item:last-child{ border-bottom:none; }
-.item h4{ margin:0 0 2px; }
+.item h4, .item h3{ margin:0 0 2px; }
+.item h3{ font-size:1rem; }
+
+/* ---------- Fase 2: hierarquia h1→h2→h3 com look preservado ----------
+   Painéis usam h2 p/ títulos de card e h3 p/ subseções/itens (antes h3/h4).
+   Tamanhos espelham o visual antigo; nada muda no render. */
+.app-main h2, [role="dialog"] h2{ font-size:1.15rem; }
+.app-main h3{ font-size:1rem; }
 .item p{ margin:0; color:var(--muted); font-size:.9rem; }
 .empty{ padding:24px 4px; text-align:center; color:var(--muted); }
 
@@ -257,7 +372,19 @@ tbody tr:last-child td{ border-bottom:none; }
 .row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .row.between{ justify-content:space-between; }
 
-/* ---------- Spinner ---------- */
+/* ---------- Skeleton (Fase 2: reserva espaço, evita pulo de layout) ---------- */
+.skel-wrap{ display:flex; flex-direction:column; gap:10px; padding:6px 4px; }
+.skel{
+  display:block; height:44px; border-radius:var(--radius-sm);
+  background:linear-gradient(90deg, var(--border) 25%, var(--primary-100) 50%, var(--border) 75%);
+  background-size:200% 100%; animation:skel 1.2s ease-in-out infinite;
+}
+.skel:nth-child(2){ width:92%; }
+.skel:nth-child(3){ width:85%; }
+@keyframes skel{ to{ background-position:-200% 0; } }
+@media (prefers-reduced-motion: reduce){ .skel{ animation:none; } }
+
+/* ---------- Spinner (mantido p/ loads inline via JS) ---------- */
 .spinner{
   width:26px; height:26px; margin:18px auto; border-radius:50%;
   border:3px solid var(--border); border-top-color:var(--primary);
@@ -287,9 +414,9 @@ tbody tr:last-child td{ border-bottom:none; }
 
 
 .form-editing {
-  border: 2px solid var(--primary, #0056b3) !important;
-  box-shadow: 0 0 8px rgba(0, 86, 179, 0.25);
-  border-radius: var(--radius, 8px);
+  border: 2px solid var(--primary) !important;
+  box-shadow: 0 0 8px rgba(15, 122, 107, 0.25);
+  border-radius: var(--radius);
   padding: 16px;
   transition: all 0.2s ease-in-out;
 }
@@ -300,14 +427,14 @@ tbody tr:last-child td{ border-bottom:none; }
 input.has-error,
 select.has-error,
 textarea.has-error {
-  border-color: var(--danger, #dc2626) !important;
+  border-color: var(--danger) !important;
 }
 .field-msg {
   display: block;
   margin-top: 5px;
   font-size: .78rem;
   font-weight: 600;
-  color: var(--danger, #dc2626);
+  color: var(--danger);
 }
 .help-text {
   display: block;
@@ -321,34 +448,62 @@ textarea.has-error {
 .pw-meter {
   height: 6px;
   margin-top: 8px;
-  border-radius: 99px;
-  background: var(--border, #e2e8f0);
+  border-radius: 999px;
+  background: var(--border);
   overflow: hidden;
 }
 .pw-meter > span {
   display: block;
   height: 100%;
   width: 0;
-  border-radius: 99px;
+  border-radius: 999px;
   transition: width .2s ease, background .2s ease;
 }
-.pw-meter.weak > span { background: var(--danger, #dc2626); }
-.pw-meter.medium > span { background: var(--warning, #e6a23c); }
-.pw-meter.strong > span { background: var(--success, #16a34a); }
+.pw-meter.weak > span { background: var(--danger); }
+.pw-meter.medium > span { background: var(--warning); }
+.pw-meter.strong > span { background: var(--success); }
 .pw-hint { display: block; margin-top: 5px; font-size: .78rem; font-weight: 600; }
-.pw-hint.weak { color: var(--danger, #dc2626); }
-.pw-hint.medium { color: var(--warning, #e6a23c); }
-.pw-hint.strong { color: var(--success, #16a34a); }
+.pw-hint.weak { color: var(--danger); }
+.pw-hint.medium { color: var(--warning-ink); }
+.pw-hint.strong { color: var(--success); }
 
 /* ---------- V3: faixa de "editando agendamento" (item 5.5) ---------- */
 .edit-banner {
   display: block;
   margin: 0 0 14px;
   padding: 10px 14px;
-  border-radius: var(--radius-sm, 8px);
-  background: var(--primary-100, #e8f1ff);
-  border: 1px solid var(--primary, #0056b3);
-  color: var(--primary-600, #0056b3);
+  border-radius: var(--radius-sm);
+  background: var(--primary-100);
+  border: 1px solid var(--primary);
+  color: var(--primary-600);
   font-size: .88rem;
   font-weight: 700;
+}
+
+/* ---------- Fase 4: cartões de vagas livres (serviço primeiro) ---------- */
+.slots-panel{ display:flex; flex-direction:column; gap:12px; margin-top:8px; }
+.slot-unit{ border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; background:var(--surface); }
+.slot-unit-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.slot-unit-name{ font-weight:700; }
+.slot-unit-meta{ font-size:.8rem; color:var(--muted); }
+.slot-count{ font-size:.8rem; font-weight:700; color:var(--primary-600); white-space:nowrap; }
+.slot-days{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+.slot-day{ border:1px solid var(--border); background:var(--bg); border-radius:999px; padding:4px 12px; font-size:.82rem; cursor:pointer; min-height:44px; }
+.slot-day.active{ background:var(--primary); border-color:var(--primary); color:#fff; font-weight:700; }
+.slot-times{ display:flex; flex-wrap:wrap; gap:8px; }
+.slot-time{ border:1px solid var(--primary); background:var(--surface); color:var(--primary-600); border-radius:var(--radius-sm); padding:6px 12px; font-size:.85rem; font-weight:600; cursor:pointer; min-height:44px; }
+.slot-time:hover{ background:var(--primary-100); }
+.slot-time.selected{ background:var(--primary); color:#fff; }
+.slot-time small{ display:block; font-size:.72rem; font-weight:400; opacity:.85; }
+.slot-summary{ display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px dashed var(--primary); border-radius:var(--radius-sm); padding:10px 14px; background:var(--primary-100); font-size:.9rem; }
+.slot-summary strong{ color:var(--primary-600); }
+.slot-empty{ border:1px dashed var(--border); border-radius:var(--radius); padding:16px; text-align:center; color:var(--muted); font-size:.9rem; }
+
+/* ---------- Fase 1 (critique): mobile 360 + touch 44 ---------- */
+@media (max-width:760px){
+  .topbar{ flex-wrap:wrap; gap:12px; }
+  .nav{ gap:12px; flex-wrap:wrap; }
+  .nav a[href^="#"]{ display:none; }
+  .hero .row .btn{ width:100%; min-height:48px; }
+  .footer-grid a{ padding:10px 0; margin:0; }
 }
