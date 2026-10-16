@@ -622,7 +622,7 @@ async function searchPatient(e){
             <h3>${esc(p.full_name)}</h3>
             <p class="muted">${esc(p.email)} ${p.phone?'· '+esc(p.phone):''} ${p.birth_date?'· Nasc: '+fmtSimpleDate(p.birth_date):''}</p>
           </div>
-          <button class="btn btn-outline btn-sm" onclick="viewPatient('${p.id}','${esc(p.full_name)}')">Ver histórico</button>
+          <button class="btn btn-outline btn-sm" data-act="view-history" data-id="${esc(p.id)}" data-name="${esc(p.full_name)}">Ver histórico</button>
         </div>`;
     }).join('');
   }catch(err){ box.innerHTML=`<div class="empty">${esc(err.message)}</div>`; }
@@ -672,7 +672,24 @@ function statusClass(s){
 function stat(label, value){
   return `<div class="card"><p class="muted" style="margin:0;font-size:.8rem;text-transform:uppercase">${label}</p><h2 style="margin:.2em 0 0;font-size:2rem">${value}</h2></div>`;
 }
-function esc(s){ return (s??'').toString().replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+// O apóstrofo também é escapado: com um nome como "Maria d'Ávila" o
+// onclick interpolado virava SyntaxError e o botão morria em silêncio.
+// O mapa fica dentro da função para esc() não depender de contexto externo.
+function esc(s){
+  return (s??'').toString().replace(
+    /[&<>"']/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+  );
+}
+
+// Delegação: os botões das listas carregam data-act/data-id/data-name em vez
+// de interpolar o nome dentro de onclick="…". Um nome com apóstrofo não
+// quebra mais o script da página.
+document.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('[data-act]');
+  if (!btn) return;
+  if (btn.dataset.act === 'view-history') return viewPatient(btn.dataset.id, btn.dataset.name);
+});
 
 document.querySelectorAll('.tabs').forEach(tabContainer => {
   const tabs = Array.from(tabContainer.querySelectorAll('.tab'));

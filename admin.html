@@ -1142,8 +1142,8 @@
           <p class="muted">${esc(u.email)} ${u.mobile ? '· ' + esc(u.mobile) : ''} ${u.job_role ? '· ' + esc(u.job_role) : ''} ${u.last_login_at ? '· Último acesso: ' + fmtDate(u.last_login_at) : '· Nunca acessou'}</p>
         </div>
         <div class="row" style="gap:6px">
-          <button class="btn btn-outline btn-sm" onclick="viewUser('${u.id}')">Abrir perfil</button>
-          <button class="btn btn-outline btn-sm" onclick="showHistory('${u.id}','${esc(u.full_name || '')}')">Abrir histórico</button>
+          <button class="btn btn-outline btn-sm" data-act="view-user" data-id="${esc(u.id)}">Abrir perfil</button>
+          <button class="btn btn-outline btn-sm" data-act="show-history" data-id="${esc(u.id)}" data-name="${esc(u.full_name || '')}">Abrir histórico</button>
         </div>
       </div>`).join('');
       } catch (err) { summary.textContent = ''; box.innerHTML = `<div class="empty">${esc(err.message || 'Erro')}</div>`; }
@@ -1422,7 +1422,26 @@
     }
     function stat(label, value) { return `<div class="card"><p class="muted" style="margin:0;font-size:.8rem;text-transform:uppercase">${label}</p><h2 style="margin:.2em 0 0;font-size:1.8rem">${value}</h2></div>`; }
     function levelClass(l) { return l === 'alto' ? 'badge-danger' : l === 'medio' ? 'badge-warning' : 'badge-success'; }
-    function esc(s) { return (s ?? '').toString().replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+    // O apóstrofo também é escapado: com um nome como "Maria d'Ávila" o
+    // onclick interpolado virava SyntaxError e o botão morria em silêncio.
+    // O mapa fica dentro da função de propósito — assim esc() não depende de
+    // contexto externo e pode ser extraída/testada isoladamente.
+    function esc(s) {
+      return (s ?? '').toString().replace(
+        /[&<>"']/g,
+        c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+      );
+    }
+
+    // Ações dos botões renderizados por innerHTML: delegadas no document, com
+    // os dados em data-*. Sem isso o nome do usuário era interpolado dentro de
+    // onclick="..." e um apóstrofo quebrava o script da página inteira.
+    document.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('[data-act]');
+      if (!btn) return;
+      if (btn.dataset.act === 'show-history') return showHistory(btn.dataset.id, btn.dataset.name);
+      if (btn.dataset.act === 'view-user') return viewUser(btn.dataset.id);
+    });
 
     document.querySelectorAll('.tabs').forEach(tabContainer => {
       const tabs = Array.from(tabContainer.querySelectorAll('.tab'));

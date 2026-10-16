@@ -480,7 +480,15 @@
 
     const el = id => document.getElementById(id);
 
-    function esc(s) { return (s ?? '').toString().replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+    // O apóstrofo também é escapado: nomes como "Maria d'Ávila" quebravam
+    // qualquer onclick que os interpolasse. O mapa fica dentro da função para
+    // esc() não depender de contexto externo.
+    function esc(s) {
+      return (s ?? '').toString().replace(
+        /[&<>"']/g,
+        c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+      );
+    }
 
     function setSelect(selectEl, options, placeholder, disabled) {
       selectEl.innerHTML = `<option value="">${esc(placeholder)}</option>` +
@@ -997,7 +1005,7 @@
           ${isOverdue(r.scheduled_at, r.status) ? ' <span class="badge badge-warning">atrasado</span>' : ''}</p>
         </div><div class="row">
           <span class="muted">${fmtDate(r.scheduled_at)}</span>
-          ${r.status === 'cancelado' ? `<button class="btn btn-outline btn-sm" onclick="rebookItem('${r._kind}','${esc(r.id)}')">Tentar agendar novamente</button>` : ''}
+          ${r.status === 'cancelado' ? `<button class="btn btn-outline btn-sm" data-act="rebook" data-kind="${esc(r._kind)}" data-id="${esc(r.id)}">Tentar agendar novamente</button>` : ''}
         </div></div>`).join('')
           : '<div class="empty">Nenhum agendamento encontrado.</div>';
 
@@ -1031,9 +1039,9 @@
         const canRebook = r.status === 'cancelado'; // item 2.6
         return `<div class="item"><div>${title(r)}</div><div class="row">
       <span class="muted">${right(r)}</span>
-      ${canEdit ? `<button class="btn btn-outline btn-sm" onclick="${editFn}('${esc(r.id)}')">Editar</button>` : ''}
-      ${canCancel ? `<button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="cancelItem('${kind}','${esc(r.id)}','${esc(r._type || '')}')">Cancelar</button>` : ''}
-      ${canRebook ? `<button class="btn btn-outline btn-sm" onclick="rebookItem('${kind}','${esc(r.id)}')">Tentar agendar novamente</button>` : ''}
+      ${canEdit ? `<button class="btn btn-outline btn-sm" data-act="edit" data-fn="${esc(editFn)}" data-id="${esc(r.id)}">Editar</button>` : ''}
+      ${canCancel ? `<button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" data-act="cancel" data-kind="${esc(kind)}" data-id="${esc(r.id)}" data-type="${esc(r._type || '')}">Cancelar</button>` : ''}
+      ${canRebook ? `<button class="btn btn-outline btn-sm" data-act="rebook" data-kind="${esc(kind)}" data-id="${esc(r.id)}">Tentar agendar novamente</button>` : ''}
     </div></div>`;
       }).join('');
     }
@@ -1665,7 +1673,22 @@
     function stat(label, value) { return `<div class="card"><p class="muted" style="margin:0;font-size:.8rem;text-transform:uppercase">${esc(label)}</p><h2 style="margin:.2em 0 0;font-size:2rem">${value}</h2></div>`; }
     function levelClass(l) { return l === 'alto' ? 'badge-danger' : l === 'medio' ? 'badge-warning' : 'badge-success'; }
 
-    document.querySelectorAll('.tabs').forEach(tabContainer => {
+    // Delegação: as listas são renderizadas por innerHTML, então os botões
+// carregam data-act/data-* em vez de interpolar valores em onclick="…".
+// Um dado vindo do banco com apóstrofo quebrava o script da página inteira.
+document.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('[data-act]');
+  if (!btn) return;
+  const act = btn.dataset.act;
+  if (act === 'rebook') return rebookItem(btn.dataset.kind, btn.dataset.id);
+  if (act === 'cancel') return cancelItem(btn.dataset.kind, btn.dataset.id, btn.dataset.type);
+  if (act === 'edit') {
+    const fn = window[btn.dataset.fn];
+    if (typeof fn === 'function') return fn(btn.dataset.id);
+  }
+});
+
+document.querySelectorAll('.tabs').forEach(tabContainer => {
       const tabs = Array.from(tabContainer.querySelectorAll('.tab'));
 
       tabs.forEach((tab, index) => {
