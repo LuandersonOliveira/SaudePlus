@@ -358,12 +358,26 @@ async function findAvailabilityByService(pool, opts) {
   }
 
   // 3) horários desses vínculos (1 query)
+  //
+  // O filtro é pelo PAR (profissional, unidade), não só pelo profissional.
+  // Filtrar por professional_id IN (...) já exclui quem não tem nenhum
+  // vínculo, mas deixa passar o caso em que o profissional atende o serviço
+  // na unidade A e tem work_schedule na unidade B: o par (B, prof) entrava na
+  // grade sem existir em professional_offers, saía com nome vazio (o fallback
+  // `{ name: '', job: '' }`) e o POST devolvia 409 — "não atende este serviço
+  // nesta unidade". Ou seja, a tela oferecia horários que nunca funcionavam.
   const profIds = [...new Set(linkRows.map((l) => l.professional_id))];
   const [schedRows] = await pool.query(
-    `SELECT professional_id, unit_id, weekday, start_time, end_time, slot_minutes
-     FROM work_schedules
-     WHERE professional_id IN (?) AND unit_id IN (?) AND active = 1`,
-    [profIds, unitIds]
+    `SELECT ws.professional_id, ws.unit_id, ws.weekday, ws.start_time, ws.end_time, ws.slot_minutes
+     FROM work_schedules ws
+     WHERE ws.active = 1
+       AND EXISTS (
+         SELECT 1 FROM professional_offers po
+          WHERE po.professional_id = ws.professional_id
+            AND po.unit_id = ws.unit_id
+            AND po.kind = ? AND po.name = ?
+       )`,
+    [tipo, servico]
   );
   const rulesByPair = new Map();
   for (const s of schedRows) {
@@ -384,16 +398,20 @@ async function findAvailabilityByService(pool, opts) {
     profByPair.set(`${l.unit_id}||${l.professional_id}`, { name: l.professional_name, job: l.job_title });
   }
 
-  // Ordem determinística: mesmo horário livre em 2 profissionais,
+  // Ordenação determinística: mesmo horário livre em 2 profissionais,
   // o primeiro em ordem alfabética vence (o POST valida o mesmo vínculo).
+  // Sem o fallback `{ name: '' }`: um par sem profByPair é, por construção,
+  // um par que o POST rejeitaria, então ele não vira vaga.
   const pairs = [];
   for (const [key, byWd] of rulesByPair) {
+    const prof = profByPair.get(key);
+    if (!prof) continue;
     const sep = key.lastIndexOf('||');
     pairs.push({
       unitId: key.slice(0, sep),
       profId: key.slice(sep + 2),
       byWd,
-      prof: profByPair.get(key) || { name: '', job: '' },
+      prof,
     });
   }
   pairs.sort((a, b) => (a.prof.name < b.prof.name ? -1 : a.prof.name > b.prof.name ? 1 : 0));
