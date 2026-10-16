@@ -217,18 +217,21 @@
   mysql --default-character-set=utf8mb4 -u root -p < server/schema.sql
   ```
 
+  > Isso cria o banco `saude` com as 13 tabelas + 10 unidades de saúde de seed.
+  O `schema.sql` já é a **união de todas as migrations** — ele sozinho produz um
+  banco completo, sem precisar rodar nenhuma migration depois.
+
   > **Importante (Windows):** o `mysql.exe` usa `latin1` por padrão na sessão CLI.
   > A flag `--default-character-set=utf8mb4` ( + `SET NAMES utf8mb4` no schema)
   > garante que nomes de unidades com acentos sejam gravados corretamente.
   > Sem ela, os seletores de Local exibem caracteres corrompidos.
 
-  Isso cria o banco `saude` com as 13 tabelas + 10 unidades de saúde de seed.
+  > O `schema.sql` tem `CREATE DATABASE saude` e `USE saude` fixos, para funcionar
+  > com `mysql < schema.sql`. Para outro nome de banco, use `npm run db:setup`,
+  > que reescreve essas duas linhas para o `DB_NAME` em uso.
 
-  Se o banco já existia de versão anterior:
-
-  ```bash
-  mysql --default-character-set=utf8mb4 -u root -p saude < server/migration_001.sql
-  ```
+  Banco já existente de versão anterior: `npm run db:migrate` (aplica as seis
+  migrations na ordem correta; todas idempotentes).
 
   ### 2) API
 
@@ -237,23 +240,38 @@
   copy .env.example .env   # Windows (cmd) — no Git Bash/WSL use: cp .env.example .env
   # edite o .env com suas credenciais MySQL e um JWT_SECRET forte
   npm install
-  npm run migrate:v3        # agenda inteligente em bancos existentes (idempotente)
-  npm run migrate:security  # refresh tokens + audit append-only (idempotente, Fase 0)
-  npm run migrate:privacy   # consentimento + CPF/RG/CNS cifrados (idempotente, Fase 1)
-  npm run migrate:audit     # trilha com hash encadeado + MFA (idempotente, Aulas 1/6)
-  npm run seed:admin        # cria o admin definido no .env
+  npm run migrate:v3                # agenda inteligente (idempotente)
+  npm run migrate:security          # refresh tokens + audit append-only (Fase 0)
+  npm run migrate:privacy           # consentimento + CPF/RG/CNS cifrados (Fase 1)
+  npm run migrate:interop           # CNES + Gov.br + diseases.source (Fase 2)
+  npm run migrate:audit             # trilha com hash encadeado + MFA (Aulas 1/6)
+  npm run migrate:audit:details     # audit_log.details → TEXT
+  npm run seed:admin                # cria o admin definido no .env
   npm start
   ```
 
-  > **Ordem importa:** `migrate:v3` → `migrate:security` → `migrate:privacy`.
-  > Pular o `migrate:privacy` causa `Unknown column 'privacy_version'` no signup.
+  Ou, em um comando só (faz `npm install` + todas as migrations + admin):
+
+  ```bash
+  npm run setup     # a partir da raiz do projeto
+  ```
+
+  > **Ordem importa:** `v3` → `security` → `privacy` → `interop` → `audit` →
+  > `audit:details`. Pular o `migrate:privacy` causa `Unknown column
+  > 'privacy_version'` no signup.
+  >
+  > **Pular o `migrate:interop` não dá erro visível — apenas desliga o MFA
+  > silenciosamente.** Sem `users.totp_enabled`, o `if (user.totp_enabled)` da
+  > rota de login lê `undefined`, que é falso, e o segundo fator nunca é pedido.
+  > Nenhum aviso, nenhuma exceção. Rode `npm run doctor` para conferir.
 
   `.env` (ver `server/.env.example`):
 
   | Var                                                           | Exemplo                                 | Para quê                                                          |
   | ------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
   | `PORT`                                                        | `4000`                                  | Porta da API                                                      |
-  | `CORS_ORIGIN`                                                 | `http://localhost:8080`                 | **Deve bater exatamente** com a URL do `npx serve` (inclui porta) |
+  | `CORS_ORIGIN`                                                 | `http://localhost:8080`                 | **Deve bater exatamente** com a URL do front (inclui porta) |
+  | `TRUST_PROXY_HOPS`                                            | `0`                                     | Atrás de nginx/Cloudflare: nº de proxies (1 para um nginx). Sem isso o rate limit e o lockout de login vêm do IP do proxy |
   | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | `localhost / 3306 / root / *** / saude` | Conexão MySQL                                                     |
   | `JWT_SECRET` | string longa aleatória | Assinatura dos tokens (nunca commitar o real) |
   | `JWT_EXPIRES_IN` | `15m` | Validade do access token (curto, padrão RNDS; o front renova sozinho via refresh) |
@@ -266,18 +284,27 @@
   | `GOVBR_BASE_URL` / `GOVBR_CLIENT_ID` / `GOVBR_CLIENT_SECRET` / `GOVBR_REDIRECT_URI` | `https://sso.acesso.gov.br` / `...` | Login Único (exige client homologado) |
   | `ADMIN_EMAIL` / `ADMIN_PASSWORD`                              | `admin@saude.app / ***`                 | Conta criada pelo `seed:admin`                                    |
 
-  API sobe em `http://localhost:4000` — confira com `GET /health` → `{"ok":true}`.
-  Se mudar a porta, ajuste `window.API_BASE` no front.
+  API sobe em `http://localhost:4000` — confira com `GET /health` → `{"ok":true}`
+  ou `GET /ready` → `{"ok":true,"db":true}` (esse último também testa o banco).
 
-  ### 3) Frontend
+  ### 3) Frontend e subir tudo junto
+
+  Na raiz do projeto, `npm run dev` sobe **a API (:4000) e o front (:8080)** ao
+  mesmo tempo. Para subir separados:
 
   ```bash
-  # na raiz do projeto (outro terminal)
-  npx serve .
+  npm run dev:api    # só a API, com auto-reload (nodemon)
+  npm run dev:web    # só o front estático
   ```
 
-  Acesse a URL que o `serve` indicar (ex. `http://localhost:8080`).
-  Se a porta **não** for `8080`, ajuste `CORS_ORIGIN` no `server/.env` e reinicie a API (`npm start`).
+  O front é servido por `scripts/serve-web.js`, que só entrega as seis páginas e
+  `assets/` — qualquer outro caminho responde 404. **Não troque por `npx serve .`**
+  nem por `http-server`: servido a partir da raiz do repositório, exporia
+  `server/.env` (senha do MySQL, `JWT_SECRET`, `DATA_ENCRYPTION_KEY`) e
+  `server/backups/`. Para usar outra porta, ajuste `WEB_PORT` no comando e
+  `CORS_ORIGIN` no `server/.env`.
+
+  Acesse `http://localhost:8080`.
 
   Fluxo de verificação rápida:
 

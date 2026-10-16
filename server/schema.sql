@@ -44,11 +44,15 @@ CREATE TABLE IF NOT EXISTS users (
     -- Contato
     phone VARCHAR(30) NULL,
     mobile VARCHAR(30) NULL,
-    -- Documentos (visíveis apenas para admin — nunca retornados em rotas de atendente)
-    cpf VARCHAR(14) NULL,
-    rg VARCHAR(15) NULL,
-    -- Cartão Nacional de Saúde — opcional, 15 dígitos
-    cns VARCHAR(15) NULL,
+    -- Documentos (visíveis apenas para admin — nunca retornados em rotas de
+    -- atendente). São TEXT, não VARCHAR: o app guarda o AES-256-GCM em
+    -- formato "enc:v1:<iv>:<ct>:<tag>", ~70 caracteres. Com o VARCHAR(14)
+    -- original, uma instalação limpa dava ERROR 1406 já no primeiro
+    -- cadastro com CPF. Mesma conversão feita por migrate:privacy.
+    cpf TEXT NULL,
+    rg TEXT NULL,
+    -- Cartão Nacional de Saúde — opcional, 15 dígitos (cifrado em repouso)
+    cns TEXT NULL,
     -- Perfil pessoal
     birth_date DATE NULL,
     gender ENUM(
@@ -100,7 +104,42 @@ CREATE TABLE IF NOT EXISTS users (
     -- Atendente apenas
     job_role VARCHAR(100) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    last_login_at DATETIME NULL
+    last_login_at DATETIME NULL,
+    -- Fase 1 (LGPD): consentimento e apagamento. Criadas por migrate-privacy,
+    -- replicadas aqui para que a instalação limpa não quebre no primeiro
+    -- signup com "Unknown column 'privacy_version'".
+    privacy_version VARCHAR(20) NULL,
+    consent_at DATETIME NULL,
+    consent_ip VARCHAR(45) NULL,
+    deleted_at DATETIME NULL,
+    -- Fase 2: vínculo com o Login Único Gov.br (migrate-interop).
+    govbr_sub VARCHAR(64) NULL,
+    -- Aulas 1/6: segundo fator TOTP (migrate-audit).
+    -- totp_enabled ausente = `if (user.totp_enabled)` lê undefined e o login
+    -- NUNCA pede o segundo fator, sem erro em lugar nenhum. É o motivo de
+    -- migrate:interop estar na sequência do README.
+    totp_secret TEXT NULL,
+    totp_enabled TINYINT(1) NOT NULL DEFAULT 0
+) ENGINE = InnoDB;
+
+-- ---------------------------------------------------------------------
+-- Refresh tokens rotativos (Fase 0, item 0.3) — guarda-se só o SHA-256.
+-- Detecta roubo por reuso: apresentar um token já rotacionado revoga a
+-- família inteira. Criada por migrate-security.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id CHAR(36) NOT NULL PRIMARY KEY,
+    user_id CHAR(36) NOT NULL,
+    token_hash CHAR(64) NOT NULL,
+    family CHAR(36) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    revoked TINYINT(1) NOT NULL DEFAULT 0,
+    replaced_by CHAR(36) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_refresh_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    INDEX idx_refresh_hash (token_hash),
+    INDEX idx_refresh_family (family),
+    INDEX idx_refresh_user (user_id)
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -152,8 +191,14 @@ CREATE TABLE IF NOT EXISTS diseases (
     region VARCHAR(150) NULL,
     alert_level ENUM('baixo', 'medio', 'alto') NOT NULL DEFAULT 'baixo',
     description TEXT NULL,
+    -- Fase 2 (migrate-interop): distingue alerta digitado pelo gestor de um
+    -- importado do InfoDengue. O sync só atualiza linhas source='infodengue',
+    -- então a coluna é o que impede sobrescrever o que a unidade cadastrou.
+    source VARCHAR(20) NOT NULL DEFAULT 'manual',
+    external_ref VARCHAR(120) NULL,
     active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_diseases_source (source)
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -197,8 +242,15 @@ CREATE TABLE IF NOT EXISTS health_units (
         'outro'
     ) NOT NULL DEFAULT 'ubs',
     neighborhood VARCHAR(120) NULL,
+    -- Fase 2 (migrate-interop): cnes_code é a chave do sync com o CNES e
+    -- precisa ser único; sem ele, `npm run sync:cnes` aborta e a rede não
+    -- sincroniza. phone e address vêm da mesma origem.
+    cnes_code VARCHAR(10) NULL,
+    phone VARCHAR(30) NULL,
+    address VARCHAR(255) NULL,
     active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_health_units_cnes UNIQUE (cnes_code)
 ) ENGINE = InnoDB;
 
 -- Seed das 10 unidades de saúde de Lagoa de Itaenga.
@@ -287,7 +339,15 @@ CREATE TABLE IF NOT EXISTS audit_log (
 -- Migration equivalente para bancos já existentes: migrate:audit:details.
     details TEXT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_audit_actor FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE CASCADE,
+    -- Aulas 1/6: trilha encadeada à prova de adulteração. prev_hash aponta
+    -- para a linha anterior e entry_hash cobre o conteúdo junto com ela;
+    -- qualquer alteração ou remoção quebra a cadeia, verificável em
+    -- GET /admin/audit-log/verify. Criadas por migrate-audit.
+    prev_hash CHAR(64) NULL,
+    entry_hash CHAR(64) NULL,
+    seq BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    CONSTRAINT fk_audit_actor FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT uq_audit_seq UNIQUE (seq),
     INDEX idx_audit_entity (entity_type, entity_id),
     INDEX idx_audit_created (created_at)
 ) ENGINE = InnoDB;
