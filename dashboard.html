@@ -1401,12 +1401,27 @@
       } catch (err) { document.getElementById('mfaStatus').textContent = 'Não foi possível verificar.'; }
     }
     async function startMfaSetup() {
+      // O back exige a senha do titular antes de gerar o segredo: um Bearer
+      // válido (XSS, log de JWT, máquina compartilhada) não pode bastar para
+      // assumir o segundo fator de outra pessoa. Reaproveita o modal de senha
+      // em vez de prompt() nativo — o DESIGN.md proíbe prompt/alert/confirm.
+      const pwd = await askPassword({
+        title: 'Ativar verificação em 2 etapas',
+        text: 'Confirme sua senha para gerar o segredo do app autenticador.',
+        confirmLabel: 'Gerar segredo',
+      });
+      if (!pwd) return;
       try {
-        const data = await apiPost('/auth/mfa/setup', {});
+        const data = await apiPost('/auth/mfa/setup', { password: pwd });
         document.getElementById('mfaSecret').textContent = data.secret;
         document.getElementById('mfaSetup').style.display = 'block';
         toast('Segredo gerado — cadastre no app autenticador', 'success');
-      } catch (err) { toast(err.message || 'Erro', 'error'); }
+      } catch (err) {
+        toast(err.message || 'Erro', 'error');
+        // Senha errada: a tela de setup não abre e o botão continua lá, para
+        // o usuário poder tentar de novo.
+        document.getElementById('mfaSetupBtn').style.display = '';
+      }
     }
     async function enableMfa() {
       const code = document.getElementById('mfaEnableCode').value.trim();

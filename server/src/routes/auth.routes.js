@@ -328,14 +328,46 @@ router.post('/mfa/verify', async (req, res, next) => {
   }
 });
 
-// POST /auth/mfa/setup — gera o segredo (logado, ainda não ativo).
+// POST /auth/mfa/setup — gera o segredo (ainda não ativo) e devolve o QR.
+//
+// Exige a SENHA do titular, não só o token. Um Bearer válido já pode ser
+// consequência de XSS, log de JWT ou máquina compartilhada — e quem tivesse
+// um token poderia ler o segredo gerado, ativar o MFA com um código próprio e
+// passar a controlar o segundo fator do usuário. Com a senha, só o titular
+// re-enrola.
+//
+// Quem já tem MFA ativo precisa usar mfa/disable (também exige senha) antes:
+// esta rota nunca devolve o segredo vigente.
 router.post('/mfa/setup', verifyToken, async (req, res, next) => {
   try {
-    const [[user]] = await pool.query('SELECT totp_enabled FROM users WHERE id = ?', [req.user.id]);
+    const { password } = req.body || {};
+    if (!password) {
+      return res.status(400).json({ error: 'Confirme sua senha para ativar o segundo fator.' });
+    }
+
+    const [[user]] = await pool.query(
+      'SELECT password_hash, totp_enabled FROM users WHERE id = ?',
+      [req.user.id]
+    );
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
-    if (user.totp_enabled) return res.status(400).json({ error: 'MFA já está ativo.' });
+    if (user.totp_enabled) {
+      return res.status(400).json({
+        error: 'O segundo fator já está ativo. Desative-o antes de gerar um novo.',
+      });
+    }
+
+    // bcrypt.compare não deve virar 500 se o hash estiver corrompido no banco.
+    const senhaConfere = await bcrypt
+      .compare(String(password), user.password_hash || '')
+      .catch(() => false);
+    if (!senhaConfere) return res.status(401).json({ error: 'Senha incorreta.' });
+
     const secret = randomSecret();
-    await pool.query('UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?', [secret, req.user.id]);
+    await pool.query('UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?', [
+      secret,
+      req.user.id,
+    ]);
+    await req.audit('mfa_setup', 'user', req.user.id, 'segredo do segundo fator gerado');
     res.json({ secret, otpauth_url: otpauthUrl({ secret, email: req.user.email }) });
   } catch (err) {
     next(err);
