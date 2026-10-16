@@ -16,6 +16,8 @@
     "migrate:privacy": "node scripts/migrate-privacy.js",
     "migrate:interop": "node scripts/migrate-interop.js",
     "migrate:audit": "node scripts/migrate-audit.js",
+    "migrate:audit:details": "node scripts/migrate-audit-details.js",
+    "migrate:all": "npm run migrate:v3 && npm run migrate:security && npm run migrate:privacy && npm run migrate:interop && npm run migrate:audit && npm run migrate:audit:details",
     "purge:retention": "node scripts/purge-retention.js",
     "backup": "node scripts/backup.js",
     "sync:cnes": "node scripts/sync-cnes.js",
