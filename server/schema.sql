@@ -279,7 +279,13 @@ CREATE TABLE IF NOT EXISTS audit_log (
     action VARCHAR(50) NOT NULL,
     entity_type VARCHAR(30) NOT NULL,
     entity_id CHAR(36) NOT NULL,
-    details VARCHAR(255) NULL,
+    -- details é TEXT, não VARCHAR(255): o sanitizeDetails() (utils/audit.js)
+-- aceita até 1000 caracteres e os motivos de status/justificativas são
+-- concatenados sem teto pelas rotas de admin. Com a coluna curta, uma
+-- justificativa longa produzia ER_DATA_TOO_LONG, o erro era engolido e a
+-- ação acontecia SEM registro — o oposto do que a auditoria deve garantir.
+-- Migration equivalente para bancos já existentes: migrate:audit:details.
+    details TEXT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_audit_actor FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE CASCADE,
     INDEX idx_audit_entity (entity_type, entity_id),

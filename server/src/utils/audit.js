@@ -22,6 +22,12 @@ const SENSITIVE_PATTERNS = [
   /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, // CPF formatado
 ];
 
+// Teto do details. O schema.sql já declara TEXT, então na prática 1000 nunca
+// é atingido — mas um banco com a migration 005b não aplicada ainda tem
+// VARCHAR(255), e é aí que o insert estourava. Ver o fallback em logAction.
+const DETAILS_MAX = 1000;
+const DETAILS_FALLBACK = 255;
+
 function sanitizeDetails(details) {
   if (details === null || details === undefined) return null;
   let text = String(details);
@@ -30,7 +36,7 @@ function sanitizeDetails(details) {
   });
   // CPF só com dígitos (11 seguidos) vira máscara parcial: mantém 3+2 finais.
   text = text.replace(/(?<!\d)(\d{3})(\d{3})(\d{3})(\d{2})(?!\d)/g, '$1.***.***-$4');
-  return text.slice(0, 1000);
+  return text.slice(0, DETAILS_MAX);
 }
 
 function toSqlDate(date) {
@@ -83,6 +89,23 @@ async function logAction(actorId, action, entityType, entityId, details) {
           'INSERT INTO audit_log (id, actor_id, action, entity_type, entity_id, details) VALUES (?,?,?,?,?,?)',
           [id, actorId, action, entityType, entityId, clean]
         );
+      } else if (insertErr.code === 'ER_DATA_TOO_LONG') {
+        // Banco ainda com audit_log.details em VARCHAR(255) (migration 005b não
+        // aplicada). Antes, esse erro subia para o catch de baixo e a ação
+        // ficava SEM NENHUM registro — o oposto do que a trilha deve garantir.
+        // Aqui truncamos e gravamos: perde-se o fim da justificativa, nunca o
+        // registro. E o hash precisa ser recalculado sobre o texto gravado,
+        // senão verifyChain acusaria "conteúdo alterado" numa linha intacta.
+        const curto = String(clean == null ? '' : clean).slice(0, DETAILS_FALLBACK);
+        const hashCurto = chainHash(prev, actorId, action, entityType, entityId, curto, createdAt);
+        await conn.query(
+          `INSERT INTO audit_log (id, actor_id, action, entity_type, entity_id, details, prev_hash, entry_hash, created_at)
+           VALUES (?,?,?,?,?,?,?,?,?)`,
+          [id, actorId, action, entityType, entityId, curto, prev, hashCurto, createdAt]
+        );
+        console.warn(
+          `audit_log.details truncado para ${DETAILS_FALLBACK} — rode: npm run db:migrate`
+        );
       } else {
         throw insertErr;
       }
@@ -90,7 +113,9 @@ async function logAction(actorId, action, entityType, entityId, details) {
     await conn.commit();
   } catch (err) {
     try { await conn.rollback(); } catch { /* ignora */ }
-    console.error('Falha ao registrar log de auditoria:', err.message);
+    // O código entra no log: sem isso, "a ação rodou e a auditoria não" vira
+    // um mistério sem rastro — exatamente o que a auditoria existe para evitar.
+    console.error(`Falha ao registrar log de auditoria [${err.code || 'SEM_CODIGO'}]:`, err.message);
   } finally {
     conn.release();
   }
@@ -117,4 +142,4 @@ async function verifyChain(poolOrConn) {
   return { ok: true, checked: rows.length, head: prev };
 }
 
-module.exports = { logAction, sanitizeDetails, chainHash, verifyChain };
+module.exports = { logAction, sanitizeDetails, chainHash, verifyChain, DETAILS_MAX };

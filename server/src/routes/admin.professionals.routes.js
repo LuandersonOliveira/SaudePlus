@@ -29,8 +29,13 @@ function minutesOf(hhmm) {
   return h * 60 + m;
 }
 
+// Motivo entra na trilha de auditoria (concatenado ao restante do details).
+// O teto é o mesmo do sanitizeDetails: sem ele, um motivo enorme só gastaria
+// memória e bandwidth numa resposta 204 que ninguém lê. Também é aceito via
+// query string (?reason=), que tem limite de URL.
 function reasonOf(req) {
-  return String((req.body && req.body.reason) || req.query.reason || '').trim();
+  const bruto = String((req.body && req.body.reason) || req.query.reason || '').trim();
+  return bruto.slice(0, 1000);
 }
 
 async function unitLabel(unitId) {

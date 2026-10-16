@@ -125,7 +125,9 @@ router.patch('/:id', async (req, res, next) => {
       if (req.params.id === req.user.id) {
         return res.status(400).json({ error: 'Você não pode alterar o status da própria conta.' });
       }
-      const statusReason = String(reason || status_notes || '').trim();
+      // O motivo vai para o details da auditoria. Teto de 1000 = o mesmo do
+      // sanitizeDetails; sem ele o campo aceitaria payload ilimitado.
+      const statusReason = String(reason || status_notes || '').trim().slice(0, 1000);
       if (account_status !== currentUser.account_status && !statusReason) {
         return res.status(400).json({ error: 'Informe o motivo da alteração de status.' });
       }
