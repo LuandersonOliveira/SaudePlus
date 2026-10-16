@@ -413,6 +413,9 @@ async function saveAtAccount(e) {
   e.preventDefault();
   const btn = document.getElementById('atSubmit');
   const get = (id) => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
+  // PUT /auth/me é atualização parcial: '' = o usuário apagou (limpar),
+  // undefined = o campo não existe nesta página (manter).
+  const campo = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : undefined; };
   // Validação local dos documentos (mesmas regras do back).
   ['at_cpf', 'at_cns', 'at_cep'].forEach(id => {
     if (get(id)) clearFieldError(document.getElementById(id));
@@ -435,15 +438,18 @@ async function saveAtAccount(e) {
   btn.disabled = true;
   try {
     await apiPut('/auth/me', {
-      full_name: get('at_full_name') || undefined,
-      social_name: get('at_social_name'), birth_date: get('at_birth_date') || undefined,
-      gender: get('at_gender'),
-      // Documento vazio NÃO vai no corpo: no back, chave presente = limpar.
-      cpf: get('at_cpf') || undefined, rg: get('at_rg'), cns: get('at_cns') || undefined,
-      mobile: get('at_mobile') || undefined, phone: get('at_phone'),
-      cep: get('at_cep'), street: get('at_street'), address_number: get('at_number'),
-      neighborhood: get('at_neighborhood'), city: get('at_city'),
-      state: get('at_state').toUpperCase(),
+      // campo() devolve '' quando o usuário apagou (limpar) e undefined quando
+      // o campo não existe nesta página (manter). Este formulário não tem
+      // blood_type/priority/race — e antes de Task 6, salvá-lo os apagava.
+      full_name: campo('at_full_name'),
+      social_name: campo('at_social_name'), birth_date: campo('at_birth_date'),
+      gender: campo('at_gender'),
+      // cpf/rg/cns são a exceção: os inputs não vêm preenchidos, então campo
+      // vazio significa "não me mexa", não "apague".
+      cpf: campo('at_cpf') || undefined, rg: campo('at_rg') || undefined, cns: campo('at_cns') || undefined,
+      mobile: campo('at_mobile'), phone: campo('at_phone'),
+      cep: campo('at_cep'), street: campo('at_street'), address_number: campo('at_number'),
+      neighborhood: campo('at_neighborhood'), city: campo('at_city'), state: campo('at_state'),
     });
     toast('Perfil atualizado', 'success');
     atAccountLoaded = false;

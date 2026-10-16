@@ -66,4 +66,66 @@ function parsePagination(query, { defaultPageSize = 20, maxPageSize = 100 } = {}
   return { wantsPaged, page, pageSize, offset: (page - 1) * pageSize };
 }
 
-module.exports = { digitsOnly, isValidCPF, isValidCNS, emailSchema, signupSchema, parsePagination };
+// ---------------------------------------------------------------------------
+// Valores válidos das colunas ENUM de `users`. Copiados literalmente dos
+// ENUMs do schema — MySQL em modo não-estrito NÃO dá erro ao receber um valor
+// fora da lista, ele trunca e avisa (WARN_DATA_TRUNCATED). Sem esta
+// checagem, um gender inválido resultava em 500 vindo do driver, não em 400
+// com mensagem em português. Mantenha em sincronia com schema.sql.
+// ---------------------------------------------------------------------------
+const VALID_GENDERS = ['masculino', 'feminino', 'outro', 'prefiro_nao_informar'];
+const VALID_PRIORITIES = ['nenhuma', 'idoso', 'gestante', 'pcd', 'lactante'];
+const VALID_RACES = ['branca', 'preta', 'parda', 'amarela', 'indigena', 'nao_informar'];
+const VALID_BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const VALID_ZONES = ['urbana', 'rural'];
+
+// Rótulos pt-BR para as mensagens de erro da API.
+const ENUM_LABELS = {
+  gender: 'gênero',
+  priority: 'prioridade',
+  race: 'raça',
+  blood_type: 'grupo sanguíneo',
+  zone: 'zona',
+};
+
+/**
+ * Valida um valor de coluna ENUM. Devolve null se válido (inclusive null/vazio,
+ * que significam "limpar") ou a mensagem de erro em português.
+ */
+function validateEnum(coluna, valor) {
+  const lista = {
+    gender: VALID_GENDERS,
+    priority: VALID_PRIORITIES,
+    race: VALID_RACES,
+    blood_type: VALID_BLOOD_TYPES,
+    zone: VALID_ZONES,
+  }[coluna];
+  if (!lista) throw new Error(`Coluna sem lista de valores válidos: ${coluna}`);
+  if (valor === null || valor === undefined || String(valor).trim() === '') return null;
+  if (!lista.includes(String(valor))) {
+    return `${ENUM_LABELS[coluna] || coluna} inválido(a). Use um dos valores: ${lista.join(', ')}.`;
+  }
+  return null;
+}
+
+/**
+ * Valida uma data YYYY-MM-DD e rejeita as que não existem (2026-02-30).
+ * Aceita também 'YYYY-MM-DDTHH:mm' porque o <input type="date"> pode mandar.
+ */
+function validateDate(value) {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value).trim());
+  if (!m) return 'Data inválida. Use o formato AAAA-MM-DD.';
+  const [, ano, mes, dia] = m.map(Number);
+  const d = new Date(Date.UTC(ano, mes - 1, dia));
+  if (d.getUTCFullYear() !== ano || d.getUTCMonth() !== mes - 1 || d.getUTCDate() !== dia) {
+    return 'Data inválida. Essa data não existe no calendário.';
+  }
+  return null;
+}
+
+module.exports = {
+  digitsOnly, isValidCPF, isValidCNS, emailSchema, signupSchema, parsePagination,
+  VALID_GENDERS, VALID_PRIORITIES, VALID_RACES, VALID_BLOOD_TYPES, VALID_ZONES,
+  validateEnum, validateDate,
+};

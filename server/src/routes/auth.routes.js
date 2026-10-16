@@ -4,7 +4,10 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const pool = require('../db');
 const { verifyToken } = require('../middleware/auth');
-const { digitsOnly, signupSchema, isValidCPF, isValidCNS } = require('../utils/validators');
+const {
+  digitsOnly, signupSchema, isValidCPF, isValidCNS,
+  VALID_PRIORITIES, VALID_RACES, validateEnum, validateDate,
+} = require('../utils/validators');
 const { PRIVACY_VERSION, anonymizeUser } = require('../utils/privacy');
 const { govbrConfig, buildAuthorizeUrl, exchangeCode, fetchUserInfo } = require('../services/govbr');
 const { randomSecret, verifyTotp, otpauthUrl } = require('../utils/totp');
@@ -12,8 +15,9 @@ const { randomSecret, verifyTotp, otpauthUrl } = require('../utils/totp');
 const router = express.Router();
 
 const VALID_ROLES = ['paciente', 'atendente'];
-const VALID_PRIORITIES = ['nenhuma', 'idoso', 'gestante', 'pcd', 'lactante'];
-const VALID_RACES = ['branca', 'preta', 'parda', 'amarela', 'indigena', 'nao_informar'];
+// As listas de ENUM e os validadores vivem em utils/validators.js (fonte
+// única, copiadas dos ENUMs do schema) para que signup e PUT /auth/me não
+// divirjam entre si.
 
 // --------------------------------------------------------------------------
 // Sessão curta + refresh rotativo (Fase 0, item 0.3 — alinhado ao padrão RNDS
@@ -603,19 +607,28 @@ router.delete('/me', verifyToken, async (req, res, next) => {
   }
 });
 
-// PUT /auth/me — atualiza perfil próprio (não pode mudar role nem status).
-// P4: aceita também cpf/rg/cns (completar perfil pós-cadastro), com a mesma
-// validação do signup e cifragem em repouso.
+// PUT /auth/me — atualiza o perfil próprio (não pode mudar role nem status).
+//
+// É uma atualização PARCIAL, e isso é contrato, não detalhe:
+//   chave ausente no corpo  -> mantém o valor atual
+//   chave presente e vazia  -> limpa (NULL)
+//   chave presente e válida -> grava
+//
+// A versão anterior montava um UPDATE com as 22 colunas e `|| null` em cada
+// uma, então toda coluna ausente do corpo era apagada. Os formulários dos três
+// painéis mandam só os campos que têm: o atendente perdia job_role ao
+// corrigir o telefone, e o admin perdia blood_type/priority/race/zone/
+// mother_name ao salvar o perfil.
+//
+// Documentos (cpf/rg/cns) seguem a mesma regra e são cifrados em repouso.
 router.put('/me', verifyToken, async (req, res, next) => {
   try {
-    const {
-      full_name, social_name: socialName, phone, mobile, birth_date, gender,
-      priority, race, guardian_name: guardianName, blood_type,
-      mother_name, father_name, cpf, rg, cns,
-      cep, street, address_number,
-      neighborhood, city, state, zone, reference_point, job_role,
-    } = req.body || {};
+    const body = req.body || {};
 
+    // Documentos: cifra e valida. Chave presente e vazia limpa.
+    const temChave = (k) => Object.prototype.hasOwnProperty.call(body, k);
+    const cpf = body.cpf;
+    const cns = body.cns;
     if (cpf !== undefined && cpf !== null && cpf !== '' && !isValidCPF(cpf)) {
       return res.status(400).json({ error: 'CPF inválido. Confira os números digitados.' });
     }
@@ -623,44 +636,91 @@ router.put('/me', verifyToken, async (req, res, next) => {
       return res.status(400).json({ error: 'Cartão SUS (CNS) inválido. Confira os 15 números.' });
     }
 
-    // Documentos: só toca na coluna se a chave veio no corpo (ausente = mantém).
-    // Presente e vazia = limpar; presente com valor = validar + cifrar.
     const docSets = [];
     const docParams = [];
-    const has = (v) => v !== undefined;
     const blank = (v) => v === null || String(v).trim() === '' || digitsOnly(v) === '';
-    if (has(cpf)) { docSets.push('cpf=?'); docParams.push(blank(cpf) ? null : req.encryptDoc(digitsOnly(cpf))); }
-    if (has(rg)) { docSets.push('rg=?'); docParams.push(String(rg || '').trim() === '' ? null : req.encryptDoc(String(rg).trim())); }
-    if (has(cns)) { docSets.push('cns=?'); docParams.push(blank(cns) ? null : req.encryptDoc(digitsOnly(cns))); }
+    if (temChave('cpf')) {
+      docSets.push('cpf=?');
+      docParams.push(blank(cpf) ? null : req.encryptDoc(digitsOnly(cpf)));
+    }
+    if (temChave('rg')) {
+      docSets.push('rg=?');
+      docParams.push(String(body.rg || '').trim() === '' ? null : req.encryptDoc(String(body.rg).trim()));
+    }
+    if (temChave('cns')) {
+      docSets.push('cns=?');
+      docParams.push(blank(cns) ? null : req.encryptDoc(digitsOnly(cns)));
+    }
 
-    await pool.query(
-      `UPDATE users SET
-        full_name=?, social_name=?, phone=?, mobile=?, birth_date=?, gender=?,
-        priority=?, race=?, guardian_name=?, blood_type=?,
-        mother_name=?, father_name=?,
-        cep=?, street=?, address_number=?, neighborhood=?, city=?, state=?,
-        zone=?, reference_point=?, job_role=?${docSets.length ? ',' + docSets.join(',') : ''}
-       WHERE id=?`,
-      [
-        full_name || req.user.full_name,
-        socialName || null,
-        phone || null, mobile || null,
-        birth_date || null, gender || null,
-        priority && VALID_PRIORITIES.includes(priority) ? priority : null,
-        race && VALID_RACES.includes(race) ? race : null,
-        guardianName || null,
-        blood_type || null,
-        mother_name || null, father_name || null,
-        cep || null, street || null, address_number || null,
-        neighborhood || null, city || null, state || null,
-        zone || null, reference_point || null,
-        job_role || null,
-        ...docParams,
-        req.user.id,
-      ]
-    );
-    res.json({ ok: true });
+    // Monta o SET só com as colunas presentes no corpo.
+    const sets = [];
+    const params = [];
+
+    const texto = (coluna, valor, transformar) => {
+      if (!temChave(coluna)) return;
+      const bruto = valor === null || valor === undefined ? '' : String(valor).trim();
+      const v = bruto === '' ? null : (transformar ? transformar(bruto) : bruto);
+      sets.push(`${coluna}=?`);
+      params.push(v);
+    };
+
+    const enumColuna = (coluna, valor) => {
+      if (!temChave(coluna)) return;
+      const erro = validateEnum(coluna, valor);
+      if (erro) throw Object.assign(new Error(erro), { status: 400 });
+      sets.push(`${coluna}=?`);
+      const v = valor === null || valor === undefined ? '' : String(valor).trim();
+      params.push(v === '' ? null : v);
+    };
+
+    // full_name é NOT NULL no schema e é o que aparece em toda lista.
+    if (temChave('full_name')) {
+      const nome = String(body.full_name || '').trim();
+      if (!nome) {
+        return res.status(400).json({ error: 'Informe o nome completo.' });
+      }
+      sets.push('full_name=?');
+      params.push(nome);
+    }
+
+    if (temChave('birth_date')) {
+      const erro = validateDate(body.birth_date);
+      if (erro) return res.status(400).json({ error: erro });
+      sets.push('birth_date=?');
+      const v = body.birth_date === null ? '' : String(body.birth_date).trim();
+      params.push(v === '' ? null : v.slice(0, 10));
+    }
+
+    for (const col of [
+      'social_name', 'phone', 'mobile', 'guardian_name', 'mother_name', 'father_name',
+      'cep', 'street', 'address_number', 'neighborhood', 'city', 'job_role',
+      'reference_point',
+    ]) {
+      texto(col, body[col]);
+    }
+
+    // 'state' é CHAR(2) no schema e a sigla da UF é sempre maiúscula.
+    texto('state', body.state, (v) => v.toUpperCase());
+
+    for (const col of ['gender', 'priority', 'race', 'blood_type', 'zone']) {
+      enumColuna(col, body[col]);
+    }
+
+    if (docSets.length) {
+      sets.push(...docSets);
+      params.push(...docParams);
+    }
+
+    if (sets.length === 0) {
+      return res.status(400).json({ error: 'Nenhum campo para atualizar.' });
+    }
+
+    await pool.query(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, [...params, req.user.id]);
+    res.json({ ok: true, atualizados: sets.length });
   } catch (err) {
+    if (err && err.status === 400) {
+      return res.status(400).json({ error: err.message });
+    }
     next(err);
   }
 });

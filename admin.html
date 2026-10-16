@@ -1542,6 +1542,11 @@
       e.preventDefault();
       const btn = document.getElementById('acctSubmit');
       const get = (id) => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
+    // PUT /auth/me é atualização parcial: '' = o usuário apagou, limpar;
+    // undefined = o campo não existe nesta página, manter. Este formulário
+    // não tem job_role/blood_type/priority/race — e antes de Task 6, salvá-lo
+    // apagava todos esses campos do usuário.
+    const campo = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : undefined; };
       // Validação local dos documentos (mesmas regras do back).
       ['a_cpf', 'a_cns', 'a_cep'].forEach(id => {
         if (get(id)) clearFieldError(document.getElementById(id));
@@ -1563,17 +1568,19 @@
       }
       btn.disabled = true;
       try {
-        await apiPut('/auth/me', {
-          full_name: get('a_full_name') || undefined,
-          social_name: get('a_social_name'), birth_date: get('a_birth_date') || undefined,
-          gender: get('a_gender'),
-          // Documento vazio NÃO vai no corpo: no back, chave presente = limpar.
-          cpf: get('a_cpf') || undefined, rg: get('a_rg'), cns: get('a_cns') || undefined,
-          mobile: get('a_mobile') || undefined, phone: get('a_phone'),
-          cep: get('a_cep'), street: get('a_street'), address_number: get('a_number'),
-          neighborhood: get('a_neighborhood'), city: get('a_city'),
-          state: get('a_state').toUpperCase(),
-        });
+await apiPut('/auth/me', {
+    full_name: campo('a_full_name'),
+    social_name: campo('a_social_name'), birth_date: campo('a_birth_date'),
+    gender: campo('a_gender'),
+    // cpf/rg/cns são a EXCEÇÃO: os inputs não vêm preenchidos (placeholder, por
+    //Privacy — o back devolve a máscara, não o número). Campo vazio nesses três
+    // quer dizer "não me mexa", não "apague": mandar '' limparia o documento
+    // salvo a cada gravação do perfil.
+    cpf: campo('a_cpf') || undefined, rg: campo('a_rg') || undefined, cns: campo('a_cns') || undefined,
+    mobile: campo('a_mobile'), phone: campo('a_phone'),
+    cep: campo('a_cep'), street: campo('a_street'), address_number: campo('a_number'),
+    neighborhood: campo('a_neighborhood'), city: campo('a_city'), state: campo('a_state'),
+    });
         toast('Dados atualizados', 'success');
         acctLoaded = false;
         await initMyAccount(true);

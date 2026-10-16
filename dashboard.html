@@ -1470,6 +1470,10 @@
       e.preventDefault();
       const btn = document.getElementById('profileSubmit');
       const get = (id) => document.getElementById(id).value.trim();
+    // Para PUT /auth/me: '' significa "usuário apagou, limpar de propósito";
+    // undefined significa "o campo não existe nesta página", que o back trata
+    // como "manter". Não confundir as duas coisas com `|| undefined`.
+    const campo = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : undefined; };
       // Validação local dos documentos (mesmas regras do back).
       if (get('p_cpf') && !isValidCPF(get('p_cpf'))) {
         setFieldError(document.getElementById('p_cpf'), 'CPF inválido. Confira os números digitados.');
@@ -1490,16 +1494,22 @@
       btn.disabled = true;
       try {
         await apiPut('/auth/me', {
-          full_name: get('p_full_name') || undefined,
-          social_name: get('p_social_name'), birth_date: get('p_birth_date') || undefined,
-          gender: get('p_gender'), mother_name: get('p_mother_name'), father_name: get('p_father_name'),
-          guardian_name: get('p_guardian'), cpf: get('p_cpf') || undefined,
-          rg: get('p_rg'), cns: get('p_cns'),
-          mobile: get('p_mobile') || undefined, phone: get('p_phone'),
-          blood_type: get('p_blood_type'), priority: get('p_priority'), race: get('p_race'),
-          cep: get('p_cep'), street: get('p_street'), address_number: get('p_number'),
-          neighborhood: get('p_neighborhood'), city: get('p_city'), state: get('p_state'),
-          zone: get('p_zone'), reference_point: get('p_reference'),
+          // campo() devolve o valor do input (string vazia se o usuário
+          // apagou) e undefined só quando o campo não existe na página.
+          // O back faz atualização parcial: ausente mantém, vazio limpa.
+          // Antes, `|| undefined` transformava "apagar de propósito" em
+          // "não enviar", e o dado sumia sem aviso.
+          full_name: campo('p_full_name'),
+          social_name: campo('p_social_name'), birth_date: campo('p_birth_date'),
+          gender: campo('p_gender'), mother_name: campo('p_mother_name'), father_name: campo('p_father_name'),
+guardian_name: campo('p_guardian'),
+    // cpf/rg/cns: campo vazio = "não me mexa" (o input não vem preenchido).
+    cpf: campo('p_cpf') || undefined, rg: campo('p_rg') || undefined, cns: campo('p_cns') || undefined,
+          mobile: campo('p_mobile'), phone: campo('p_phone'),
+          blood_type: campo('p_blood_type'), priority: campo('p_priority'), race: campo('p_race'),
+          cep: campo('p_cep'), street: campo('p_street'), address_number: campo('p_number'),
+          neighborhood: campo('p_neighborhood'), city: campo('p_city'), state: campo('p_state'),
+          zone: campo('p_zone'), reference_point: campo('p_reference'),
         });
         toast('Perfil salvo', 'success');
         initProfile();
