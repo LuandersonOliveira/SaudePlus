@@ -1,17 +1,18 @@
 /* ==========================================================================
    Saúde+ — Design system
    Fonte Inter autohospedada (latin, variável 100–900): zero dependência
-   de rede — primeiro paint funciona com 3G instável ou offline. */
+   de rede — primeiro paint funciona com 3G instável ou offline.
+
+   Identidade: a "lagoa" (Lagoa de Itaenga) como fio condutor — água, ondas,
+   conexão que se espalha. Paleta de alto contraste e tipografia generosa
+   porque o público inclui pessoas com baixa familiaridade digital.
+   ========================================================================== */
 
 /* latin */
 @font-face{
   font-family:'Inter'; font-style:normal; font-weight:100 900; font-display:swap;
   src:url('fonts/inter-latin.woff2') format('woff2');
 }
-   Identidade: a "lagoa" (Lagoa de Itaenga) como fio condutor — água, ondas,
-   conexão que se espalha. Paleta de alto contraste e tipografia generosa
-   porque o público inclui pessoas com baixa familiaridade digital.
-   ========================================================================== */
 
 /* P1 acessibilidade: texto visível só para leitor de tela (rótulos que o
    layout dispensa visualmente, mas a WCAG/e-MAG exige). */
