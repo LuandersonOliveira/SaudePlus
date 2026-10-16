@@ -201,64 +201,69 @@ CREATE TABLE IF NOT EXISTS health_units (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE = InnoDB;
 
+-- Seed das 10 unidades de saúde de Lagoa de Itaenga.
+-- Os ids são FIXOS de propósito: com UUID() a PRIMARY KEY nunca colidia e o
+-- INSERT IGNORE inseria as 10 unidades de novo a cada execução — três
+-- rodadas de `npm run db:setup` deixavam 30 unidades com nome repetido.
+-- Com id estável, o IGNORE colide e o seed é idempotente.
 INSERT IGNORE INTO
     health_units (id, name, type, neighborhood)
 VALUES (
-        UUID(),
+        '5a0e1b12-0001-4a10-9c01-000000000001',
         'Posto de Saúde da Família José Cavalcanti de Petribu',
         'ubs',
         'Zona Rural'
     ),
     (
-        UUID(),
+        '5a0e1b12-0002-4a10-9c01-000000000002',
         'Posto de Saúde da Família Progresso',
         'ubs',
         'Centro'
     ),
     (
-        UUID(),
+        '5a0e1b12-0003-4a10-9c01-000000000003',
         'Posto de Saúde da Família Manoel Hermínio',
         'ubs',
         'Saudade'
     ),
     (
-        UUID(),
+        '5a0e1b12-0004-4a10-9c01-000000000004',
         'Posto de Saúde da Família Boa Esperança',
         'ubs',
         'Vila Boa Esperança'
     ),
     (
-        UUID(),
+        '5a0e1b12-0005-4a10-9c01-000000000005',
         'Posto de Saúde da Família Nova Itaenga',
         'ubs',
         'Nova Itaenga'
     ),
     (
-        UUID(),
+        '5a0e1b12-0006-4a10-9c01-000000000006',
         'Posto de Saúde da Família Salinas',
         'ubs',
         'Salinas'
     ),
     (
-        UUID(),
+        '5a0e1b12-0007-4a10-9c01-000000000007',
         'Posto de Saúde da Família Moinho',
         'ubs',
         'Moinho'
     ),
     (
-        UUID(),
+        '5a0e1b12-0008-4a10-9c01-000000000008',
         'Casa de Saúde e Maternidade Josefa Cavalcanti de Petribu',
         'hospital',
         'Centro'
     ),
     (
-        UUID(),
+        '5a0e1b12-0009-4a10-9c01-000000000009',
         'Policlínica Saúde São Sebastião',
         'clinica',
         'Centro'
     ),
     (
-        UUID(),
+        '5a0e1b12-000a-4a10-9c01-00000000000a',
         'CAPS Flor da Pedra',
         'caps',
         'Vila Boa Esperança'
