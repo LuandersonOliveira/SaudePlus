@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
-const { requireCapability } = require('../middleware/capabilities');
+const { requireCapability, pode } = require('../middleware/capabilities');
 const { audit } = require('../middleware/audit');
 
 const router = express.Router();
@@ -15,10 +15,17 @@ router.use(requireCapability('users'));
 // Hierarquia de privilégio — impede escalonamento lateral (P0.4).
 // Um admin não pode alterar o status de alguém de nível igual ou superior.
 const LEVEL_RANK = { superadmin: 4, gestor: 3, atendimento: 2, alertas: 1 };
-const SELF_RANK = 4; // admin sem admin_level explícito é tratado como gestor (fallback do middleware)
+
+// Sem `?? LEVEL_RANK.gestor`: nível ausente não pode virar gestor no cálculo
+// de rank — era o mesmo fail-open do middleware, aqui numa segunda forma.
+// Um alvo admin sem nível explícito simplesmente não é rebaixável por esta via.
+function rankDe(adminLevel) {
+  const r = LEVEL_RANK[adminLevel];
+  return typeof r === 'number' ? r : 0;
+}
 
 function actorRank(user) {
-  return LEVEL_RANK[user.admin_level] ?? LEVEL_RANK.gestor;
+  return rankDe(user && user.admin_level);
 }
 
 const SAFE_ROLES = ['paciente', 'atendente', 'admin'];
@@ -93,6 +100,11 @@ router.get('/:id',
 
 // PATCH /admin/users/:id — altera account_status e/ou job_role
 // Papel (role) só pode ser alterado diretamente no banco de dados.
+//
+// A rota exige 'users' (no router.use acima). Alterar o NÍVEL administrativo
+// exige ainda a capability 'admins', que só o superadmin tem — verificado
+// aqui, e não no middleware da rota, porque o payload decide: um gestor pode
+// sim ativar uma conta e ajustar um cargo.
 router.patch('/:id', async (req, res, next) => {
   try {
     const { account_status, job_role, admin_level, reason, status_notes } = req.body || {};
@@ -110,7 +122,7 @@ router.patch('/:id', async (req, res, next) => {
     // (ou igual) não pode desativar nem rebaixar alguém de nível superior —
     // antes isso permitia, por exemplo, um 'atendimento' desativar o superadmin.
     if (currentUser.role === 'admin') {
-      const targetRank = LEVEL_RANK[currentUser.admin_level] ?? LEVEL_RANK.gestor;
+      const targetRank = rankDe(currentUser.admin_level);
       if (actorRank(req.user) <= targetRank) {
         return res.status(403).json({
           error: 'Você não pode alterar uma conta de nível administrativo igual ou superior ao seu.',
@@ -138,7 +150,7 @@ router.patch('/:id', async (req, res, next) => {
       updates.push('job_role=?'); params.push(job_role || null); logParts.push(`cargo -> ${job_role}`);
     }
     if (admin_level !== undefined) {
-      if (req.user.admin_level !== 'superadmin') return res.status(403).json({ error: 'Somente o superadmin pode alterar níveis administrativos.' });
+      if (!pode('admins', req.user)) return res.status(403).json({ error: 'Seu nível administrativo não permite alterar níveis de outros administradores.' });
       if (!SAFE_ADMIN_LEVELS.includes(admin_level)) return res.status(400).json({ error: 'Nível administrativo inválido.' });
       // Não pode rebaixar para baixo do próprio nível.
       if ((LEVEL_RANK[admin_level] ?? 0) < actorRank(req.user)) {

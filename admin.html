@@ -476,15 +476,18 @@
 
     // P3: visões por nível administrativo (espelha requireCapability do back).
     // atendimento → só atendimentos; alertas → só doenças; gestor/superadmin → tudo.
+    // Espelha server/src/middleware/capabilities.js — é o MESMO mapa, com a
+    // capability 'admins' que só o superadmin tem. Fail-closed: nível
+    // ausente ou desconhecido NÃO vira gestor aqui também.
     const LEVEL_CAPS = {
-      superadmin: ['users', 'appointments', 'diseases', 'units', 'audit', 'reports'],
+      superadmin: ['users', 'appointments', 'diseases', 'units', 'audit', 'reports', 'admins'],
       gestor: ['users', 'appointments', 'diseases', 'units', 'audit', 'reports'],
       atendimento: ['appointments'],
       alertas: ['diseases'],
     };
     function myCaps() {
       const level = SESSION && SESSION.user && SESSION.user.admin_level;
-      return LEVEL_CAPS[level] || LEVEL_CAPS.gestor;
+      return LEVEL_CAPS[level] || [];
     }
     function can(cap) { return myCaps().includes(cap); }
 
@@ -508,7 +511,12 @@
       // Card de atividade recente exige 'audit'.
       const activityCard = document.getElementById('recentActivity')?.closest('.card');
       if (activityCard && !showAuditoria) activityCard.style.display = 'none';
-      const level = SESSION.user.admin_level || 'gestor';
+      // O <select> de nível administrativo só aparece para quem tem 'admins'.
+      document.querySelectorAll('[id^="edit_admin_level_"]').forEach((el) => {
+        const campo = el.closest('.field');
+        if (campo) campo.style.display = can('admins') ? '' : 'none';
+      });
+      const level = SESSION.user.admin_level || 'sem nível';
       const badge = document.getElementById('levelBadge');
       if (badge) badge.textContent = level;
     }
@@ -1223,7 +1231,7 @@
           <label for="edit_reason_${u.id}">Motivo da alteração <span class="muted" style="font-weight:400">(obrigatório ao mudar status)</span></label>
           <input class="input" id="edit_reason_${u.id}" placeholder="Ex.: solicitação do paciente, cadastro duplicado">
         </div>
-        ${u.role === 'admin' && SESSION.user.admin_level === 'superadmin' ? `<div class="field"><label for="edit_admin_level_${u.id}">Nível administrativo</label><select class="select" id="edit_admin_level_${u.id}"><option value="superadmin" ${u.admin_level === 'superadmin' ? 'selected' : ''}>Superadmin</option><option value="gestor" ${(!u.admin_level || u.admin_level === 'gestor') ? 'selected' : ''}>Gestor</option><option value="atendimento" ${u.admin_level === 'atendimento' ? 'selected' : ''}>Atendimento</option><option value="alertas" ${u.admin_level === 'alertas' ? 'selected' : ''}>Alertas</option></select></div>` : ''}
+        ${u.role === 'admin' && can('admins') ? `<div class="field"><label for="edit_admin_level_${u.id}">Nível administrativo</label><select class="select" id="edit_admin_level_${u.id}"><option value="superadmin" ${u.admin_level === 'superadmin' ? 'selected' : ''}>Superadmin</option><option value="gestor" ${(!u.admin_level || u.admin_level === 'gestor') ? 'selected' : ''}>Gestor</option><option value="atendimento" ${u.admin_level === 'atendimento' ? 'selected' : ''}>Atendimento</option><option value="alertas" ${u.admin_level === 'alertas' ? 'selected' : ''}>Alertas</option></select></div>` : ''}
       </div>
       <button class="btn btn-primary" style="margin-top:12px" onclick="adminUpdateUser('${u.id}')">Salvar status</button>
     </div>`;
