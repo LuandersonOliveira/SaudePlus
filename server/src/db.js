@@ -12,4 +12,14 @@ const pool = mysql.createPool({
   dateStrings: true,
 });
 
+// Conexão ociosa morre quando o MySQL reinicia, expira por wait_timeout ou a
+// rede pisca. O mysql2 reemite isso no próprio pool: sem um listener, o Node
+// lança "Unhandled 'error' event" e o processo INTEIRO morre. Não há
+// uncaughtException em lugar nenhum para segurar isso.
+pool.on('error', (err) => {
+  console.error(`Erro na conexão do pool MySQL [${err.code || 'SEM_CODIGO'}]:`, err.message);
+  // Não tentamos reconectar aqui: o mysql2 já marca a conexão como morta e o
+  // próximo acquire() cria outra. A tentativa aqui competiria com ele.
+});
+
 module.exports = pool;

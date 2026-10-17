@@ -29,13 +29,43 @@ function isEncrypted(value) {
   return typeof value === 'string' && value.startsWith(PREFIX);
 }
 
+/**
+ * Falha FECHADA em produção.
+ *
+ * Sem chave válida, encryptField devolvia o valor em TEXTO PURO, com um
+ * único console.warn, uma vez. CPF/RG/CNS iam para o MySQL em claro e o
+ * isEncrypted os tratava como legado para sempre — e em produção não há
+ * ninguém para ver o aviso. Um controle de segurança que se desliga sozinho
+ * é pior do que um que falha.
+ *
+ * Em desenvolvimento a degradação continua, senão `npm run setup` num
+ * ambiente novo seria impossível para o aluno da faculdade.
+ */
+function assertCryptoConfigured() {
+  const key = getKey();
+  if (key) return true;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'DATA_ENCRYPTION_KEY ausente ou inválida. Gere com: ' +
+        "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\" " +
+        'e coloque no server/.env. Recusar subir: gravar documento em claro é pior.'
+    );
+  }
+  return false;
+}
+
 // Cifra um campo; null/vazio -> null; já cifrado -> devolve como está.
 function encryptField(value) {
   if (value === null || value === undefined || String(value) === '') return null;
   const text = String(value);
   if (isEncrypted(text)) return text;
+  // Em produção, chave inválida LANÇA (falha fechada). Em dev, avisa uma vez
+  // e grava em claro, para o setup local continuar possível.
   const key = getKey();
-  if (!key) return text; // dev sem chave: plaintext + warn (nunca em produção)
+  if (!key) {
+    assertCryptoConfigured();
+    return text;
+  }
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   const ct = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
@@ -57,4 +87,6 @@ function decryptField(value) {
   return Buffer.concat([decipher.update(Buffer.from(ctB64, 'base64')), decipher.final()]).toString('utf8');
 }
 
-module.exports = { encryptField, decryptField, isEncrypted };
+module.exports = {
+  encryptField, decryptField, isEncrypted, assertCryptoConfigured,
+};
