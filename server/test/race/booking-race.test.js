@@ -115,11 +115,30 @@ let server;
 let base;
 let ctx;
 
+const rede = setTimeout(() => process.exit(process.exitCode ?? 0), 15000);
+rede.unref();
+
 test.before(async () => {
   const passo = (m) => { if (process.env.RACE_DEBUG) console.log('  [before]', m); };
 
   passo('criando banco descartável');
   const admin = await novaConexao(false);
+  // Varredura do que sobrou de execuções anteriores.
+  //
+  // O teardown faz DROP, mas ele não roda se o processo morre (Ctrl+C, timeout
+  // do runner) — e o `process.exit` de segurança do after pode cortar o DROP no
+  // meio. Sem esta varredura, cada execução dessas deixa um `saude_race_<pid>`
+  // para sempre: a máquina do aluno vai enchendo de lixo de teste sem nunca
+  // ninguém reclamar, porque o teste "passa".
+  const [sobras] = await admin.query(
+    "SELECT schema_name AS n FROM information_schema.schemata WHERE schema_name LIKE 'saude\\_race\\_%'"
+  );
+  if (sobras.length) {
+    passo(`limpando ${sobras.length} banco(s) de execuções anteriores`);
+    for (const { n } of sobras) {
+      await admin.query('DROP DATABASE IF EXISTS `' + n + '`').catch(() => {});
+    }
+  }
   await admin.query('DROP DATABASE IF EXISTS `' + DB + '`');
   await admin.query('CREATE DATABASE `' + DB + '` CHARACTER SET utf8mb4');
   soltar(admin);
@@ -184,10 +203,12 @@ test.before(async () => {
 });
 
 test.after(async () => {
-  // Rede de segurança: se algum await travar, o processo ainda encerra.
-  // unref() não impede o disparo — só não segura o event loop sozinho.
-  const rede = setTimeout(() => process.exit(process.exitCode ?? 0), 5000);
-  rede.unref();
+  // O DROP vem PRIMEIRO, com o menor possível de coisa entre ele e a saída.
+  // Depois ele só há a rede de segurança: se algum await travar, o processo
+  // ainda encerra — unref() não impede o disparo, só não segura o event loop.
+  const admin = await novaConexao(false);
+  await admin.query('DROP DATABASE IF EXISTS `' + DB + '`').catch(() => {});
+  soltar(admin);
 
   if (server) {
     if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
@@ -198,9 +219,6 @@ test.after(async () => {
   abertas.clear();
   principal = null;
 
-  const admin = await novaConexao(false);
-  await admin.query('DROP DATABASE IF EXISTS `' + DB + '`').catch(() => {});
-  soltar(admin);
   clearTimeout(rede);
 });
 
