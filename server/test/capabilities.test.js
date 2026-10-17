@@ -160,7 +160,7 @@ test.before(async () => {
     `INSERT INTO users (id, full_name, email, password_hash, role, account_status)
      VALUES (?,?,?,?,?,?)
      ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), password_hash = VALUES(password_hash),
-                             account_status = VALUES(account_status)`,
+                             account_status = VALUES(account_status), admin_level = NULL`,
     [ALVO_ID, 'Gerenciado', 'gerenciado@caps.local', hash, 'paciente', 'pendente']
   );
   // O ator TEM que existir: audit_log.actor_id é FK para users, e um ator

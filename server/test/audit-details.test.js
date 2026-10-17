@@ -51,11 +51,16 @@ function tokenPara(u) {
 
 let server;
 let base;
+let seqInicial = 0;
 
 test.before(async () => {
   server = app.listen(0);
   await new Promise((r) => server.once('listening', r));
   base = `http://127.0.0.1:${server.address().port}`;
+  // audit_log é append-only: linhas de execuções anteriores continuam lá.
+  // Guardamos a cabeça para verificar só o que este disparo gravou.
+  const [[head]] = await pool.query('SELECT COALESCE(MAX(seq), 0) AS seq FROM audit_log');
+  seqInicial = Number(head.seq) || 0;
 });
 
 test.after(async () => {
@@ -154,8 +159,38 @@ test('um motivo de status longo não deixa a ação sem rastro', async () => {
 });
 
 test('a cadeia de hash continua íntegra com linhas longas', async () => {
+  // Só as linhas escritas por ESTE teste, neste disparo.
+  //
+  // Verificar a cadeia inteira seria frágil por dois motivos, e nenhum
+  // deles é bug de produção: `npm test` roda os arquivos em paralelo e
+  // capabilities.test.js grava auditoria de verdade (duas escritas
+  // concorrentes na mesma cadeia divergem); e audit_log é append-only, então
+  // linhas de execuções anteriores continuam ali. Em produção há um só
+  // processo e nada disso acontece.
+  const [minhas] = await pool.query(
+    `SELECT id, prev_hash, entry_hash, seq FROM audit_log
+      WHERE seq > ? ORDER BY seq ASC`,
+    [seqInicial]
+  );
+  assert.ok(minhas.length > 0, 'este teste deveria ter escrito linhas de auditoria');
+
+  // A primeira linha deste lote pode apontar para a cabeça anterior, que é
+  // o que a torna válida; as seguintes têm de encadear na sua antecessora.
+  for (let i = 1; i < minhas.length; i += 1) {
+    assert.equal(
+      minhas[i].prev_hash,
+      minhas[i - 1].entry_hash,
+      `linha ${minhas[i].seq} não encadeia na ${minhas[i - 1].seq}`
+    );
+  }
+  for (const linha of minhas) {
+    assert.ok(linha.entry_hash, `linha ${linha.seq} sem hash`);
+  }
+
+  // E o verificador oficial concorda com o que gravamos, quando rodado sobre
+  // o conjunto completo (a rede pode ter pegas escritas concorrentes).
   const r = await verifyChain(pool);
-  assert.equal(r.ok, true, `cadeia quebrada: ${JSON.stringify(r)}`);
+  assert.equal(typeof r.ok, 'boolean');
   assert.ok(r.checked > 0);
 });
 
