@@ -161,6 +161,11 @@ CREATE TABLE IF NOT EXISTS appointments (
     professional_id CHAR(36) NULL,
     scheduled_at DATETIME NOT NULL,
     notes TEXT NULL,
+    -- Fase 5: duração do atendimento marcado (migrate-booking-duration).
+    -- Sem ela, o cálculo de conflito tratava TUDO como 30 min, e um
+    -- atendimento de 60 min não bloqueava o horário seguinte da grade de 30.
+    -- NULL = registro anterior à coluna; o cálculo usa COALESCE(…, 30).
+    duration_minutes INT NULL DEFAULT NULL,
     status ENUM(
         'pendente',
         'confirmado',
@@ -219,6 +224,8 @@ CREATE TABLE IF NOT EXISTS exams (
     professional_id CHAR(36) NULL,
     scheduled_at DATETIME NOT NULL,
     notes TEXT NULL,
+    -- Fase 5: mesma razão de appointments.duration_minutes.
+    duration_minutes INT NULL DEFAULT NULL,
     status ENUM(
         'pendente',
         'confirmado',

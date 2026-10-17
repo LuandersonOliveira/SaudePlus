@@ -9,7 +9,7 @@ const express = require('express');
 const crypto = require('crypto');
 const pool = require('../db');
 const { verifyToken } = require('../middleware/auth');
-const { TIPOS, validateBooking, validateScheduleWindow } = require('../utils/booking');
+const { TIPOS, validateBooking, duracaoMinutos, validateScheduleWindow } = require('../utils/booking');
 
 const LABELS = {
   consulta: {
@@ -106,6 +106,17 @@ function createBookingRouter(tipo) {
       if (hasDoctor) { columns.push('doctor'); values.push(doctorName); }
       columns.push('location', 'unit_id', 'professional_id', 'scheduled_at', 'notes');
       values.push(location, unit_id, professional_id || null, scheduled_at, notes || null);
+
+      // A duração vai gravada junto. Sem ela, o cálculo de conflito trataria
+      // este atendimento como 30 min para sempre — e um atendimento de 60 min
+      // deixaria livre o horário seguinte da grade de 30.
+      const duracao = await duracaoMinutos(conn, {
+        unitId: unit_id,
+        professionalId: professional_id || null,
+        scheduledAt: scheduled_at,
+      });
+      columns.push('duration_minutes');
+      values.push(duracao);
 
       await conn.query(
         `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(',')})`,

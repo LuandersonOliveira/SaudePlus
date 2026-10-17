@@ -57,11 +57,24 @@ function validateScheduleWindow(value) {
   return null;
 }
 
+// Duração assumida para registro que não tem `duration_minutes` gravado
+// (agendamento anterior à migration 007, ou serviço sem profissional
+// alocado). Ignorar essas linhas seria pior: permitiria sobreposição.
+const DURACAO_PADRAO = 30;
+
+// Minutos ocupados por um registro, com a constante como reserva para o
+// legado. A duração é do AGENDAMENTO, não da agenda atual: se o admin mudar
+// o slot_minutes amanhã, o que foi marcado hoje não muda de significado.
+function duracaoDe(row) {
+  const d = Number(row.duration_minutes);
+  return Number.isFinite(d) && d > 0 ? d : DURACAO_PADRAO;
+}
+
 async function fetchBusyIntervals(pool, professionalId, fromStr, toStr, excludeId) {
   const intervals = [];
   for (const table of ['appointments', 'exams']) {
     const [rows] = await pool.query(
-      `SELECT id, scheduled_at FROM ${table}
+      `SELECT id, scheduled_at, duration_minutes FROM ${table}
        WHERE professional_id = ? AND status IN ('pendente', 'confirmado')
          AND scheduled_at BETWEEN ? AND ?`,
       [professionalId, `${fromStr} 00:00:00`, `${toStr} 23:59:59`]
@@ -69,7 +82,7 @@ async function fetchBusyIntervals(pool, professionalId, fromStr, toStr, excludeI
     for (const row of rows) {
       if (excludeId && row.id === excludeId) continue;
       const start = parseDateTime(row.scheduled_at);
-      if (start) intervals.push({ start: start.getTime(), end: start.getTime() + 30 * 60000 });
+      if (start) intervals.push({ start: start.getTime(), end: start.getTime() + duracaoDe(row) * 60000 });
     }
   }
   const [blocks] = await pool.query(
@@ -99,7 +112,7 @@ async function fetchBusyIntervalsBulk(pool, professionalIds, fromStr, toStr, exc
 
   for (const table of ['appointments', 'exams']) {
     const [rows] = await pool.query(
-      `SELECT professional_id, id, scheduled_at FROM ${table}
+      `SELECT professional_id, id, scheduled_at, duration_minutes FROM ${table}
        WHERE professional_id IN (?) AND status IN ('pendente', 'confirmado')
          AND scheduled_at BETWEEN ? AND ?`,
       [ids, `${fromStr} 00:00:00`, `${toStr} 23:59:59`]
@@ -107,7 +120,7 @@ async function fetchBusyIntervalsBulk(pool, professionalIds, fromStr, toStr, exc
     for (const row of rows) {
       if (excludeId && row.id === excludeId) continue;
       const start = parseDateTime(row.scheduled_at);
-      if (start) ensure(row.professional_id).push({ start: start.getTime(), end: start.getTime() + 30 * 60000 });
+      if (start) ensure(row.professional_id).push({ start: start.getTime(), end: start.getTime() + duracaoDe(row) * 60000 });
     }
   }
   const [blocks] = await pool.query(
@@ -137,6 +150,54 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
  *   serviceName, scheduledAt, excludeId (registro em edição)
  * }
  */
+/**
+ * Localiza o `work_schedules` que casa com o horário pedido e devolve a
+ * duração do atendimento.
+ *
+ * Com DUAS agendas sobrepostas no mesmo dia, o horário pode ser candidato de
+ * ambas; a primeira que casa define a duração. É a mesma regra que o
+ * chamador usava — agora ela é uma função só, e é usada tanto para validar
+ * o candidato quanto para gravar a duração no agendamento.
+ *
+ * @returns {{slot: number, start: number, end: number}|null}
+ */
+function schedulePara(schedules, when) {
+  const minutesOfDay = when.getHours() * 60 + when.getMinutes();
+  for (const s of schedules) {
+    const start = toMinutes(s.start_time);
+    const end = toMinutes(s.end_time);
+    const slotMin = Number(s.slot_minutes) || 30;
+    if (start === null || end === null) continue;
+    if (minutesOfDay >= start && minutesOfDay + slotMin <= end && (minutesOfDay - start) % slotMin === 0) {
+      return { slot: slotMin, start, end };
+    }
+  }
+  return null;
+}
+
+async function agendasDoDia(pool, professionalId, unitId, when) {
+  const [rows] = await pool.query(
+    `SELECT start_time, end_time, slot_minutes FROM work_schedules
+     WHERE professional_id = ? AND unit_id = ? AND weekday = ? AND active = 1`,
+    [professionalId, unitId, when.getDay()]
+  );
+  return rows;
+}
+
+/**
+ * Duração, em minutos, do atendimento que seria marcado neste horário.
+ *
+ * Serviço sem profissional alocado não tem agenda: a unidade decide depois, e
+ * 30 min é o padrão histórico.
+ */
+async function duracaoMinutos(pool, { unitId, professionalId, scheduledAt }) {
+  if (!professionalId) return DURACAO_PADRAO;
+  const when = parseDateTime(scheduledAt);
+  if (!when) return DURACAO_PADRAO;
+  const casa = schedulePara(await agendasDoDia(pool, professionalId, unitId, when), when);
+  return casa ? casa.slot : DURACAO_PADRAO;
+}
+
 async function validateBooking(pool, opts) {
   const { unitId, professionalId, serviceName, scheduledAt, excludeId } = opts;
   const tipo = resolveTipo(opts);
@@ -177,29 +238,10 @@ async function validateBooking(pool, opts) {
   if (!links.length) return 'Este profissional não atende este serviço nesta unidade.';
 
   const when = parseDateTime(scheduledAt);
-  const weekday = when.getDay();
-  const minutesOfDay = when.getHours() * 60 + when.getMinutes();
+  const casa = schedulePara(await agendasDoDia(pool, professionalId, unitId, when), when);
+  if (!casa) return 'O profissional não atende neste dia e horário.';
 
-  const [schedules] = await pool.query(
-    `SELECT start_time, end_time, slot_minutes FROM work_schedules
-     WHERE professional_id = ? AND unit_id = ? AND weekday = ? AND active = 1`,
-    [professionalId, unitId, weekday]
-  );
-
-  let slot = 30;
-  let insideSchedule = false;
-  for (const s of schedules) {
-    const start = toMinutes(s.start_time);
-    const end = toMinutes(s.end_time);
-    const slotMin = Number(s.slot_minutes) || 30;
-    if (start === null || end === null) continue;
-    if (minutesOfDay >= start && minutesOfDay + slotMin <= end && (minutesOfDay - start) % slotMin === 0) {
-      insideSchedule = true;
-      slot = slotMin;
-      break;
-    }
-  }
-  if (!insideSchedule) return 'O profissional não atende neste dia e horário.';
+  const slot = casa.slot;
 
   const dateStr = toDateStr(when);
   const intervals = await fetchBusyIntervals(pool, professionalId, dateStr, dateStr, excludeId);
@@ -542,6 +584,17 @@ async function applyBookingChange(pool, opts) {
         excludeId: opts.id,
       });
       if (bookingError) return { status: 409, body: { error: bookingError } };
+
+      // Reagendar muda a grade, então muda a duração: um atendimento de 60 min
+      // levado para um turno de 30 min tem que ser reavaliado como 30. Sem
+      // isto, o registro carregaria a duração do horário antigo.
+      const duracao = await duracaoMinutos(pool, {
+        unitId: record.unit_id,
+        professionalId: record.professional_id,
+        scheduledAt: scheduled_at,
+      });
+      updates.push('duration_minutes=?'); params.push(duracao);
+      logParts.push(`duração -> ${duracao} min`);
     }
   }
 
@@ -566,6 +619,9 @@ module.exports = {
   toDateStr,
   validateScheduleWindow,
   validateBooking,
+duracaoMinutos,
+duracaoDe,
+DURACAO_PADRAO,
   getAvailability,
   findAvailabilityByService,
   applyBookingChange,
