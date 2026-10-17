@@ -68,7 +68,19 @@ Sistema incumbente vanilla (sem build) para rede municipal. Assinatura: a "lagoa
 
 ## Colors
 
-Lagoa comprometida: texto `ink` quase-preto-esverdeado sobre `bg` água-clara; ação só em `primary/primary-600`; `accent` terracota com moderação (nunca texto corrido). Semânticos fechados: danger/warning/success + bgs pastéis. Detector Fase 0 acusa 3 pares reprovados — não usar como texto: `ink on primary` 2.9:1, `primary-600 on primary-600` 1.0:1 (hover), `warning on warning-bg` 3.2:1. Corrigir na Fase 1 sem trocar paleta (escurecer texto ou clarear fundo).
+Lagoa comprometida: texto `ink` quase-preto-esverdeado sobre `bg` água-clara; ação só em `primary/primary-600`; `accent` terracota com moderação (nunca texto corrido). Semânticos fechados: danger/warning/success + bgs pastéis.
+
+**Contraste (Fase 0 detector → Fase 1/2 resolvido).** O detector acusou 3 pares reprovados. Estado medido hoje, com os valores reais de `styles.css`:
+
+| Par | Razão | Veredito |
+|---|---|---|
+| `white` on `--primary` | 5.23:1 | Passa AA |
+| `white` on `--primary-600` | 7.89:1 | Passa AAA |
+| `--warning` on `--warning-bg` | 3.20:1 | **Reprovado** — resolvido trocando o texto por `--warning-ink` (7.14:1) |
+
+A correção foi de token, não de paleta: `--warning-ink` existe exatamente para texto sobre `--warning-bg`, e `--warning` ficou só para ícone/borda/acento.
+
+**Don't (regra permanente):** não usar `--warning`, `--warning-bg` nem `--success` como fundo de texto pequeno. `--warning` sobre `--bg` dá 3.62:1 e `white` sobre `--success` dá 4.08:1 — ambos reprovados para texto normal (precisariam de ≥4.5:1). Texto branco sobre `--primary`/`--primary-600`/`--danger` está liberado (5.23 / 7.89 / 5.44).
 
 ## Typography
 
@@ -76,7 +88,7 @@ Inter variável (100–900) autohospedada em `assets/fonts/inter-latin.woff2` co
 
 ## Layout
 
-`--maxw:1080px`, `.container 32px 20px 64px`. Grids: `.grid-2/4/5` colapsam <760px; dentro de `app-shell` colapsam mais cedo (1300px/1150px) porque rail rouba 256px. Rail: `grid 256px 1fr`, sticky 100vh, vira topbar rolável <980px e empilha <620px. Hero `72px 20px 96px` centrado, max 680/560px. Linha 35–75 chars implícita; sem scroll horizontal.
+`--maxw:1080px`, `.container 32px 20px 64px`. Grids: `.grid-2/3/4/5` colapsam <760px; dentro de `app-shell` colapsam mais cedo (1300px/1150px) porque rail rouba 256px. Rail: `grid 256px 1fr`, sticky 100vh, vira topbar rolável <980px e empilha <620px. Hero `72px 20px 96px` centrado, max 680/560px. Linha 35–75 chars implícita; sem scroll horizontal.
 
 ## Elevation & Depth
 
@@ -91,6 +103,7 @@ Raio generoso amigável: 14px cards, 9px inputs/botões, 999px badges/pills (`sl
 - Btn: primary branco sobre verde, outline borda `border`; `:active translateY(1px)`; transição 150ms bg/border; futuro: `loadingButton` desabilita + spinner (evita duplo submit).
 - Tabs: linha inferior 2.5px; sidebar vira pill esquerda 3px + `primary-100` bg; `has-badge` flex para contador fila.
 - Field/input/select/textarea: label 0.85rem 600, padding 11/13, raio sm; erro `.has-error` borda danger + `.field-msg` 0.78rem 600 + `aria-invalid` (via `assets/ui.js:setFieldError`).
+- `.opt`: complemento discreto do label (`(opcional)`, `- mínimo 6 caracteres`) — 0.75rem `muted`, peso 400. Vive no design system, não num `<style>` de página: as seis páginas compartilham `assets/styles.css`, e uma regra local só aparecia onde foi escrita.
 - Card/item/badge/spinner/toast/slots: `.slot-day` pill toggle, `.slot-time` outline vira preenchido selected, `.slot-summary` dashed; spinner 26px borda rotativa (trocar por skeleton na Fase 3).
 - Wizard `.wizard-steps` contador + conector 2px; role-cards 2col selecionável (`radiogroup`).
 - Tabs: setas/Home/End navegam e ativam via `assets/ui.js` (auto-init em todo `[role=tablist]`); Esc fecha o diálogo aberto (closer dedicado; senha resolve null).

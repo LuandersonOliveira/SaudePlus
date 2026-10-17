@@ -209,7 +209,25 @@
 
   ## Setup completo
 
-  Pré-requisitos: **Node >= 18**, **MySQL 8 rodando**, `npx serve` (ou qualquer static server) para o front.
+  Pré-requisitos: **Node >= 18** e **MySQL 8 rodando**. Só isso — não precisa
+  de `npx serve`, nem de `mysql < schema.sql` na mão.
+
+  ```bash
+  git clone <repo> && cd SaudePlus
+
+  npm run setup     # instala as deps, cria o banco, aplica as migrations e cria o admin
+  npm run doctor    # confere Node, .env, MySQL, migrations pendentes e portas
+  npm run dev       # sobe a API (:4000) e o front (:8080)
+  ```
+
+  Acesse `http://localhost:8080`. O `npm run doctor` responde "pronto para
+  rodar" quando não falta nada — e diz o quê falta quando falta.
+
+  Os três comandos são idempotentes: rodar de novo não duplica nada.
+
+  ### Setup manual (só se `npm run setup` não servir no seu ambiente)
+
+  O resultado é o mesmo; a diferença é controlar cada passo.
 
   ### 1) Banco de dados
 
@@ -230,7 +248,7 @@
   > com `mysql < schema.sql`. Para outro nome de banco, use `npm run db:setup`,
   > que reescreve essas duas linhas para o `DB_NAME` em uso.
 
-  Banco já existente de versão anterior: `npm run db:migrate` (aplica as seis
+  Banco já existente de versão anterior: `npm run db:migrate` (aplica todas as
   migrations na ordem correta; todas idempotentes).
 
   ### 2) API
@@ -238,27 +256,16 @@
   ```bash
   cd server
   copy .env.example .env   # Windows (cmd) — no Git Bash/WSL use: cp .env.example .env
-  # edite o .env com suas credenciais MySQL e um JWT_SECRET forte
+  # edite o .env com suas credenciais MySQL, um JWT_SECRET forte e a DATA_ENCRYPTION_KEY
   npm install
-  npm run migrate:v3                # agenda inteligente (idempotente)
-  npm run migrate:security          # refresh tokens + audit append-only (Fase 0)
-  npm run migrate:privacy           # consentimento + CPF/RG/CNS cifrados (Fase 1)
-  npm run migrate:interop           # CNES + Gov.br + diseases.source (Fase 2)
-  npm run migrate:audit             # trilha com hash encadeado + MFA (Aulas 1/6)
-  npm run migrate:audit:details     # audit_log.details → TEXT
-  npm run seed:admin                # cria o admin definido no .env
+  npm run migrate:all                 # todas as migrations, na ordem correta
+  npm run seed:admin                  # cria o admin definido no .env
   npm start
   ```
 
-  Ou, em um comando só (faz `npm install` + todas as migrations + admin):
-
-  ```bash
-  npm run setup     # a partir da raiz do projeto
-  ```
-
-  > **Ordem importa:** `v3` → `security` → `privacy` → `interop` → `audit` →
-  > `audit:details`. Pular o `migrate:privacy` causa `Unknown column
-  > 'privacy_version'` no signup.
+  > **Ordem importa:** `migrate:all` roda `v3` → `security` → `privacy`
+  > → `interop` → `audit` → `audit:details`, nessa ordem. Pular o
+  > `migrate:privacy` causa `Unknown column 'privacy_version'` no signup.
   >
   > **Pular o `migrate:interop` não dá erro visível — apenas desliga o MFA
   > silenciosamente.** Sem `users.totp_enabled`, o `if (user.totp_enabled)` da
@@ -270,7 +277,7 @@
   | Var                                                           | Exemplo                                 | Para quê                                                          |
   | ------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
   | `PORT`                                                        | `4000`                                  | Porta da API                                                      |
-  | `CORS_ORIGIN`                                                 | `http://localhost:8080`                 | **Deve bater exatamente** com a URL do front (inclui porta) |
+  | `CORS_ORIGIN`                                                 | `http://localhost:8080`                 | Deve bater com a URL do front (inclui porta). `npm run dev` já deixa consistente: o `serve-web.js` serve em 8080 |
   | `TRUST_PROXY_HOPS`                                            | `0`                                     | Atrás de nginx/Cloudflare: nº de proxies (1 para um nginx). Sem isso o rate limit e o lockout de login vêm do IP do proxy |
   | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | `localhost / 3306 / root / *** / saude` | Conexão MySQL                                                     |
   | `JWT_SECRET` | string longa aleatória | Assinatura dos tokens (nunca commitar o real) |
@@ -315,15 +322,34 @@
 
   ## Scripts disponíveis
 
-  Dentro de `server/` (`npm run <script>`):
+  ### Na raiz do projeto (o que você deve usar)
+
+  | Script | Para quê |
+  | ------ | -------- |
+  | `npm run setup` | Instala as dependências, cria o banco, aplica todas as migrations e cria o admin. Idempotente. |
+  | `npm run doctor` | Diagnóstico do ambiente: Node, `.env`, MySQL, migrations pendentes, porta 4000/8080 livre, e se falta `DATA_ENCRYPTION_KEY`. |
+  | `npm run dev` | Sobe a API (:4000) e o front (:8080) juntos. |
+  | `npm run dev:api` / `npm run dev:web` | Sobe um lado só. |
+  | `npm test` | Suíte completa (`node:test`): contratos HTTP, RBAC, auditoria, cripto, front e banco. |
+  | `npm run test:race` | Só o teste de concorrência do booking — precisa de duas conexões MySQL simultâneas. |
+  | `npm run test:all` | `npm test` + `npm run test:race`. |
+  | `npm run smoke-test` | Verificação curta (segundos): saúde, headers, CORS, 17 asserts de RBAC e os validadores. |
+  | `npm run db:setup` / `db:migrate` / `db:seed` | Criar o banco / aplicar migrations / semear admin e dados demo. |
+  | `npm run backup` | Dump do banco (gzip + SHA-256 + manifesto), com retenção. |
+
+  O `npm test` roda contra o banco de desenvolvimento e é seguro: usa usuários
+  de teste com UUID fixo e limpa o que cria.
+
+  ### Dentro de `server/` (`npm run <script>`)
 
   | Script             | Comando                                             | Para quê                                                                                                                                                                   |
   | ------------------ | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `start`            | `node src/server.js`                                | Sobe a API + inicia job de lembretes                                                                                                                                       |
+  | `start`            | `node src/server.js`                                | Sobe a API + inicia job de lembretes. Antes do `listen`, valida `DATA_ENCRYPTION_KEY` e `JWT_SECRET` — em produção, config inválida impede o boot. |
   | `dev`              | `nodemon src/server.js`                             | Dev com auto-reload                                                                                                                                                        |
   | `seed:admin`       | `node scripts/seed-admin.js`                        | Cria (ou promove a `superadmin`) o admin do `.env` com `bcryptjs`                                                                                                          |
   | `seed:demo` | `node scripts/seed-v3-demo.js [--reset]` | Popula agenda demo em 4 unidades (serviços, 6 profissionais, horários + 3 vagas ocupadas p/ testar conflito; idempotente) |
-  | `migrate` | importa `migration_001.sql` | Atualiza bancos antigos (perfil estendido) |
+| `migrate:all` | roda todas em ordem | `v3` → `security` → `privacy` → `interop` → `audit` → `audit:details`. Idempotente. **É o que o `setup` usa.** |
+| `migrate` | importa `migration_001.sql` | Só para bancos muito antigos (perfil estendido). O `schema.sql` já é a união de tudo, então banco novo não precisa. |
   | `migrate:v3` | `node scripts/migrate-v3.js` | Cria `social_name/cns/priority/guardian`, `unit_id/professional_id` e tabelas `professionals/unit_offers/professional_offers/work_schedules/schedule_blocks` (idempotente) |
   | `migrate:security` | `node scripts/migrate-security.js` | **Fase 0:** cria `refresh_tokens` + triggers append-only em `audit_log` (idempotente; rode após `migrate:v3`) |
   | `migrate:privacy` | `node scripts/migrate-privacy.js` | **Fase 1:** consentimento (`privacy_version`, `consent_at/ip`, `deleted_at`) + `cpf/rg/cns` → TEXT + normaliza CPF + cifra legado (exige `DATA_ENCRYPTION_KEY`) |
@@ -334,7 +360,8 @@
   | `sync:cnes` | `node scripts/sync-cnes.js [--apply]` | **Fase 2:** CNES → `health_units` (dry-run default; `CNES_MUNICIPIO_CODE=260850`) |
   | `sync:alerts` | `node scripts/sync-alerts.js [--apply]` | **Fase 2:** InfoDengue → `diseases` (só `source='infodengue'`) |
   | `test:rnds` | `node scripts/test-rnds.js` | **Fase 2:** builders/validador FHIR offline (sem rede) |
-  | `smoke-test`       | `node scripts/smoke-test.js`                        | Sobe app em porta efêmera; assert `GET /health 200` + `401` sem token em `/admin/stats`, `/admin/export/summary.csv`, `/health-units/manage`, `/me/reminders`              |
+  | `smoke-test`       | `node scripts/smoke-test.js`                        | Verificação curta: `GET /health 200`, headers do helmet, CORS, os 4×401 sem token e a matriz RBAC de `rbac-matrix.js` (mesma que a suíte roda) |
+  | `test`             | `node --test "test/*.test.js"`                      | Suíte completa: contratos HTTP, RBAC, auditoria encadeada, cripto fail-closed, front e banco. O teste de corrida fica fora (precisa de 2 conexões) — use `test:race`. |
   | `migrate:supabase` | `node scripts/migrate-supabase.js`                  | Migração opcional a partir do Supabase                                                                                                                                     |
   | (avulsos)          | `diagnose-db.js`, `build-pdf.js` | Diagnóstico de DB, geração de PDFs de `docs/` |
 
@@ -420,17 +447,24 @@
   6. ~~`admin_level` granular no backend~~ — **feito (P0.4):** `requireCapability` aplicado de verdade (`users`, `appointments`, `diseases`, `audit`, `reports`); painel admin ainda unificado — separar visões por nível.
   7. ~~Retenção/expurgo~~ — **feito** (temporalidade + `purge:retention`); falta antes de dados reais: HTTPS/HSTS, DPO nomeado, revisão jurídica, KMS/Vault, Fase 2 (RNDS).
 
-  Ver detalhes em `docs/PLANO_MELHORIAS.md`.
+  Ver detalhes em `docs/PLANO_MELHORIAS.md`. Os achados da auditoria que
+  ficaram **fora** desta rodada estão em
+  [`docs/TECHNICAL_DEBT.md`](docs/TECHNICAL_DEBT.md), com gravidade, local e
+  risco de cada um.
 
   ## Problemas comuns
 
-  | Sintoma                           | Causa provável / solução                                                                                |
-  | --------------------------------- | ------------------------------------------------------------------------------------------------------- |
-  | `Failed to fetch` no console      | API fora do ar, ou `CORS_ORIGIN` no `.env` ≠ URL do `npx serve` (inclui porta). Alinhe e reinicie a API |
-  | `Token inválido ou expirado`      | Access expira em 15 min — o front renova sozinho; se persistir, logar de novo                         |
-  | Erro ao instalar deps             | Confirme `bcryptjs` (não `bcrypt`) — já vem assim no `package.json`                                     |
-  | Porta 4000 ocupada                | Mude `PORT` no `.env` **e** `window.API_BASE` no front antes de `assets/api.js`                         |
-  | Alerta não aparece p/ paciente    | Só `active = 1` lista em `GET /diseases?active=true` — confira no admin                                 |
-  | Acentos corrompidos no Local      | Faltou `--default-character-set=utf8mb4` ao importar o SQL no Windows                                   |
-  | Atendente não consegue logar      | Conta ainda `pendente` — admin ativa em Usuários e Histórico                                            |
-  | `404` em `/admin/professionals/*` | Cheque ordem de montagem em `src/app.js` (específica antes da genérica)                                 |
+| Sintoma                           | Causa provável / solução                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `Failed to fetch` no console      | API fora do ar, ou `CORS_ORIGIN` no `.env` ≠ URL do front (inclui porta). Rode `npm run doctor` — ele verifica os dois lados |
+| `GET /server/.env` devolve 404    | **Comportamento correto.** O front é servido por allowlist (`scripts/serve-web.js`); `server/` nunca é servido. Foi assim que a auditoria provou que o `.env` não está exposto |
+| Login não pede o segundo fator    | `migrate:interop` não rodou (sem `users.totp_enabled`, o MFA desliga em silêncio). Rode `npm run db:migrate` |
+| "Muitos intentos de login"        | Lockout por conta: 5 tentativas por `ip|email` travam por 15 min. Espere ou ajuste `TRUST_PROXY_HOPS` se está atrás de proxy |
+| `Token inválido ou expirado`      | Access expira em 15 min — o front renova sozinho; se persistir, logar de novo                         |
+| Erro ao instalar deps             | Confirme `bcryptjs` (não `bcrypt`) — já vem assim no `package.json`                                     |
+| Porta 4000 ocupada                | Mude `PORT` no `.env` **e** `window.API_BASE` no front antes de `assets/api.js`                         |
+| Alerta não aparece p/ paciente    | Só `active = 1` lista em `GET /diseases?active=true` — confira no admin                                 |
+| Acentos corrompidos no Local      | Faltou `--default-character-set=utf8mb4` ao importar o SQL no Windows                                   |
+| Atendente não consegue logar      | Conta ainda `pendente` — admin ativa em Usuários e Histórico                                            |
+| `404` em `/admin/professionals/*` | Cheque ordem de montagem em `src/app.js` (específica antes da genérica)                                 |
+| API não sobe e imprime erro de config | É o fail-closed: `DATA_ENCRYPTION_KEY` ausente/inválida ou `JWT_SECRET` com menos de 32 chars. Em desenvolvimento a falta da chave só avisa; em produção impede o boot |

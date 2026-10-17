@@ -6,13 +6,29 @@ ninguém num sistema em desenvolvimento.
 
 ## 0) Checklist antes da aula começar
 
-- [ ] MySQL rodando e `schema.sql` importado
-- [ ] `server/.env` preenchido (`DB_PASSWORD`, `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`)
-- [ ] `npm install` rodado dentro de `server/`
-- [ ] `npm run seed:admin` rodado (cria o usuário admin)
-- [ ] `npm start` rodando — `http://localhost:4000/health` responde `{"ok":true}`
-- [ ] `npx serve .` rodando na raiz do projeto — anote a porta exata que apareceu
-- [ ] Se a porta do `serve` não for 8080, ajustar `CORS_ORIGIN` no `.env` e reiniciar a API
+Três comandos, na raiz do projeto:
+
+```bash
+npm run setup     # instala as dependências, cria o banco, aplica as migrations e cria o admin
+npm run doctor    # deve responder "pronto para rodar"
+npm run dev       # sobe a API (:4000) e o front (:8080)
+```
+
+- [ ] `npm run doctor` respondeu **pronto para rodar**
+- [ ] `http://localhost:4000/health` responde `{"ok":true}`
+- [ ] `http://localhost:8080` abre a página inicial
+- [ ] Você anotou o `ADMIN_EMAIL` e a `ADMIN_PASSWORD` que estão no `server/.env`
+
+Se `npm run doctor` reclamar de `DATA_ENCRYPTION_KEY`, ele mesmo diz como gerar:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+> Não use `npx serve .` nem qualquer outro servidor estático: servido a partir
+> da raiz do repositório, ele exporia `server/.env` (senha do MySQL,
+> `JWT_SECRET`, `DATA_ENCRYPTION_KEY`). O `npm run dev` usa
+> `scripts/serve-web.js`, que só entrega as páginas e `assets/`.
 
 ## 1) Papel: aluno (usuário comum)
 
@@ -55,8 +71,32 @@ promessa da interface — é uma regra do servidor.
 
 | Sintoma                                                | Causa provável                                                                               |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| "Failed to fetch" no console                           | API não está rodando, ou `CORS_ORIGIN` no `.env` não bate com a porta do `npx serve`         |
-| "Token inválido ou expirado"                           | Token expira em 7 dias por padrão (`JWT_EXPIRES_IN`) — basta logar de novo                   |
+| "Failed to fetch" no console                           | API não está rodando, ou `CORS_ORIGIN` no `.env` não bate com a porta do front — rode `npm run doctor` |
+| `GET /server/.env` devolve 404                         | **Isso está certo.** O front é servido por allowlist; `server/` nunca é exposto             |
+| "Muitos intentos de login"                             | Lockout por conta: 5 tentativas travam por 15 min. Espere, ou ajuste `TRUST_PROXY_HOPS` se há proxy |
+| Login não pede o segundo fator                         | `migrate:interop` não rodou (o MFA desliga em silêncio). Rode `npm run db:migrate`            |
+| "Token inválido ou expirado"                           | O access token expira em 15 min e o front renova sozinho; se persistir, logar de novo         |
 | Erro ao instalar dependências                          | Confirme que está usando `bcryptjs` (não `bcrypt`) — já vem assim no `package.json` entregue |
 | Porta 4000 ocupada                                     | Mude `PORT` no `.env` **e** `window.API_BASE` no front antes de carregar `assets/api.js`     |
 | Aluno cria conta mas não consegue ver alerta de doença | Alertas só aparecem com `active = 1` — confirme no painel admin                              |
+
+## 5) Os 5 defeitos que este roteiro comprova
+
+São bugs que a auditoria encontrou e que foram corrigidos. Se um deles
+reaparecer, a correção foi perdida — vale parar a aula e registrar.
+
+1. **Apóstrofo no nome.** Criar um usuário chamado `Maria d'Ávila Souza`, e no
+   admin clicar **Abrir histórico**. Antes, o apóstrofo quebrava o script da
+   página inteira e o botão morria sem aviso.
+2. **Edição parcial.** No painel do atendente, alterar **só o telefone** de um
+   aluno e salvar. O cargo (`job_role`) precisa continuar igual — a edição
+   parcial não pode apagar o que não está no formulário.
+3. **Campos que o formulário não mostra.** No admin, salvar o perfil de um
+   paciente e conferir que **tipo sanguíneo** e **prioridade** continuam
+   preenchidos: são colunas que o formulário não tem.
+4. **Login com MFA.** Logar com MFA ligado e **recarregar a página no meio do
+   prompt**. As páginas devem redirecionar para o login, não ficar presas com a
+   tela em branco (skeleton eterno).
+5. **`admin_level` vazio.** Um admin sem nível definido deve receber **403** em
+   rotas de administer usuários — nunca acesso total. O padrão é falhar
+   fechado, não aberto.

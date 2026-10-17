@@ -242,27 +242,50 @@ test('o seed de unidades sai do schema.sql já populado', async () => {
   assert.equal(Number(row.n), 10, 'o schema.sql traz as 10 unidades de Lagoa de Itaenga');
 });
 
-test('o README documenta migrate:interop na sequência de instalação', () => {
+test('o README documenta a ordem real das migrations', () => {
   const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
-  // A sequência do bloco "2) API" precisa conter interop entre as migrations.
-  const bloco = readme.slice(readme.indexOf('npm install'), readme.indexOf('npm run seed:admin'));
-  assert.ok(
-    /migrate:interop/.test(bloco),
-    'a sequência de migrations do README precisa incluir migrate:interop'
-  );
-  const ordem = ['migrate:v3', 'migrate:security', 'migrate:privacy', 'migrate:interop', 'migrate:audit'];
+
+  // O caminho principal é `npm run setup`, e o manual usa `migrate:all` —
+  // não a lista migration-por-migration, que era o que o README mostrava
+  // antes e que ninguém devia copiar na mão.
+  assert.match(readme, /npm run setup/, 'o README precisa oferecer o setup por comando');
+  assert.match(readme, /npm run migrate:all/, 'o caminho manual precisa usar migrate:all');
+
+  // A ordem autoritativa é a linha da tabela que descreve o `migrate:all`.
+  // Não dá para varrer o README inteiro: o texto de aviso menciona
+  // `migrate:privacy` antes da tabela, e "primeira ocorrência" mede prosa,
+  // não ordem. A nota "Ordem importa" também quebra em várias linhas.
+  const linha = readme
+    .split('\n')
+    .find((l) => /^\s*\|\s*`migrate:all`/.test(l));
+  assert.ok(linha, 'o README precisa ter uma linha de tabela para migrate:all');
+
+  const ordem = ['v3', 'security', 'privacy', 'interop', 'audit'];
   let pos = -1;
   for (const passo of ordem) {
-    const i = bloco.indexOf(passo);
-    assert.ok(i > -1, `README não menciona ${passo}`);
-    assert.ok(i > pos, `README lista ${passo} fora de ordem`);
+    const i = linha.indexOf(passo);
+    assert.ok(i > -1, `a linha do migrate:all não menciona ${passo}`);
+    assert.ok(i > pos, `a linha do migrate:all lista ${passo} fora de ordem`);
     pos = i;
+  }
+
+  // E a linha precisa bater com o que o script realmente executa.
+  const pkg = require('../package.json');
+  const executadas = (pkg.scripts['migrate:all'].match(/migrate:[\w:]+/g) || [])
+    .map((m) => m.replace('migrate:', ''));
+  assert.ok(executadas.length >= 6, `migrate:all só encadeia ${executadas.length} migrations`);
+  let anterior = -1;
+  for (const passo of executadas) {
+    const i = linha.indexOf(passo);
+    assert.ok(i > -1, `o README não documenta migrate:${passo}, que o migrate:all executa`);
+    assert.ok(i > anterior, `o README documenta migrate:${passo} fora de ordem`);
+    anterior = i;
   }
 });
 
 test('o README avisa que pular migrate:interop desliga o MFA', () => {
   const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
-  const bloco = readme.slice(readme.indexOf('npm run migrate:interop'));
+  const bloco = readme.slice(readme.indexOf('migrate:interop'));
   assert.match(
     bloco.slice(0, 1200),
     /mfa|segundo fator/i,

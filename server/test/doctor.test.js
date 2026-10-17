@@ -101,3 +101,22 @@ test('parsePairs monta "ip|email" normalizado', () => {
   assert.equal(parsePairs('10.0.0.1', '  Admin@Saude.App '), '10.0.0.1|admin@saude.app');
   assert.equal(parsePairs('::1', undefined), '::1|');
 });
+
+test('npm run setup instala as dependências da RAIZ, não só as do server', () => {
+  // Achado seguindo a verificação do README do zero, num clone limpo:
+  // `npm run setup` rodava `npm --prefix server install` e nada mais. Mas
+  // `npm run dev` usa `concurrently`, que é devDependency da RAIZ — então
+  // num clone novo o setup terminava "com sucesso" e o dev morria com
+  // "'concurrently' não é reconhecido". Instalar as duas árvores é o que faz
+  // o caminho documentado (setup → doctor → dev) funcionar de verdade.
+  const raiz = require('../../package.json');
+  const setup = raiz.scripts.setup;
+  assert.match(setup, /\bnpm install\b/, 'setup precisa instalar as deps da raiz');
+  assert.match(setup, /--prefix server install/, 'setup precisa instalar as deps do server');
+  assert.match(setup, /db:setup/, 'setup precisa criar o banco e rodar as migrations');
+  // E o dev realmente depende do concurrently.
+  assert.ok(
+    (raiz.devDependencies && raiz.devDependencies.concurrently) || (raiz.dependencies && raiz.dependencies.concurrently),
+    'o dev usa concurrently, então ele tem que estar declarado na raiz'
+  );
+});

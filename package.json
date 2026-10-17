@@ -4,7 +4,7 @@
   "private": true,
   "description": "Saúde+ — cuidado integrado Lagoa de Itaenga. Orquestra a API (server/) e o front estático.",
   "scripts": {
-    "setup": "npm --prefix server install && npm run db:setup",
+    "setup": "npm install && npm --prefix server install && npm run db:setup",
     "dev": "concurrently -k -n api,web -c green,cyan \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "npm --prefix server run dev",
     "dev:web": "node scripts/serve-web.js",
