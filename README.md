@@ -264,7 +264,7 @@
   ```
 
   > **Ordem importa:** `migrate:all` roda `v3` → `security` → `privacy`
-  > → `interop` → `audit` → `audit:details`, nessa ordem. Pular o
+  > → `interop` → `audit` → `audit:details` → `mfa:replay`, nessa ordem. Pular o
   > `migrate:privacy` causa `Unknown column 'privacy_version'` no signup.
   >
   > **Pular o `migrate:interop` não dá erro visível — apenas desliga o MFA
@@ -348,7 +348,7 @@
   | `dev`              | `nodemon src/server.js`                             | Dev com auto-reload                                                                                                                                                        |
   | `seed:admin`       | `node scripts/seed-admin.js`                        | Cria (ou promove a `superadmin`) o admin do `.env` com `bcryptjs`                                                                                                          |
   | `seed:demo` | `node scripts/seed-v3-demo.js [--reset]` | Popula agenda demo em 4 unidades (serviços, 6 profissionais, horários + 3 vagas ocupadas p/ testar conflito; idempotente) |
-| `migrate:all` | roda todas em ordem | `v3` → `security` → `privacy` → `interop` → `audit` → `audit:details`. Idempotente. **É o que o `setup` usa.** |
+| `migrate:all` | roda todas em ordem | `v3` → `security` → `privacy` → `interop` → `audit` → `audit:details` → `mfa:replay`. Idempotente. **É o que o `setup` usa.** |
 | `migrate` | importa `migration_001.sql` | Só para bancos muito antigos (perfil estendido). O `schema.sql` já é a união de tudo, então banco novo não precisa. |
   | `migrate:v3` | `node scripts/migrate-v3.js` | Cria `social_name/cns/priority/guardian`, `unit_id/professional_id` e tabelas `professionals/unit_offers/professional_offers/work_schedules/schedule_blocks` (idempotente) |
   | `migrate:security` | `node scripts/migrate-security.js` | **Fase 0:** cria `refresh_tokens` + triggers append-only em `audit_log` (idempotente; rode após `migrate:v3`) |

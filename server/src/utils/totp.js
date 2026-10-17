@@ -38,15 +38,47 @@ function totpNow(secret, atMs = Date.now()) {
   return hotp(secret, Math.floor(atMs / 1000 / STEP));
 }
 
-function verifyTotp(secret, code, atMs = Date.now()) {
+/**
+ * Verifica o código e devolve QUAL passo casou.
+ *
+ * A rota precisa do passo, não só do booleano: sem ele não dá para impedir
+ * replay (RFC 6238 §5.2 — um código não pode ser usado duas vezes, nem
+ * durante a janela de tolerância).
+ *
+ * @returns {{ok: boolean, step?: number}}
+ */
+function matchStep(secret, code, atMs = Date.now()) {
   const clean = String(code || '').replace(/\D/g, '');
-  if (clean.length !== DIGITS) return false;
+  if (clean.length !== DIGITS) return { ok: false };
   const step = Math.floor(atMs / 1000 / STEP);
-  for (let d = -WINDOW; d <= WINDOW; d++) {
-    const expected = hotp(secret, step + d);
-    if (crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(clean))) return true;
+  for (let d = -WINDOW; d <= WINDOW; d += 1) {
+    const candidate = step + d;
+    const expected = hotp(secret, candidate);
+    if (crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(clean))) {
+      return { ok: true, step: candidate };
+    }
   }
-  return false;
+  return { ok: false };
+}
+
+function verifyTotp(secret, code, atMs = Date.now()) {
+  return matchStep(secret, code, atMs).ok;
+}
+
+/**
+ * O passo `tentado` é replay de `ultimoUsado`?
+ *
+ * Bloqueia o passo usado E todos os anteriores: pela janela ±1, o passo -1 é
+ * literalmente o mesmo código validado por outra via da função. Passos futuros
+ * são livres — é o próximo código de verdade.
+ *
+ * @param {number|null|undefined} ultimoUsado passo do último código aceito
+ * @param {number} tentado passo do código agora apresentado
+ */
+function replayBloqueia(ultimoUsado, tentado) {
+  if (typeof ultimoUsado !== 'number' || !Number.isFinite(ultimoUsado)) return false;
+  if (typeof tentado !== 'number' || !Number.isFinite(tentado)) return true;
+  return tentado <= ultimoUsado;
 }
 
 function otpauthUrl({ secret, email, issuer = 'Saude+' }) {
@@ -54,4 +86,4 @@ function otpauthUrl({ secret, email, issuer = 'Saude+' }) {
   return `otpauth://totp/${encodeURIComponent(label)}?secret=${encodeURIComponent(secret)}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
 }
 
-module.exports = { randomSecret, totpNow, verifyTotp, otpauthUrl, STEP, DIGITS };
+module.exports = { randomSecret, totpNow, verifyTotp, matchStep, replayBloqueia, otpauthUrl, STEP, DIGITS };

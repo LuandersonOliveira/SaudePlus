@@ -119,7 +119,13 @@ CREATE TABLE IF NOT EXISTS users (
     -- NUNCA pede o segundo fator, sem erro em lugar nenhum. É o motivo de
     -- migrate:interop estar na sequência do README.
     totp_secret TEXT NULL,
-    totp_enabled TINYINT(1) NOT NULL DEFAULT 0
+    totp_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    -- Fase 5: último passo TOTP aceito (migrate-mfa-replay).
+    -- Um código só vale se o passo for MAIOR que este: sem isso o mesmo
+    -- código abria sessão quantas vezes quisesse dentro da janela de 90s.
+    -- Numérico, não datetime — um passo é um contador, não um instante, e é
+    -- isso que sobrevive ao `dateStrings: true` do pool.
+    totp_last_step BIGINT NULL DEFAULT NULL
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------

@@ -13,7 +13,13 @@ const {
 } = require('../utils/loginThrottle');
 const { PRIVACY_VERSION, anonymizeUser } = require('../utils/privacy');
 const { govbrConfig, buildAuthorizeUrl, exchangeCode, fetchUserInfo } = require('../services/govbr');
-const { randomSecret, verifyTotp, otpauthUrl } = require('../utils/totp');
+const { randomSecret, verifyTotp, matchStep, replayBloqueia, otpauthUrl } = require('../utils/totp');
+const {
+  mfaAttempts,
+  bloqueioMfa,
+  registrarFalhaMfa,
+  registrarSucessoMfa,
+} = require('../utils/mfaAttempts');
 
 const router = express.Router();
 
@@ -286,14 +292,63 @@ router.post('/mfa/verify', async (req, res, next) => {
     if (!user || user.account_status !== 'ativo' || !user.totp_enabled || !user.totp_secret) {
       return res.status(401).json({ error: 'Verificação indisponível.' });
     }
-    if (!verifyTotp(user.totp_secret, code)) {
-      return res.status(401).json({ error: 'Código inválido.' });
+
+    // Teto de tentativas no segundo fator. O limite de senha protege o
+    // primeiro fator; sem este, a rota virava uma porta sem trinco — 6 dígitos
+    // testados indefinidamente, inclusive fora da janela de 30s.
+    const bloqueio = bloqueioMfa(mfaAttempts, user.id);
+    if (bloqueio) {
+      const min = Math.ceil(bloqueio.segundosRestantes / 60);
+      return res.status(429).json({
+        error: `Muitas tentativas de verificação. Tente de novo em ${min} min.`,
+      });
     }
+
+    // Replay: o passo precisa ser estritamente maior que o último aceito.
+    // Com WINDOW = ±1, o mesmo código vale por 90s; sem isto, um código
+    // capturado (foto do app, log, alguém olhando por cima do ombro) abria
+    // sessão nova quantas vezes quisesse dentro dessa janela.
+    const casou = matchStep(user.totp_secret, code);
+    const ultimoPasso = user.totp_last_step === null || user.totp_last_step === undefined
+      ? null
+      : Number(user.totp_last_step);
+
+    if (!casou.ok || replayBloqueia(ultimoPasso, casou.step)) {
+      registrarFalhaMfa(mfaAttempts, user.id);
+      // Mesma regra do lockout de senha: o erro que completa a cota responde
+      // 429, dizendo já quando pode tentar de novo. Quem descobre o bloqueio
+      // só na tentativa seguinte é quem fica cinco minutos apertando F5.
+      const travou = bloqueioMfa(mfaAttempts, user.id);
+      if (travou) {
+        return res.status(429).json({
+          error: `Muitas tentativas de verificação. Tente de novo em ${Math.ceil(travou.segundosRestantes / 60)} min.`,
+        });
+      }
+      return res.status(401).json({
+        error: casou.ok ? 'Código já utilizado. Aguarde o próximo.' : 'Código inválido.',
+      });
+    }
+
+    // Grava o passo usado ANTES de emitir a sessão: se o UPDATE falhar, é
+    // melhor perder um login do que aceitar o mesmo código para sempre.
     try {
-      await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
+      await pool.query(
+        'UPDATE users SET totp_last_step = ?, last_login_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [casou.step, user.id]
+      );
     } catch (updateError) {
-      if (updateError.code !== 'ER_BAD_FIELD_ERROR') throw updateError;
+      // Banco sem a coluna (migration não rodada): o login funciona, mas o
+      // replay volta. Sinalizado no console — não é motivo para negar o
+      // segundo fator a quem já tem MFA funcionando.
+      if (updateError.code === 'ER_BAD_FIELD_ERROR') {
+        console.warn('mfa: coluna users.totp_last_step ausente — rode npm run db:migrate (replay do TOTP fica desprotegido)');
+        await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id])
+          .catch((e) => { if (e.code !== 'ER_BAD_FIELD_ERROR') throw e; });
+      } else {
+        throw updateError;
+      }
     }
+    registrarSucessoMfa(mfaAttempts, user.id);
     const payload = {
       id: user.id, email: user.email,
       role: user.role, admin_level: user.admin_level || null, full_name: user.full_name,
