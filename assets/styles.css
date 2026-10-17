@@ -190,12 +190,17 @@ textarea:focus-visible, select:focus-visible, .tab:focus-visible{
 /* ---------- Grid ---------- */
 .grid{ display:grid; gap:16px; }
 .grid-2{ grid-template-columns:repeat(2,1fr); }
+/* .grid-3 era usado no formulário de vínculo do admin.html mas não existia
+   aqui: o `grid` sem colunas deixa o browser usar uma coluna só, e o
+   formulário renderizava empilhado. */
+.grid-3{ grid-template-columns:repeat(3,1fr); }
 .grid-4{ grid-template-columns:repeat(4,1fr); }
 .grid-5{ grid-template-columns:repeat(5,1fr); }
 @media (max-width:760px){
-  .grid-2, .grid-4, .grid-5{ grid-template-columns:1fr; }
+  .grid-2, .grid-3, .grid-4, .grid-5{ grid-template-columns:1fr; }
 }
 @media (min-width:761px) and (max-width:1000px){
+  .grid-3{ grid-template-columns:repeat(2,1fr); }
   .grid-5{ grid-template-columns:repeat(3,1fr); }
 }
 /* Telas com sidebar: o conteúdo perde ~256px em relação à janela.
@@ -310,6 +315,10 @@ textarea:focus-visible, select:focus-visible, .tab:focus-visible{
 /* ---------- Forms ---------- */
 .field{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
 .field label{ font-size:.85rem; font-weight:600; color:var(--ink); }
+/* Complemento discreto do label: "(opcional)", "- mínimo 6 caracteres".
+   Antes esta regra vivia no <style> do auth.html e as outras três páginas
+   que a usavam ficavam sem estilo nenhum. */
+.opt{ font-size:.75rem; color:var(--muted); font-weight:400; margin-left:4px; }
 .input, .textarea, .select{
   font:inherit; padding:11px 13px; border:1.5px solid var(--border); border-radius:var(--radius-sm);
   background:var(--surface); color:var(--ink); width:100%;

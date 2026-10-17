@@ -1448,7 +1448,31 @@
       const filled = PROFILE_TRACKED.filter(k => user[k] !== null && user[k] !== undefined && String(user[k]).trim() !== '').length;
       return Math.round((filled / PROFILE_TRACKED.length) * 100);
     }
+    let profileListenersBound = false;
+
+    // Os listeners sao registrados UMA vez, fora do try.
+    //
+    // A versao anterior os registrava dentro do try, DEPOIS do GET /auth/me:
+    // - a cada salvamento, saveProfile() chama initProfile() de novo e cada
+    //   passada anexa mais um listener. Tres salvamentos = tres POSTs por
+    //   clique e tres toasts.
+    // - se o GET falhasse (401 sem refresh, rede caida), o try engolia o erro
+    //   e o form ficava SEM handler: o browser fazia o GET nativo e recarregava
+    //   a pagina, perdendo tudo que o usuario digitou.
+    function bindProfileListeners() {
+      if (profileListenersBound) return;
+      profileListenersBound = true;
+      document.getElementById('p_cpf').addEventListener('input', e => maskCpf(e.target));
+      document.getElementById('p_cns').addEventListener('input', e => maskCns(e.target));
+      document.getElementById('p_mobile').addEventListener('input', e => maskPhone(e.target, true));
+      document.getElementById('p_phone').addEventListener('input', e => maskPhone(e.target, false));
+      document.getElementById('profileForm').addEventListener('submit', saveProfile);
+    }
+
     async function initProfile() {
+      // Recarrega os dados do form — por isso a funcao continua chamando
+      // initProfile() depois de salvar — mas nao re-registra os handlers.
+      bindProfileListeners();
       try {
         const { user } = await apiGet('/auth/me');
         for (const [key, id] of Object.entries(PROFILE_IDS)) {
@@ -1474,12 +1498,7 @@
                <button class="btn btn-primary btn-sm" type="button" onclick="switchTab('minha-conta')">Completar agora</button>
              </div>`;
         }
-        document.getElementById('p_cpf').addEventListener('input', e => maskCpf(e.target));
-        document.getElementById('p_cns').addEventListener('input', e => maskCns(e.target));
-        document.getElementById('p_mobile').addEventListener('input', e => maskPhone(e.target, true));
-        document.getElementById('p_phone').addEventListener('input', e => maskPhone(e.target, false));
-        document.getElementById('profileForm').addEventListener('submit', saveProfile);
-      } catch (err) { console.error('perfil:', err); }
+        } catch (err) { console.error('perfil:', err); }
     }
     async function saveProfile(e) {
       e.preventDefault();
