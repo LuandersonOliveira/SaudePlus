@@ -14,9 +14,19 @@
 
   function getToken() { return localStorage.getItem(TOKEN_KEY); }
   function getRefreshToken() { return localStorage.getItem(REFRESH_KEY); }
-  function getStoredUser() {
+function getStoredUser() {
     var raw = localStorage.getItem(USER_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    try {
+      var parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_e) {
+      // Conteúdo corrompido (inclusive a string "undefined" que uma versão
+      // anterior gravava no login com MFA): descarta a sessão em vez de deixar
+      // JSON.parse estourar e a página inteira quebrar.
+      clearSession();
+      return null;
+    }
   }
   function setSession(token, user, refreshToken) {
     localStorage.setItem(TOKEN_KEY, token);
@@ -41,11 +51,35 @@
       });
       if (!res.ok) return false;
       var data = await res.json();
+      if (!data || !data.token) return false;
       setSession(data.token, data.user, data.refreshToken);
       return true;
     } catch (_e) {
       return false;
     }
+  }
+
+  // Rotas que NÃO podem entrar no retry de refresh.
+  //
+  // A guarda anterior era `path.indexOf('/auth/') !== 0`, o que excluía o
+  // prefixo inteiro — inclusive /auth/me e /auth/me/export. Com o access
+  // token de 15min expirado, abrir "Minha conta" recebia 401 e caía direto
+  // no clearSession(), deslogando a pessoa mesmo com um refresh token de 30
+  // dias válido na mão. Só as rotas de credencial ficam de fora: renovar
+  // dentro delas criaria recursão.
+  var AUTH_NO_RETRY = [
+    '/auth/login',
+    '/auth/signup',
+    '/auth/refresh',
+    '/auth/logout',
+    '/auth/mfa/'
+  ];
+
+  function semRetry(path) {
+    for (var i = 0; i < AUTH_NO_RETRY.length; i++) {
+      if (path.indexOf(AUTH_NO_RETRY[i]) === 0) return true;
+    }
+    return false;
   }
 
   async function request(method, path, body, _retried) {
@@ -66,8 +100,8 @@
 
     if (!res.ok) {
       // Access curto (15 min): tenta renovar uma vez antes de deslogar.
-      // Não aplica a /auth/* (evita recursão no próprio refresh/login).
-      if (res.status === 401 && !_retried && path.indexOf('/auth/') !== 0 && await tryRefresh()) {
+      // Excluímos só as rotas de credencial (AUTH_NO_RETRY) — não o /auth/ todo.
+      if (res.status === 401 && !_retried && !semRetry(path) && await tryRefresh()) {
         return request(method, path, body, true);
       }
       if (res.status === 401) clearSession();
@@ -87,6 +121,12 @@
   // ---- Autenticação ----
   window.authLogin = async function (email, password) {
     var data = await request('POST', '/auth/login', { email: email, password: password });
+    // Login com MFA responde { mfa_required, mfa_token } — SEM `token`. A
+    // versão anterior chamava setSession à toa e guardava a string
+    // "undefined" em saude_token e saude_user; depois getStoredUser fazia
+    // JSON.parse("undefined") e LANÇAVA, deixando admin.html e
+    // atendente.html presos em skeleton sem redirecionar para o login.
+    if (!data || !data.token) return data;
     setSession(data.token, data.user, data.refreshToken);
     return data;
   };

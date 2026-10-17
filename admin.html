@@ -436,7 +436,12 @@
     const WEEK = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
     window.addEventListener('load', async () => {
-      SESSION = await requireAuth();
+      // requireAuth() rejeita quando não há sessão. Sem o try/catch, a rejeição
+      // virava unhandled rejection e a página ficava presa no skeleton para
+      // sempre — sem redirecionar para o login.
+      try {
+        SESSION = await requireAuth();
+      } catch (_e) { location.replace('auth.html'); return; }
       if (!SESSION) return;
       if (!(await isAdmin())) { toast('Acesso restrito ao admin', 'error'); location.replace('dashboard.html'); return; }
       document.getElementById('userEmail').textContent = SESSION.user.email;
@@ -974,7 +979,11 @@
           can('diseases') ? apiGet('/diseases?active=true').catch(() => []) : [],
           apiGet('/admin/stats'),
         ]);
-        const today = new Date().toISOString().slice(0, 10);
+        // Data LOCAL, não UTC: toISOString() converte para UTC e, em
+      // America/Sao_Paulo (UTC-3), o dia vira às 21h — "Agenda de hoje"
+      // mostrava AMANHÃ das 21h à meia-noite.
+      const agora = new Date();
+      const today = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
         const isToday = r => (r.scheduled_at || '').slice(0, 10) === today;
         const todayAppts = A.filter(isToday);
         const todayExams = E.filter(isToday);

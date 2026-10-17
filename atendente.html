@@ -309,7 +309,11 @@ async function confirmReagendar() {
 }
 
 window.addEventListener('load', async ()=>{
-  SESSION = await requireRole(['atendente', 'admin']);
+  // Sem o try/catch, a rejeição do requireRole virava unhandled rejection e o
+  // painel ficava preso no skeleton, sem redirecionar para o login.
+  try {
+    SESSION = await requireRole(['atendente', 'admin']);
+  } catch (_e) { location.replace('auth.html'); return; }
   if(!SESSION) return;
 
   const name = SESSION.user.full_name || SESSION.user.email;
@@ -520,7 +524,11 @@ async function loadAll(){
     ]);
     allAppointments = A; allExams = E;
 
-    const today = new Date().toISOString().slice(0,10);
+    // Data LOCAL, não UTC: toISOString() converte para UTC e, em
+    // America/Sao_Paulo (UTC-3), o dia vira às 21h — "Fila do dia" mostrava
+    // AMANHÃ das 21h à meia-noite.
+    const agora = new Date();
+    const today = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
     const todayA = A.filter(r=>r.scheduled_at.slice(0,10)===today && r.status==='pendente');
     const todayE = E.filter(r=>r.scheduled_at.slice(0,10)===today && r.status==='pendente');
     const todayTotal = todayA.length + todayE.length;
