@@ -164,7 +164,7 @@ CREATE TABLE IF NOT EXISTS appointments (
     -- Fase 5: duração do atendimento marcado (migrate-booking-duration).
     -- Sem ela, o cálculo de conflito tratava TUDO como 30 min, e um
     -- atendimento de 60 min não bloqueava o horário seguinte da grade de 30.
-    -- NULL = registro anterior à coluna; o cálculo usa COALESCE(…, 30).
+    -- NULL = registro anterior à coluna (o cálculo usa COALESCE com 30).
     duration_minutes INT NULL DEFAULT NULL,
     status ENUM(
         'pendente',

@@ -21,24 +21,33 @@ const ROOT = path.resolve(__dirname, '..');
 const SERVER_DIR = path.join(ROOT, 'server');
 
 // Ordem importa. Cada entrada depende da anterior.
-const MIGRATIONS = [
-  'migrate-v3.js',
-  'migrate-security.js',
-  'migrate-privacy.js',
-  'migrate-interop.js',
-  'migrate-audit.js',
-  'migrate-audit-details.js',
-];
+//
+// A lista NÃO é escrita aqui: vem de `server/package.json` no script
+// `migrate:all`. Duas listas paralelas da mesma ordem divergiram — quando a
+// Fase 5 adicionou migrate:mfa:replay e migrate:booking:duration, o
+// migrate:all cresceu e esta ficou em 6. Resultado: `npm run db:setup` imprimia
+// "Pronto." em uma base sem as colunas novas, e todo agendamento passava a
+// devolver 500.
+//
+// Quem decide a ordem é o package.json; aqui só traduz `migrate:audit:details`
+// para o nome do arquivo `migrate-audit-details.js`.
+function migrationScripts() {
+  const pkg = JSON.parse(fs.readFileSync(path.join(SERVER_DIR, 'package.json'), 'utf8'));
+  const linha = (pkg.scripts && pkg.scripts['migrate:all']) || '';
+  const nomes = linha.match(/npm run migrate:[\w:]+/g) || [];
+  if (!nomes.length) {
+    throw new Error(
+      'server/package.json não define o script migrate:all — a ordem das migrations ficou indeterminada'
+    );
+  }
+  return nomes.map((n) => n.replace(/^npm run /, '').replace(/:/g, '-') + '.js');
+}
 
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
 const GREEN = '\x1b[32m';
 const RED = '\x1b[31m';
 const RESET = '\x1b[0m';
-
-function migrationScripts() {
-  return MIGRATIONS.slice();
-}
 
 /**
  * O nome do banco vai para DDL sem quoting externo (DROP/CREATE DATABASE).

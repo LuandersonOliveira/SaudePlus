@@ -11,6 +11,8 @@ const {
   escapingProblems,
   dpoWarning,
   parsePairs,
+  COLUNAS_ESPERADAS,
+  TABELAS_ESPERADAS,
 } = require('../../scripts/doctor');
 
 test('nodeOk aceita >= 18 e rejeita abaixo', () => {
@@ -100,6 +102,91 @@ test('dpoWarning avisa quando o encarregado não está configurado', () => {
 test('parsePairs monta "ip|email" normalizado', () => {
   assert.equal(parsePairs('10.0.0.1', '  Admin@Saude.App '), '10.0.0.1|admin@saude.app');
   assert.equal(parsePairs('::1', undefined), '::1|');
+});
+
+test('toda coluna que o código referencia em migration está na lista do doctor', () => {
+  // O doctor só ajuda se souber o que procurar. Quando a Fase 5 criou
+  // `duration_minutes` e `totp_last_step`, a lista ficou para trás: numa base
+  // sem elas, `npm run doctor` respondia "Ambiente pronto" e todo agendamento
+  // devolvia 500. Este teste existe para a lista não voltar a ficar para trás.
+  const esperadas = [
+    ['users', 'totp_last_step'],
+    ['appointments', 'duration_minutes'],
+    ['exams', 'duration_minutes'],
+  ];
+  for (const par of esperadas) {
+    assert.ok(
+      COLUNAS_ESPERADAS.some(([t, c]) => t === par[0] && c === par[1]),
+      `doctor precisa verificar ${par[0]}.${par[1]}`
+    );
+  }
+});
+
+test('a lista do doctor bate com o que o schema.sql cria', () => {
+  // Se o schema já traz a coluna, a lista serve de guarda para a migration;
+  // se não trouxer nem uma nem outra, o caminho está errado.
+  //
+  // O bloco é lido até `) ENGINE`, e não até o primeiro `;`: um `;` dentro de
+  // um comentário SQL é legal e trunca qualquer parser que divida por
+  // ponto-e-vírgula. (Foi exatamente o que aconteceu com este teste antes.)
+  const schema = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'schema.sql'),
+    'utf8'
+  );
+  for (const [tabela, coluna] of COLUNAS_ESPERADAS) {
+    const bloco = new RegExp(`CREATE TABLE[^;]*\\b${tabela}\\b[\\s\\S]*?\\) ENGINE`, 'i').exec(schema);
+    assert.ok(bloco, `schema.sql deveria criar ${tabela}`);
+    assert.match(
+      bloco[0],
+      new RegExp(`^\\s*${coluna}\\b`, 'm'),
+      `schema.sql cria ${tabela} sem ${coluna}, mas o doctor exige que ela exista`
+    );
+  }
+});
+
+test('as tabelas esperadas são as que o código consulta', () => {
+  for (const t of ['refresh_tokens', 'audit_log', 'professionals', 'professional_offers', 'work_schedules', 'schedule_blocks']) {
+    assert.ok(TABELAS_ESPERADAS.includes(t), `doctor deveria verificar a tabela ${t}`);
+  }
+});
+
+test('o doctor confere o MESMO banco que o pool conectou', () => {
+  // Achado ao validar o guard de colunas: o pool é criado por db.js, que lê
+  // process.env — e dotenv.config() NÃO sobrescreve variável já existente.
+  // A checagem usava env.DB_NAME, o valor do ARQUIVO. Com DB_NAME no ambiente,
+  // o doctor conectava num banco e conferia outro, e ainda dizia "Ambiente
+  // pronto" — que é o pior resultado possível para uma ferramenta de
+  // diagnóstico. Precedência igual à do db-setup.js: ambiente vence o .env.
+  const { configAlvo } = require('../../scripts/doctor');
+  const original = process.env.DB_NAME;
+  try {
+    process.env.DB_NAME = 'saude_do_ambiente';
+    const alvo = configAlvo({ DB_NAME: 'saude_do_arquivo' });
+    assert.equal(alvo.DB_NAME, 'saude_do_ambiente');
+  } finally {
+    if (original === undefined) delete process.env.DB_NAME;
+    else process.env.DB_NAME = original;
+  }
+
+  // Sem variável no ambiente, o arquivo manda.
+  process.env.DB_NAME = 'saude_quebrada_temporaria';
+  try {
+    const limpo = (() => {
+      const saved = process.env.DB_NAME;
+      delete process.env.DB_NAME;
+      const r = configAlvo({ DB_NAME: 'saude_do_arquivo' });
+      process.env.DB_NAME = saved;
+      return r;
+    })();
+    assert.equal(limpo.DB_NAME, 'saude_do_arquivo');
+  } finally {
+    if (original === undefined) delete process.env.DB_NAME;
+    else process.env.DB_NAME = original;
+  }
+
+  // E sem nenhum dos dois, o padrão.
+  assert.equal(configAlvo({}).DB_NAME, 'saude');
+  assert.equal(configAlvo({}).DB_PORT, 3306);
 });
 
 test('npm run setup instala as dependências da RAIZ, não só as do server', () => {

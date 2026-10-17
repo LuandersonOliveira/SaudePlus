@@ -21,16 +21,28 @@ const SERVER_DIR = path.join(ROOT, 'server');
 const ARQUIVOS_ESC = ['admin.html', 'atendente.html', 'dashboard.html'];
 
 // Colunas/tabelas que o código toca mas que dependem de migration.
+//
+// A lista precisa acompanhar TODA migration nova. Uma coluna que falta aqui
+// é uma coluna que o doctor não acusa: quando a Fase 5 adicionou
+// `duration_minutes`, o doctor continuou respondendo "Ambiente pronto" em uma
+// base sem ela — e todo agendamento devolvia 500. O teste que exige esta lista
+// sincronizada está em server/test/doctor.test.js.
 const COLUNAS_ESPERADAS = [
   ['users', 'govbr_sub'],
   ['users', 'totp_secret'],
   ['users', 'totp_enabled'],
+  // Fase 5, migration 006: sem esta, o TOTP aceita replay e nada avisa.
+  ['users', 'totp_last_step'],
   ['users', 'privacy_version'],
   ['users', 'consent_at'],
   ['users', 'consent_ip'],
   ['users', 'deleted_at'],
   ['users', 'cns'],
   ['users', 'job_role'],
+  // Fase 5, migration 007: o INSERT do agendamento e o cálculo de conflito
+  // referenciam estas duas; sem elas, agendar dá 500.
+  ['appointments', 'duration_minutes'],
+  ['exams', 'duration_minutes'],
   ['health_units', 'cnes_code'],
   ['diseases', 'source'],
 ];
@@ -153,6 +165,20 @@ function loadEnv() {
   return { ok: true, env: parsed };
 }
 
+// O banco que o POOL usou vem de process.env — dotenv.config() NÃO
+// sobrescreve variável já existente. Se a checagem usasse env.DB_NAME (o valor
+// do ARQUIVO), o doctor conferiria um banco enquanto o pool falaria em outro,
+// sem nunca perceber. Mesma precedência do db-setup.js: ambiente vence .env.
+function configAlvo(env) {
+  const cfg = (nome, padrao) => process.env[nome] || env[nome] || padrao;
+  return {
+    DB_NAME: cfg('DB_NAME', 'saude'),
+    DB_HOST: cfg('DB_HOST', 'localhost'),
+    DB_PORT: cfg('DB_PORT', 3306),
+    DB_USER: cfg('DB_USER', 'root'),
+  };
+}
+
 function loadPool() {
   const dbPath = path.join(SERVER_DIR, 'src', 'db.js');
   // db.js lê process.env no require — então o .env precisa estar aplicado antes.
@@ -260,8 +286,9 @@ async function main() {
     try {
       pool = loadPool();
       await pool.query('SELECT 1');
-      const dbName = env.DB_NAME || 'saude';
-      ok('mysql', `${env.DB_HOST || 'localhost'}:${env.DB_PORT || 3306} (${env.DB_USER || 'root'})`);
+      const alvo = configAlvo(env);
+      const dbName = alvo.DB_NAME;
+      ok('mysql', `${alvo.DB_HOST}:${alvo.DB_PORT} (${alvo.DB_USER})`);
 
       const [[sch]] = await pool.query(
         'SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?',
@@ -338,6 +365,12 @@ module.exports = {
   dpoWarning,
   parsePairs,
   main,
+  configAlvo,
+  // Exportado para o teste de paridade (server/test/doctor.test.js): a lista
+  // de colunas tem que refletir o que o código referencia, senão o doctor
+  // fica verde em uma base quebrada — que é o que ele existe para evitar.
+  COLUNAS_ESPERADAS,
+  TABELAS_ESPERADAS,
 };
 
 if (require.main === module) {

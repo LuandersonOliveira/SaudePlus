@@ -99,21 +99,32 @@ test('assertSafeDbName recusa tudo que não é identificador simples', () => {
   }
 });
 
-test('migrationScripts devolve a ordem completa, com interop antes de audit', () => {
+test('migrationScripts devolve exatamente o que o migrate:all executa, na mesma ordem', () => {
+  // Esta lista NÃO pode ser escrita à mão. A versão anterior fixava 6 nomes
+  // aqui e em db-setup.js; quando a Fase 5 adicionou migrate:mfa:replay e
+  // migrate:booking:duration, o migrate:all cresceu e as duas listas fixas
+  // ficaram para trás — `npm run db:setup` imprimia "Pronto." sem criar as
+  // colunas, e todo agendamento passava a dar 500. O teste fixo é o que deu
+  // aparência de cobertura a um caminho que não conhecia as migrations novas.
   const scripts = migrationScripts();
-  assert.deepEqual(scripts, [
-    'migrate-v3.js',
-    'migrate-security.js',
-    'migrate-privacy.js',
-    'migrate-interop.js',
-    'migrate-audit.js',
-    'migrate-audit-details.js',
-  ]);
+  const pkg = require('../package.json');
+  const esperada = (pkg.scripts['migrate:all'].match(/npm run (migrate:[\w:]+)/g) || [])
+    .map((n) => n.replace('npm run ', '').replace(/:/g, '-') + '.js');
+
+  assert.ok(esperada.length >= 6, 'o migrate:all deveria encadear todas as migrations');
+  assert.deepEqual(
+    scripts,
+    esperada,
+    'db-setup e migrate:all precisam executar exatamente as mesmas migrations, na mesma ordem'
+  );
 
   const idx = (nome) => scripts.indexOf(nome);
   assert.ok(idx('migrate-v3.js') < idx('migrate-privacy.js'), 'privacy depende das colunas de v3');
   assert.ok(idx('migrate-security.js') < idx('migrate-audit.js'), 'audit depende de refresh_tokens');
-  assert.ok(idx('migrate-interop.js') > -1, 'interop precisa existir — sem ele o MFA some em silêncio');
+  assert.ok(idx('migrate-interop.js') > -1, 'interop precisa existir - sem ele o MFA some em silêncio');
+  // E as migrations da Fase 5, que era exatamente o que faltava.
+  assert.ok(idx('migrate-mfa-replay.js') > -1, 'proteção de replay do TOTP precisa entrar no setup');
+  assert.ok(idx('migrate-booking-duration.js') > -1, 'duration_minutes precisa entrar no setup');
 });
 
 test('todo script de migration listado existe no disco', () => {
