@@ -52,6 +52,7 @@ function createBookingRouter(tipo) {
   });
 
   router.post('/', async (req, res, next) => {
+    let conn = null;
     try {
       const body = req.body || {};
       const serviceName = hasDoctor ? body.specialty : body.exam_type;
@@ -63,19 +64,39 @@ function createBookingRouter(tipo) {
         return res.status(400).json({ error: msg.noUnit });
       }
 
-      // Regras de disponibilidade validadas no servidor (item 4.5)
-      const bookingError = await validateBooking(pool, {
+      // Validação e inserção na MESMA transação, com lock na linha do
+      // profissional. Antes eram duas round-trips independentes: a validação
+      // lia os intervalos ocupados, decidia "livre" e devolvia; o insert
+      // vinha depois. Dois cliques (ou duas abas, ou um retry depois de um
+      // 502) faziam os dois passarem na validação antes de qualquer um
+      // inserir, e os dois agendamentos entravam no mesmo horário.
+      //
+      // `SELECT … FOR UPDATE` na linha do profissional serializa as
+      // requisições concorrentes: a segunda espera a primeira terminar a
+      // transação e só então lê os ocupados — já com o primeiro registro.
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+      if (professional_id) {
+        await conn.query('SELECT id FROM professionals WHERE id = ? FOR UPDATE', [professional_id]);
+      }
+
+      const bookingError = await validateBooking(conn, {
         tipo,
         unitId: unit_id,
         professionalId: professional_id || null,
         serviceName,
         scheduledAt: scheduled_at,
       });
-      if (bookingError) return res.status(409).json({ error: bookingError });
+      if (bookingError) {
+        await conn.rollback().catch(() => {});
+        conn.release();
+        conn = null;
+        return res.status(409).json({ error: bookingError });
+      }
 
       let doctorName = hasDoctor ? (body.doctor || null) : null;
       if (hasDoctor && professional_id) {
-        const [[prof]] = await pool.query('SELECT name FROM professionals WHERE id = ?', [professional_id]);
+        const [[prof]] = await conn.query('SELECT name FROM professionals WHERE id = ?', [professional_id]);
         if (prof) doctorName = prof.name;
       }
 
@@ -86,12 +107,19 @@ function createBookingRouter(tipo) {
       columns.push('location', 'unit_id', 'professional_id', 'scheduled_at', 'notes');
       values.push(location, unit_id, professional_id || null, scheduled_at, notes || null);
 
-      await pool.query(
+      await conn.query(
         `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(',')})`,
         values
       );
+      await conn.commit();
+      conn.release();
+      conn = null;
       res.status(201).json({ id });
     } catch (err) {
+      if (conn) {
+        await conn.rollback().catch(() => {});
+        conn.release();
+      }
       next(err);
     }
   });
