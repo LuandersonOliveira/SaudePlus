@@ -14,6 +14,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PAINEIS = ['admin.html', 'atendente.html', 'dashboard.html'];
@@ -217,6 +218,45 @@ test('nenhum painel interpola esc() direto dentro de onclick', () => {
       `${p} ainda tem ${usos.length} interpolação(ões) de esc() dentro de onclick=`
     );
   }
+});
+
+test('a aspa dupla de um dado NÃO escapa do atributo onclick', () => {
+  // A dívida técnica registrou "XSS residual: esc() não cobre onclick com
+  // aspas duplas". Isto testa a afirmação em vez de acreditar nela.
+  //
+  // A defesa tem duas camadas, e é a segunda que fecha o caso:
+  //  1. estrutural — não há mais `esc()` interpolado dentro de onclick (teste
+  //     acima); o dado vai em data-attribute e um listener delegado lê;
+  //  2. mesmo que alguém volte a interpolar, esc() transforma `"` em
+  //     `&quot;`, que é decodificado DEPOIS de o limite do atributo estar
+  //     definido — ou seja, não abre aspas.
+  //
+  // O esc() é extraído da página de verdade (casamento de chaves) e
+  // executado num sandbox, para não testar uma cópia minha.
+  const html = htmlDe('admin.html');
+  const inicio = html.indexOf('function esc(');
+  assert.ok(inicio > -1, 'admin.html deveria definir esc()');
+  const abre = html.indexOf('{', inicio);
+  let prof = 0;
+  let fim = -1;
+  for (let i = abre; i < html.length; i += 1) {
+    if (html[i] === '{') prof += 1;
+    else if (html[i] === '}') { prof -= 1; if (prof === 0) { fim = i; break; } }
+  }
+  assert.ok(fim > abre, 'não consegui isolar o corpo de esc()');
+  const fonteEsc = html.slice(inicio, fim + 1);
+
+  const ctx = { entrada: 'x" onmouseover="alert(1)" x="' };
+  vm.runInNewContext(`${fonteEsc}\nthis.resultado = esc(entrada);`, ctx);
+  const saida = ctx.resultado;
+
+  assert.ok(!saida.includes('"'), `a aspa dupla deveria virar entidade, veio: ${saida}`);
+  assert.ok(saida.includes('&quot;'), `" deveria virar &quot;, veio: ${saida}`);
+
+  // O ponto decisivo: com a entidade no lugar, o atributo continua fechado.
+  const botao = `<button onclick="editUnit('${saida}')">Editar</button>`;
+  assert.ok(!botao.includes('onmouseover="alert(1)"'), 'o payload não pode virar um atributo novo');
+  assert.equal((botao.match(/"/g) || []).length, 2, 'o botão deve ter exatamente as duas aspas do atributo onclick');
 });
 
 test('todo data-act usado é tratado pelo listener delegado', () => {

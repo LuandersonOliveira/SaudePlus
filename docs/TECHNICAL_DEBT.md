@@ -23,13 +23,17 @@ derivar — o símbolo/trecho descrito é o que importa.
 | `utils/audit.js` (`verifyChain`) | Exigia adjacência por `seq`; salto de AUTO_INCREMENT (transação que rolou back) era lido como adulteração | Percorre o encadeamento por hash a partir de GENESIS |
 | `test:race` | deixava bancos `saude_race_*` órfãos quando o processo morria | `before` varre os órfãos antes de criar o seu |
 
+## Fechado sem mudança de código: não era explorável
+
+| Onde era | Achado | O que a verificação mostrou |
+|---|---|---|
+| `admin.html`, `atendente.html` | "`esc()` não cobre `onclick` com aspas duplas (XSS residual)" | **Falso positivo.** Duas camadas: (1) desde a Task 5 não existe mais `esc()` interpolado dentro de `onclick="…"` — o dado vai em `data-attribute` e um listener delegado lê; (2) `esc()` escapa `"` → `&quot;`, que é decodificado depois de o limite do atributo estar definido, então não abre aspas. Teste em `escaping.test.js` renderiza o botão com `x" onmouseover="alert(1)" x="` usando o `esc()` extraído da página de verdade, e confirma que o botão tem exatamente as duas aspas do atributo. Nenhum código alterado — mudar algo aqui seria mexer em código correto. |
+
 ## MEDIUM — correção funcional, sem risco de segurança
 
 | Onde | Achado | Risco |
 |---|---|---|
-| `booking.js` (`fetchBusyIntervals`) | Duração de 30 min está fixa no cálculo de **conflito**, enquanto `work_schedules.slot_minutes` aceita 5–240. O candidato novo usa a duração certa (booking.js:196), mas os **já existentes** são tratados como 30 min | Só morde quando o mesmo profissional tem dois `work_schedules` **sobrepostos no mesmo dia com `slot_minutes` diferentes** (ex.: 08:00–12:00 de 60 min e 09:00–17:00 de 30 min): um agendamento de 60 min às 09:00 libera as 09:30, que a grade de 30 min oferece. Com uma grade só, o problema fica mascarado. **Resolver** persistindo a duração (ou a unit_id + horário que a define) e usando-a ao montar os intervalos ocupados. |
 | `booking.js` (`findAvailabilityByService`) | Um horário com 2 profissionais disponíveis é reportado como 1 vaga; `totalVagas` subconta | O usuário vê "1 vaga" e escolhe por engano, ou desiste de um horário que tem 2 profissionais. |
-| `privacy.js` (anonimização LGPD) | A anonimização roda em 4 statements independentes, sem transação | Uma falha no meio deixa o usuário parcialmente anonimizado — o pior estado possível num pedido de LGPD: os dados somem sem o registro de exclusão. **Resolver** dentro de transação. |
 | `auth.routes.js` (fallback CPF Gov.br) | Faz `SELECT * FROM users` e compara CPF com `===` | Compara o usuário inteiro e **não é timing-safe**. **Resolver** `SELECT cpf` + `timingSafeEqual`. |
 | `admin.routes.js` (auditoria) | Lê `audit_log` com `INNER JOIN users`, que oculta linhas órfãs; `verifyChain` não usa join | A tela e o verificador discordam: o verificador acusa cadeia íntegra e a lista mostra menos linhas. **Resolver** `LEFT JOIN` e exibir o órfão marcado. |
 
