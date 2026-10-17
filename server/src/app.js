@@ -24,6 +24,18 @@ const interopRoutes = require('./routes/interop.routes');
 
 const app = express();
 
+// --------------------------------------------------------------------------
+// trust proxy — precisa vir ANTES de qualquer middleware que leia req.ip.
+//
+// Sem isto, atrás de nginx/Cloudflare/IIS o `req.ip` é o IP do PROXY para
+// toda requisição, e o rate limit (300 req/15min), o lockout de login e o
+// consent_ip passam a valer para o proxy inteiro, não para o cliente.
+//.Default 0 = desligado, que é o certo em desenvolvimento local.
+// Atrás de um único nginx: TRUST_PROXY_HOPS=1.
+// --------------------------------------------------------------------------
+const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS) || 0;
+if (trustProxyHops > 0) app.set('trust proxy', trustProxyHops);
+
 // Segurança HTTP básica (Fase 0): headers via helmet + JSON com limite.
 app.use(helmet());
 app.use(cookieParser());
@@ -43,12 +55,13 @@ function buildCorsOrigin() {
 
 app.use(cors({ origin: buildCorsOrigin() }));
 app.use(express.json({ limit: '100kb' }));
-app.use(globalLimiter);
-// Fase 3: segurança isolada — req.audit() e req.encryptDoc/decryptDoc
-// disponíveis em todas as rotas; o ator é lido de req.user na hora do uso.
-app.use(attachAudit);
-app.use(attachDocs);
+// Form-urlencoded também: DELETE /auth/me manda senha no corpo, e sem isto
+// o express.json não parseia e a exclusão de conta devolve 400.
+app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
+// /health e /ready ANTES do globalLimiter. Um balanceador consultando a
+// prontidão a cada 5s estoura a janela de 300 req/15min em ~25 minutos e
+// passa a receber 429 no lugar de tráfego real.
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 // GET /ready — sonda de prontidão p/ monitoramento (Aula 1: disponibilidade).
@@ -62,6 +75,12 @@ app.get('/ready', async (req, res) => {
     res.status(503).json({ ok: false, db: false });
   }
 });
+
+app.use(globalLimiter);
+// Fase 3: segurança isolada — req.audit() e req.encryptDoc/decryptDoc
+// disponíveis em todas as rotas; o ator é lido de req.user na hora do uso.
+app.use(attachAudit);
+app.use(attachDocs);
 
 app.use('/auth', authLimiter, authRoutes);
 app.use('/me/appointments', appointmentsRoutes);

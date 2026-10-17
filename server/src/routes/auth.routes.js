@@ -8,6 +8,9 @@ const {
   digitsOnly, signupSchema, isValidCPF, isValidCNS,
   VALID_PRIORITIES, VALID_RACES, validateEnum, validateDate,
 } = require('../utils/validators');
+const {
+  loginKey, loginBlockInfo, registerLoginFailure, registerLoginSuccess,
+} = require('../utils/loginThrottle');
 const { PRIVACY_VERSION, anonymizeUser } = require('../utils/privacy');
 const { govbrConfig, buildAuthorizeUrl, exchangeCode, fetchUserInfo } = require('../services/govbr');
 const { randomSecret, verifyTotp, otpauthUrl } = require('../utils/totp');
@@ -86,41 +89,16 @@ function ageInYears(birthDateStr) {
 }
 
 // --------------------------------------------------------------------------
-// Proteção contra força bruta no login (TAREFAS V3, item 6.3):
-// 5 tentativas erradas => bloqueio de 5 minutos para aquele IP.
+// Proteção contra força bruta no login (TAREFAS V3, item 6.3).
+// A lógica mora em utils/loginThrottle.js, com o relógio injetado — assim é
+// testável sem esperar 5 minutos. Resumo do que mudou: a chave do Map passou
+// a ser `ip|e-mail` em vez de só `ip` (ver o arquivo para o porquê) e o Map
+// passou a ser varrido e limitado.
 // --------------------------------------------------------------------------
-const LOGIN_WINDOW_MS = 5 * 60 * 1000;
-const LOGIN_MAX_ATTEMPTS = 5;
-const loginAttempts = new Map(); // ip -> { count, windowEndsAt, blockedUntil }
+const loginAttempts = new Map(); // "ip|email" -> { count, windowEndsAt, blockedUntil }
 
 function clientIp(req) {
   return req.ip || (req.socket && req.socket.remoteAddress) || 'desconhecido';
-}
-
-function loginBlockInfo(ip) {
-  const entry = loginAttempts.get(ip);
-  if (!entry) return null;
-  const now = Date.now();
-  if (entry.blockedUntil && entry.blockedUntil > now) return entry;
-  if (entry.windowEndsAt && entry.windowEndsAt < now) loginAttempts.delete(ip);
-  return null;
-}
-
-function registerLoginFailure(ip) {
-  const now = Date.now();
-  const entry = loginAttempts.get(ip) || { count: 0, windowEndsAt: now + LOGIN_WINDOW_MS };
-  if (entry.blockedUntil && entry.blockedUntil > now) return entry;
-  if (entry.windowEndsAt < now) {
-    entry.count = 0;
-    entry.windowEndsAt = now + LOGIN_WINDOW_MS;
-  }
-  entry.count += 1;
-  if (entry.count >= LOGIN_MAX_ATTEMPTS) {
-    entry.blockedUntil = now + LOGIN_WINDOW_MS;
-    entry.count = 0;
-  }
-  loginAttempts.set(ip, entry);
-  return entry;
 }
 
 router.post('/signup', async (req, res, next) => {
@@ -222,8 +200,12 @@ router.post('/login', async (req, res, next) => {
       return res.status(400).json({ error: 'Informe e-mail e senha.' });
     }
 
-    const ip = clientIp(req);
-    const blocked = loginBlockInfo(ip);
+    const normalizedEmail = String(email).toLowerCase().trim();
+    // Chave por conta E por IP: um ataque a uma conta não tranca as demais
+    // nem tranca quem está atrás do mesmo proxy.
+    const chave = loginKey(clientIp(req), normalizedEmail);
+
+    const blocked = loginBlockInfo(loginAttempts, chave);
     if (blocked) {
       const seconds = Math.ceil((blocked.blockedUntil - Date.now()) / 1000);
       const minutes = Math.max(1, Math.ceil(seconds / 60));
@@ -232,10 +214,9 @@ router.post('/login', async (req, res, next) => {
       });
     }
 
-    const normalizedEmail = String(email).toLowerCase().trim();
     const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
     if (!rows.length) {
-      registerLoginFailure(ip);
+      registerLoginFailure(loginAttempts, chave);
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
@@ -252,11 +233,11 @@ router.post('/login', async (req, res, next) => {
 
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
-      registerLoginFailure(ip);
+      registerLoginFailure(loginAttempts, chave);
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
-    loginAttempts.delete(ip);
+    registerLoginSuccess(loginAttempts, chave);
 
     const payload = {
       id: user.id, email: user.email,
