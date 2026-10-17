@@ -10,6 +10,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Política de Privacidade | Saúde+</title>
 <link rel="stylesheet" href="assets/styles.css">
+<!-- Carrega api.js para que window.API_BASE exista. Sem este script,
+       API_BASE caía sempre no fallback http://localhost:4000 e o contato do
+       encarregado (art. 41 da LGPD) ficava "indisponível" em qualquer
+       ambiente deployado fora do localhost. -->
+  <script defer src="assets/api.js"></script>
 </head>
 <body>
 <header class="topbar">
