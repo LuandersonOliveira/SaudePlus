@@ -51,12 +51,34 @@ function chainHash(prev, actorId, action, entityType, entityId, details, created
     .digest('hex');
 }
 
+const AUDIT_LOCK = 'saudeplus:audit-chain';
+
 async function logAction(actorId, action, entityType, entityId, details) {
   const clean = sanitizeDetails(details);
   const createdAt = toSqlDate(new Date());
   const conn = await pool.getConnection().catch(() => null);
   if (!conn) return; // sem banco: não derruba a operação principal
+  // Mutex da cadeia.
+  //
+  // `SELECT ... ORDER BY seq DESC LIMIT 1 FOR UPDATE` NÃO serializa as escritas
+  // de auditoria: no fim do índice não existe "próxima" linha, então o InnoDB
+  // não pega o gap lock que impediria um INSERT concorrente. Duas requisições
+  // simultâneas liam a mesma cabeça e as duas escrevem — a trilha fica com
+  // duas linhas no mesmo elo, e o verificador acusa adulteração onde só houve
+  // corrida. Aconteceu de verdade em `npm test`.
+  //
+  // GET_LOCK é um lock nomeado do próprio MySQL, compartilhado entre conexões
+  // e entre processos: é exatamente a primitiva que falta aqui.
+  let comLock = false;
   try {
+    const [[pegou]] = await conn.query('SELECT GET_LOCK(?, ?) AS ok', [AUDIT_LOCK, 5]);
+    comLock = Number(pegou && pegou.ok) === 1;
+    if (!comLock) {
+      // Sem o lock (5s de espera, MySQL sobrecarregado), seguimos mesmo assim
+      // para não perder a auditoria. Registrar uma linha fora de ordem é
+      // aceitável; perder o registro não é.
+      console.warn('audit: GET_LOCK não concedido — a linha pode entrar fora de ordem na cadeia');
+    }
     await conn.beginTransaction();
     let prev = 'GENESIS';
     try {
@@ -117,10 +139,32 @@ async function logAction(actorId, action, entityType, entityId, details) {
     // um mistério sem rastro — exatamente o que a auditoria existe para evitar.
     console.error(`Falha ao registrar log de auditoria [${err.code || 'SEM_CODIGO'}]:`, err.message);
   } finally {
+    // O lock é da conexão: tem que ser devolvido antes de ela voltar ao pool,
+    // senão o próximo borrower fica esperando um lock que ninguém tem.
+    if (comLock) {
+      try { await conn.query('SELECT RELEASE_LOCK(?)', [AUDIT_LOCK]); } catch { /* ignora */ }
+    }
     conn.release();
   }
 }
 
+/**
+ * Verifica a integridade da trilha percorrendo o ENCADEAMENTO, não a numeração.
+ *
+ * A versão anterior comparava `linha[i].prev_hash` com `linha[i-1].entry_hash`
+ * varrendo por `seq`. Duas coisas quebram isso:
+ *
+ * 1. `seq` é AUTO_INCREMENT e o MySQL consome o valor ANTES do INSERT. Uma
+ *    transação que roda back (chave duplicada, por exemplo) queima o número e
+ *    a linha nunca aparece. Salto de sequência é normal, não é adulteração.
+ * 2. A ordem em que as linhas chegam do banco pode não ser a ordem da cadeia
+ *    (um backfill entra com seq menor e só é lido depois).
+ *
+ * O que define a ordem é o elo de hash. Então: confere o hash de cada linha
+ * contra o próprio conteúdo, e caminha de elo em elo a partir de GENESIS.
+ * Salto de seq deixa de importar; duas linhas penduradas no mesmo elo ainda
+ * são detectadas — que é a divergência que a corrida de escrita produz.
+ */
 async function verifyChain(poolOrConn) {
   const query = (sql, params) => poolOrConn.query(sql, params);
   const cols = `id, actor_id, action, entity_type, entity_id, details, prev_hash, entry_hash,
@@ -131,15 +175,57 @@ async function verifyChain(poolOrConn) {
   } catch {
     [rows] = await query(`SELECT ${cols} FROM audit_log ORDER BY created_at ASC, id ASC`);
   }
-  let prev = 'GENESIS';
+  if (!rows.length) return { ok: true, checked: 0, head: 'GENESIS' };
+
   for (const r of rows) {
-    if (!r.entry_hash) return { ok: false, checked: rows.length, firstBad: r.id, reason: 'linha sem hash (pré-migração 005)' };
-    if (r.prev_hash !== prev) return { ok: false, checked: rows.length, firstBad: r.id, reason: 'elo anterior divergente' };
-    const recomputed = chainHash(prev, r.actor_id, r.action, r.entity_type, r.entity_id, r.details, r.created_at);
-    if (recomputed !== r.entry_hash) return { ok: false, checked: rows.length, firstBad: r.id, reason: 'conteúdo alterado' };
-    prev = r.entry_hash;
+    if (!r.entry_hash) {
+      return { ok: false, checked: rows.length, firstBad: r.id, reason: 'linha sem hash (pré-migração 005)' };
+    }
+    const recomputed = chainHash(r.prev_hash, r.actor_id, r.action, r.entity_type, r.entity_id, r.details, r.created_at);
+    if (recomputed !== r.entry_hash) {
+      return { ok: false, checked: rows.length, firstBad: r.id, reason: 'conteúdo alterado' };
+    }
   }
-  return { ok: true, checked: rows.length, head: prev };
+
+  // Encadeia: quem aponta para este elo?
+  const porElo = new Map();
+  for (const r of rows) {
+    const lista = porElo.get(r.prev_hash);
+    if (lista) lista.push(r);
+    else porElo.set(r.prev_hash, [r]);
+  }
+
+  const visitadas = new Set();
+  let elo = 'GENESIS';
+  for (;;) {
+    const proximas = porElo.get(elo) || [];
+    // Duas linhas claiming o mesmo elo é a divergência da corrida de escrita.
+    if (proximas.length > 1) {
+      const jaVista = proximas.find((r) => visitadas.has(r.id));
+      const outra = proximas.find((r) => !visitadas.has(r.id));
+      if (jaVista && outra) {
+        return { ok: false, checked: rows.length, firstBad: outra.id, reason: 'elo anterior divergente (duas linhas no mesmo elo)' };
+      }
+    }
+    const proxima = proximas.find((r) => !visitadas.has(r.id));
+    if (!proxima) break;
+    visitadas.add(proxima.id);
+    elo = proxima.entry_hash;
+  }
+
+  // Sobrou linha fora do caminho? Ela é órfã: aponta para elo que ninguém
+  // alcança a partir de GENESIS, e é exatamente o que uma adulteração hide.
+  if (visitadas.size !== rows.length) {
+    const orfa = rows.find((r) => !visitadas.has(r.id));
+    return {
+      ok: false,
+      checked: visitadas.size,
+      firstBad: orfa.id,
+      reason: 'elo anterior divergente (linha fora da cadeia)',
+    };
+  }
+
+  return { ok: true, checked: rows.length, head: elo };
 }
 
 module.exports = { logAction, sanitizeDetails, chainHash, verifyChain, DETAILS_MAX };
