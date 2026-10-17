@@ -6,6 +6,7 @@ const { requireCapability } = require('../middleware/capabilities');
 const { verifyChain } = require('../utils/audit');
 const { applyBookingChange } = require('../utils/booking');
 const { parsePagination } = require('../utils/validators');
+const { normalizeCounts } = require('../utils/stats');
 
 // Listagem paginável sem quebra: com ?page/?pageSize responde
 // envelope {data,page,pageSize,total}; sem query mantém o array legado.
@@ -28,37 +29,60 @@ router.use(verifyToken, requireAdmin);
 
 router.get('/stats', async (req, res, next) => {
   try {
-    const [[users]] = await pool.query("SELECT COUNT(*) AS total, SUM(account_status = 'pendente') AS pending, SUM(account_status = 'inativo') AS inactive FROM users");
-    const [[units]] = await pool.query('SELECT COUNT(*) AS total, SUM(active = 1) AS active FROM health_units');
-    const [[diseases]] = await pool.query('SELECT COUNT(*) AS total, SUM(active = 1) AS active FROM diseases');
-    res.json({ users, units, diseases });
+    // COALESCE(SUM(...), 0): no MySQL, SUM() sobre zero linhas devolve NULL.
+    // Instalação nova (tabela vazia) mandava `pending: null` e o painel
+    // mostrava "null" no contador. normalizeCounts é a segunda parede: se
+    // algum outro campo novo entrar sem COALESCE, ele ainda não vaza null.
+    const [[users]] = await pool.query(
+      `SELECT COUNT(*) AS total,
+              COALESCE(SUM(account_status = 'pendente'), 0) AS pending,
+              COALESCE(SUM(account_status = 'inativo'), 0) AS inactive
+       FROM users`
+    );
+    const [[units]] = await pool.query(
+      'SELECT COUNT(*) AS total, COALESCE(SUM(active = 1), 0) AS active FROM health_units'
+    );
+    const [[diseases]] = await pool.query(
+      'SELECT COUNT(*) AS total, COALESCE(SUM(active = 1), 0) AS active FROM diseases'
+    );
+    res.json({
+      users: normalizeCounts(users),
+      units: normalizeCounts(units),
+      diseases: normalizeCounts(diseases),
+    });
   } catch (err) { next(err); }
 });
 
 router.get('/export/summary.csv', requireCapability('reports'), async (req, res, next) => {
   try {
+    // Mesmo motivo do /stats: COALESCE para que o CSV nunca traga "null" numa
+    // célula de número.
     const [[users]] = await pool.query(`SELECT
       COUNT(*) AS total,
-      SUM(account_status = 'ativo') AS active,
-      SUM(account_status = 'pendente') AS pending,
-      SUM(account_status = 'inativo') AS inactive
+      COALESCE(SUM(account_status = 'ativo'), 0) AS active,
+      COALESCE(SUM(account_status = 'pendente'), 0) AS pending,
+      COALESCE(SUM(account_status = 'inativo'), 0) AS inactive
       FROM users`);
     const [[appointments]] = await pool.query(`SELECT
       COUNT(*) AS total,
-      SUM(status = 'pendente') AS pending,
-      SUM(status = 'confirmado') AS confirmed,
-      SUM(status = 'cancelado') AS cancelled,
-      SUM(status = 'concluido') AS completed
+      COALESCE(SUM(status = 'pendente'), 0) AS pending,
+      COALESCE(SUM(status = 'confirmado'), 0) AS confirmed,
+      COALESCE(SUM(status = 'cancelado'), 0) AS cancelled,
+      COALESCE(SUM(status = 'concluido'), 0) AS completed
       FROM appointments`);
     const [[exams]] = await pool.query(`SELECT
       COUNT(*) AS total,
-      SUM(status = 'pendente') AS pending,
-      SUM(status = 'confirmado') AS confirmed,
-      SUM(status = 'cancelado') AS cancelled,
-      SUM(status = 'concluido') AS completed
+      COALESCE(SUM(status = 'pendente'), 0) AS pending,
+      COALESCE(SUM(status = 'confirmado'), 0) AS confirmed,
+      COALESCE(SUM(status = 'cancelado'), 0) AS cancelled,
+      COALESCE(SUM(status = 'concluido'), 0) AS completed
       FROM exams`);
-    const [[units]] = await pool.query('SELECT COUNT(*) AS total, SUM(active = 1) AS active, SUM(active = 0) AS inactive FROM health_units');
-    const [[diseases]] = await pool.query('SELECT COUNT(*) AS total, SUM(active = 1) AS active, SUM(active = 0) AS inactive FROM diseases');
+    const [[units]] = await pool.query(
+      'SELECT COUNT(*) AS total, COALESCE(SUM(active = 1), 0) AS active, COALESCE(SUM(active = 0), 0) AS inactive FROM health_units'
+    );
+    const [[diseases]] = await pool.query(
+      'SELECT COUNT(*) AS total, COALESCE(SUM(active = 1), 0) AS active, COALESCE(SUM(active = 0), 0) AS inactive FROM diseases'
+    );
 
     const rows = [
       ['Indicador', 'Total', 'Ativos/Pendentes', 'Inativos/Confirmados', 'Cancelados/Concluidos'],
@@ -119,20 +143,11 @@ router.get('/exams', requireCapability('appointments'), async (req, res, next) =
   }
 });
 
-// Busca por e-mail (parcial) para localizar o histórico de um usuário.
-// Segurança (P0.4): exige a permissão 'users' (mesma da gestão de usuários).
-router.get('/users', requireCapability('users'), async (req, res, next) => {
-  try {
-    const email = String(req.query.email || '').toLowerCase().trim();
-    const [rows] = await pool.query(
-      'SELECT id, full_name, email, phone FROM users WHERE email LIKE ? ORDER BY full_name LIMIT 20',
-      ['%' + email + '%']
-    );
-    res.json(rows);
-  } catch (err) {
-    next(err);
-  }
-});
+// NOTA: existia aqui um `router.get('/users')` (busca por e-mail) que nunca
+// executava — `app.use('/admin/users', adminUsersRoutes)` é montado ANTES do
+// `app.use('/admin', adminRoutes)`, então este caminho já era servido por
+// admin.users.routes.js. Duas implementações da mesma rota, uma delas morta:
+// quem fosse mexer aqui editaria código que ninguém executa. Removida.
 
 // Histórico de um usuário — exige a permissão 'users' (P0.4) e audita a leitura.
 router.get('/history', requireCapability('users'), async (req, res, next) => {

@@ -111,10 +111,20 @@ router.post('/:id/offers', verifyToken, requireAdmin, requireCapability('units')
     if (!unit) return res.status(404).json({ error: 'Unidade não encontrada.' });
 
     const id = crypto.randomUUID();
-    await pool.query(
-      'INSERT IGNORE INTO unit_offers (id, unit_id, kind, name) VALUES (?,?,?,?)',
-      [id, req.params.id, kind, serviceName]
-    );
+    // Sem IGNORE: duplicata agora é 409 em vez de 201 com id fantasma. Mesmo
+    // defeito do POST de professional_offers — o front acreditava no 201 e a
+    // auditoria registrava uma criação que não aconteceu.
+    try {
+      await pool.query(
+        'INSERT INTO unit_offers (id, unit_id, kind, name) VALUES (?,?,?,?)',
+        [id, req.params.id, kind, serviceName]
+      );
+    } catch (erro) {
+      if (erro && erro.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({ error: 'Este serviço já está cadastrado nesta unidade.' });
+      }
+      throw erro;
+    }
     await req.audit('create', 'unit_offer', id,
       `${serviceName} (${kind}) em ${unit.name}`);
     res.status(201).json({ id });

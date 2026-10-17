@@ -18,10 +18,17 @@ router.use(verifyToken, requireAdmin, requireCapability('units'));
 const KINDS = ['consulta', 'exame'];
 const TIME_RE = /^\d{2}:\d{2}(:\d{2})?$/;
 
+// Aceita "HH:MM" ou "HH:MM:SS" e normaliza para "HH:MM:SS" — mas só se hora e
+// minuto existirem de verdade. O regex sozinho aceitou "99:99" e "12:99": o
+// INSERT passava, o MySQL reclamava, e a rota devolvia **500** (não 400). Pior:
+// um horário assim some de todos os filtros de disponibilidade, então o
+// profissional desaparece do próprio dia de atendimento sem ninguém perceber.
 function cleanTime(value) {
   if (typeof value !== 'string' || !TIME_RE.test(value)) return null;
-  const [h, m] = value.split(':');
-  return `${h}:${m}:00`;
+  const [h, m] = value.split(':').map(Number);
+  if (!Number.isInteger(h) || !Number.isInteger(m)) return null;
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
 }
 
 function minutesOf(hhmm) {
@@ -151,10 +158,23 @@ router.post('/:id/offers', async (req, res, next) => {
     if (!unit) return res.status(404).json({ error: 'Unidade não encontrada.' });
 
     const id = crypto.randomUUID();
-    await pool.query(
-      'INSERT IGNORE INTO professional_offers (id, professional_id, unit_id, kind, name) VALUES (?,?,?,?,?)',
-      [id, req.params.id, unitId, kind, serviceName]
-    );
+    // Sem IGNORE: a duplicata precisa ser VISÍVEL.
+    //
+    // `INSERT IGNORE` engolia o ER_DUP_ENTRY e a rota respondia 201 com o id
+    // recém-gerado — que nunca existiu. O front mostrava o vínculo na lista e
+    // a auditoria registrava "criou vínculo" para nada. Agora a duplicata é um
+    // 409 honesto e nada é auditado, porque nada mudou.
+    try {
+      await pool.query(
+        'INSERT INTO professional_offers (id, professional_id, unit_id, kind, name) VALUES (?,?,?,?,?)',
+        [id, req.params.id, unitId, kind, serviceName]
+      );
+    } catch (erro) {
+      if (erro && erro.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({ error: 'Este vínculo já existe para este profissional nesta unidade.' });
+      }
+      throw erro;
+    }
     const reason = reasonOf(req);
     await req.audit('create', 'professional_offer', id,
       `vínculo: ${serviceName} (${kind}) em ${unit.name}${reason ? `; motivo: ${reason}` : ''}`);
@@ -282,3 +302,7 @@ router.delete('/:id/blocks/:blockId', async (req, res, next) => {
 });
 
 module.exports = router;
+// cleanTime é testado diretamente (server/test/admin-silent-failures.test.js):
+// a validação de hora/minuto é o tipo de coisa que a review "de olho" aprova
+// e que o MySQL só revela com um 500 confuso.
+module.exports.cleanTime = cleanTime;
