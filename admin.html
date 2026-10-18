@@ -425,6 +425,13 @@
     let units = [];
     let editingUnitId = null;
     let diseases = [];
+
+    // Quem praticou a ação. A API usa LEFT JOIN, então uma linha cujo ator
+    // não existe mais vem com `actor_missing: 1` e nome vazio — sem isto a
+    // linha aparecia sem identificação nenhuma.
+    const ATOR_AUDITORIA = (r) => (r.actor_missing
+      ? 'Usuário removido'
+      : (r.actor_name || r.actor_email || 'Sistema'));
     let editingDiseaseId = null;
     let deletingDiseaseId = null;
     let professionals = [];
@@ -1019,8 +1026,8 @@
 
         try {
           const rows = await apiGet('/admin/audit-log?limit=5');
-          document.getElementById('recentActivity').innerHTML = rows.length
-            ? rows.map(r => `<div class="item"><div><h3>${esc(r.actor_name || r.actor_email)} <span class="badge">${esc(r.action)}</span></h3><p>${esc(r.entity_type)} · ${esc(r.details || '')}</p></div><span class="muted">${fmtDate(r.created_at)}</span></div>`).join('')
+        document.getElementById('recentActivity').innerHTML = rows.length
+          ? rows.map(r => `<div class="item"><div><h3>${esc(ATOR_AUDITORIA(r))} <span class="badge">${esc(r.action)}</span></h3><p>${esc(r.entity_type)} · ${esc(r.details || '')}</p></div><span class="muted">${fmtDate(r.created_at)}</span></div>`).join('')
             : '<div class="empty">Nenhuma ação registrada ainda.</div>';
         } catch (e) { document.getElementById('recentActivity').innerHTML = '<div class="empty">Não foi possível carregar a atividade.</div>'; }
       } catch (err) { toast(err.message || 'Erro ao carregar dados', 'error'); }
@@ -1387,7 +1394,7 @@
         const rows = await apiGet('/admin/audit-log?' + params.toString());
         document.getElementById('auditLog').innerHTML = rows.length
           ? rows.map(r => `<div class="item"><div>
-          <h3>${esc(r.actor_name || r.actor_email)} <span class="badge">${esc(r.action)}</span></h3>
+          <h3>${esc(ATOR_AUDITORIA(r))} <span class="badge">${esc(r.action)}</span></h3>
           <p>${esc(r.entity_type)} · ${esc(r.details || '')}</p>
         </div><span class="muted">${fmtDate(r.created_at)}</span></div>`).join('')
           : '<div class="empty">Nenhuma ação registrada ainda.</div>';

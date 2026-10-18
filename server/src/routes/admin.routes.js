@@ -272,11 +272,19 @@ router.get('/audit-log', requireCapability('audit'), async (req, res, next) => {
   if (action) { filters.push('al.action = ?'); params.push(action); }
   if (actorId) { filters.push('al.actor_id = ?'); params.push(actorId); }
   const where = filters.length ? 'WHERE ' + filters.join(' AND ') : '';
+  // LEFT JOIN, não INNER: `audit_log.actor_id` é ON DELETE RESTRICT, mas um
+  // ator ainda pode ter sumido por carga de dump restaurada ou inconsistência
+  // antiga. Com INNER essas linhas sumiam da tela — enquanto `verifyChain`
+  // (que não usa join) continuava contando, então a lista e o verificador
+  // discordavam. `actor_missing` marca a linha para a UI exibir
+  // "(usuário removido)".
+  const SELECT_AUDIT = `SELECT al.*, u.full_name AS actor_name, u.email AS actor_email,
+       CASE WHEN u.id IS NULL THEN 1 ELSE 0 END AS actor_missing
+       FROM audit_log al LEFT JOIN users u ON u.id = al.actor_id`;
   const { wantsPaged, page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 50, maxPageSize: 200 });
   if (wantsPaged) {
     return pagedList(res, next, {
-      baseSql: `SELECT al.*, u.full_name AS actor_name, u.email AS actor_email
-       FROM audit_log al JOIN users u ON u.id = al.actor_id
+      baseSql: `${SELECT_AUDIT}
        ${where} ORDER BY al.created_at DESC`,
       countSql: `SELECT COUNT(*) AS total FROM audit_log al ${where}`,
       params, page, pageSize, offset, wantsPaged,
@@ -285,8 +293,7 @@ router.get('/audit-log', requireCapability('audit'), async (req, res, next) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
     const [rows] = await pool.query(
-      `SELECT al.*, u.full_name AS actor_name, u.email AS actor_email
-       FROM audit_log al JOIN users u ON u.id = al.actor_id
+      `${SELECT_AUDIT}
        ${where}
        ORDER BY al.created_at DESC LIMIT ?`,
       [...params, limit]

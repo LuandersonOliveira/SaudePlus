@@ -54,9 +54,11 @@ porque o **porquê** de cada decisão é o que evita a reintrodução.
 
 ## MEDIUM — correção funcional, sem risco de segurança
 
+_Todos os achados desta seção foram corrigidos._
+
 | Onde | Achado | Risco |
 |---|---|---|
-| `admin.routes.js` (auditoria) | Lê `audit_log` com `INNER JOIN users`, que oculta linhas órfãs; `verifyChain` não usa join | A tela e o verificador discordam: o verificador acusa cadeia íntegra e a lista mostra menos linhas. **Resolver** `LEFT JOIN` e exibir o órfão marcado. |
+| `admin.routes.js` (auditoria) | Lê `audit_log` com `INNER JOIN users`, que oculta linhas órfãs; `verifyChain` não usa join | A tela e o verificador discordam: o verificador acusa cadeia íntegra e a lista mostra menos linhas. **Corrigido** — `LEFT JOIN` + `actor_missing`, e o painel mostra "Usuário removido". |
 
 ## MEDIUM — endurecimento de segurança
 
