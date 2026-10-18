@@ -23,7 +23,8 @@
     "migrate:audit:details": "node scripts/migrate-audit-details.js",
     "migrate:mfa:replay": "node scripts/migrate-mfa-replay.js",
     "migrate:booking:duration": "node scripts/migrate-booking-duration.js",
-    "migrate:all": "npm run migrate:v3 && npm run migrate:security && npm run migrate:privacy && npm run migrate:interop && npm run migrate:audit && npm run migrate:audit:details && npm run migrate:mfa:replay && npm run migrate:booking:duration",
+    "migrate:reminder:delivery": "node scripts/migrate-reminder-delivery.js",
+    "migrate:all": "npm run migrate:v3 && npm run migrate:security && npm run migrate:privacy && npm run migrate:interop && npm run migrate:audit && npm run migrate:audit:details && npm run migrate:mfa:replay && npm run migrate:booking:duration && npm run migrate:reminder:delivery",
     "purge:retention": "node scripts/purge-retention.js",
     "backup": "node scripts/backup.js",
     "sync:cnes": "node scripts/sync-cnes.js",
@@ -41,10 +42,11 @@
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.10.0",
+    "nodemailer": "^10.1.6",
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.14"
   },
   "engines": {
     "node": ">=18"

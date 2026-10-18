@@ -263,10 +263,11 @@
   npm start
   ```
 
-  > **Ordem importa:** `migrate:all` roda `v3` → `security` → `privacy`
-  > → `interop` → `audit` → `audit:details` → `mfa:replay` → `booking:duration`,
-  > nessa ordem. Pular o
-  > `migrate:privacy` causa `Unknown column 'privacy_version'` no signup.
+> **Ordem importa:** `migrate:all` roda `v3` → `security` → `privacy`
+> → `interop` → `audit` → `audit:details` → `mfa:replay` → `booking:duration`
+> → `reminder:delivery`,
+> nessa ordem. Pular o
+> `migrate:privacy` causa `Unknown column 'privacy_version'` no signup.
   >
   > **Pular o `migrate:interop` não dá erro visível — apenas desliga o MFA
   > silenciosamente.** Sem `users.totp_enabled`, o `if (user.totp_enabled)` da
@@ -317,9 +318,14 @@
   mesmo tempo. Para subir separados:
 
   ```bash
-  npm run dev:api    # só a API, com auto-reload (nodemon)
+  npm run dev:api    # só a API (scripts/run-local.js: carrega o .env e libera texto puro)
   npm run dev:web    # só o front estático
   ```
+
+  O `dev:api` **não** tem auto-reload: ele roda `node` direto. Para recarregar
+  ao editar, use `npm --prefix server run dev`, que é o `nodemon src/server.js`
+  — mas ele não passa pelo `run-local.js`, então só funciona depois de
+  `npm run db:setup` e com `ALLOW_PLAINTEXT_DEV` no ambiente (veja abaixo).
 
   O front é servido por `scripts/serve-web.js`, que só entrega as seis páginas e
   `assets/` — qualquer outro caminho responde 404. **Não troque por `npx serve .`**
@@ -389,13 +395,14 @@
   | `dev`              | `nodemon src/server.js`                             | Dev com auto-reload                                                                                                                                                        |
   | `seed:admin`       | `node scripts/seed-admin.js`                        | Cria (ou promove a `superadmin`) o admin do `.env` com `bcryptjs`                                                                                                          |
   | `seed:demo` | `node scripts/seed-v3-demo.js [--reset]` | Popula agenda demo em 4 unidades (serviços, 6 profissionais, horários + 3 vagas ocupadas p/ testar conflito; idempotente) |
-| `migrate:all` | roda todas em ordem | `v3` → `security` → `privacy` → `interop` → `audit` → `audit:details` → `mfa:replay` → `booking:duration`. Idempotente. **É o que o `setup` usa.** |
+| `migrate:all` | roda todas em ordem | `v3` → `security` → `privacy` → `interop` → `audit` → `audit:details` → `mfa:replay` → `booking:duration` → `reminder:delivery`. Idempotente. **É o que o `setup` usa.** |
 | `migrate` | importa `migration_001.sql` | Só para bancos muito antigos (perfil estendido). O `schema.sql` já é a união de tudo, então banco novo não precisa. |
   | `migrate:v3` | `node scripts/migrate-v3.js` | Cria `social_name/cns/priority/guardian`, `unit_id/professional_id` e tabelas `professionals/unit_offers/professional_offers/work_schedules/schedule_blocks` (idempotente) |
   | `migrate:security` | `node scripts/migrate-security.js` | **Fase 0:** cria `refresh_tokens` + triggers append-only em `audit_log` (idempotente; rode após `migrate:v3`) |
   | `migrate:privacy` | `node scripts/migrate-privacy.js` | **Fase 1:** consentimento (`privacy_version`, `consent_at/ip`, `deleted_at`) + `cpf/rg/cns` → TEXT + normaliza CPF + cifra legado (exige `DATA_ENCRYPTION_KEY`) |
   | `migrate:interop` | `node scripts/migrate-interop.js` | **Fase 2:** `health_units.cnes_code/phone/address`, `users.govbr_sub`, `diseases.source/external_ref` |
   | `migrate:audit` | `node scripts/migrate-audit.js` | **Aulas 1/6:** hash encadeado (`prev_hash`/`entry_hash`/`seq`) + MFA (`totp_*`) + FK do log `CASCADE→RESTRICT` |
+  | `migrate:reminder:delivery` | `node scripts/migrate-reminder-delivery.js` | **Fase 7:** `reminders.sent_at/send_channel/send_error` — o job passou a enviar e-mail, e sem essas colunas um envio recusado seria indistinguível de um enviado |
   | `backup` | `node scripts/backup.js [--dir] [--keep=7]` | **Aulas 1/6:** dump `mysqldump` → gzip → SHA-256 + manifesto, com retenção |
   | `purge:retention` | `node scripts/purge-retention.js [--apply]` | **Fase 1:** sem `--apply` só lista contas inativas +5 anos; com `--apply` anonimiza + limpa refresh tokens +90 dias |
   | `sync:cnes` | `node scripts/sync-cnes.js [--apply]` | **Fase 2:** CNES → `health_units` (dry-run default; `CNES_MUNICIPIO_CODE=260850`) |

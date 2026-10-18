@@ -13,9 +13,24 @@
         lembrete não);
      2. cada linha do lote é isolada — uma que falha é contada em `failed`
         e não derruba as outras.
+
+   Envio (Fase 7): o job gravava a linha e parava ali. Um lembrete que só
+   aparece quando o paciente abre o painel não é lembrete. Agora ele também
+   manda e-mail, com três regras que a ordem do código expresses:
+
+     1. GRAVA ANTES DE ENVIAR. O `INSERT` vem primeiro e o envio depois.
+        Se o SMTP estiver fora, o lembrete continua existindo no painel —
+        perder o registro é pior que não enviar, e é o mesmo critério que
+        já governava este arquivo;
+     2. `sent_at` só é preenchido se o transporte ACEITOU a mensagem. Um
+        envio recusado deixa `sent_at` NULL e grava o motivo em
+        `send_error`, para que "não saiu" e "saiu" nunca se confundam;
+     3. o envio é isolado por lembrete. Uma falha de SMTP em um paciente não
+        toca no lote nem no lembrete dos outros.
    ========================================================================== */
 const crypto = require('crypto');
 const pool = require('../db');
+const mailer = require('../services/mailer');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Limite de reminders.message. Espelha o VARCHAR(255) do schema.
@@ -37,6 +52,46 @@ function nextDayWindow(now = new Date()) {
     const end = new Date(start);
     end.setDate(end.getDate() + 1);
     return { start, end };
+}
+
+/**
+ * Tenta entregar o lembrete por e-mail e devolve o que foi registrado.
+ *
+ * `mailer.enviar()` nunca lança, mas o `UPDATE` pode: e se ele falhar, o
+ * lembrete continua gravado (a parte que importa) e o job segue.
+ */
+async function entregarPorEmail(reminderId, userId, { title, message }) {
+    let destino = null;
+    try {
+        const [[u]] = await pool.query('SELECT email FROM users WHERE id = ?', [userId]);
+        destino = u ? u.email : null;
+    } catch (err) {
+        console.error(`Falha ao buscar e-mail do usuário ${userId}: ${err.message}`);
+        return 'failed';
+    }
+
+    const resposta = await mailer.enviar({
+        para: destino,
+        assunto: title,
+        texto: `${message}\n\nVocê pode ver seus agendamentos em Saúde+.\nSe não quiser receber lembretes por e-mail, fale com a unidade.`,
+    });
+
+    // `sent_at` só quando o transporte aceitou. Sem SMTP configurado, ou com
+    // destinatário inválido, fica NULL + send_error — que é informação, não
+    // falha silenciosa.
+    const sentAt = resposta.enviado ? new Date() : null;
+    const motivo = resposta.enviado ? null : String(resposta.motivo || resposta.erro || 'desconhecido').slice(0, 255);
+    try {
+        await pool.query(
+            'UPDATE reminders SET sent_at = ?, send_channel = ?, send_error = ? WHERE id = ?',
+            [sentAt, resposta.enviado ? 'email' : null, motivo, reminderId]
+        );
+    } catch (err) {
+        console.error(`Falha ao registrar a entrega do lembrete ${reminderId}: ${err.message}`);
+        return 'failed';
+    }
+
+    return resposta.enviado ? 'sent' : 'pending';
 }
 
 /**
@@ -66,10 +121,14 @@ async function createReminderFor(row, kind) {
         );
         if (existing.length) return 'exists';
 
+        // Grava PRIMEIRO. Se o envio falhar, o lembrete continua no painel.
+        const reminderId = crypto.randomUUID();
         await pool.query(
             'INSERT INTO reminders (id, user_id, title, message, remind_at) VALUES (?,?,?,?,?)',
-            [crypto.randomUUID(), row.user_id, title, message, toSqlDate(remindAt)]
+            [reminderId, row.user_id, title, message, toSqlDate(remindAt)]
         );
+
+        await entregarPorEmail(reminderId, row.user_id, { title, message });
         return 'created';
     } catch (err) {
         console.error(
@@ -85,6 +144,11 @@ async function runReminderJob(now = new Date()) {
     const endSql = toSqlDate(end);
     let created = 0;
     let failed = 0;
+    // Quantos ficaram registrados sem envio aceito: SMTP não configurado ou
+    // destinatário inválido. Não é "failed" — o lembrete existe e está no
+    // painel — mas também não é enviado, e o operador precisa ver a diferença
+    // no resumo em vez de ler a tabela. É contado depois do lote, em uma
+    // consulta só.
 
     const processar = async (rows, kind) => {
         for (const row of rows) {
@@ -120,13 +184,36 @@ async function runReminderJob(now = new Date()) {
     );
     await processar(exams, 'exam');
 
-    return { created, failed, appointments: appointments.length, exams: exams.length };
+    // Quantos dos lembretes deste dia ficaram sem entrega aceita. Não é
+    // "failed": a linha existe e está no painel. Mas também não saiu, e o
+    // operador precisa ver essa diferença no resumo em vez de ir ler a
+    // tabela.
+    //
+    // A janela é a de HOJE, não a de amanhã: o lembrete da consulta de
+    // amanhã é gravado com `remind_at = scheduled_at - 1 dia`, que é o dia
+    // corrente. Filtrar pela janela do agendamento não encontra nada.
+    let pendentes = 0;
+    try {
+        const hoje = new Date(start);
+        hoje.setDate(hoje.getDate() - 1);
+        const [[conta]] = await pool.query(
+            `SELECT COUNT(*) AS n FROM reminders
+       WHERE remind_at >= ? AND remind_at < ? AND sent_at IS NULL AND send_error IS NOT NULL`,
+            [toSqlDate(hoje), startSql]
+        );
+        pendentes = Number(conta.n) || 0;
+    } catch (err) {
+        // A contagem é informativo: falhar nela não invalida o lote.
+        console.error(`Falha ao contar lembretes pendentes: ${err.message}`);
+    }
+
+    return { created, failed, pendentes, appointments: appointments.length, exams: exams.length };
 }
 
 function startReminderJob() {
     const execute = () => runReminderJob()
         .then((result) => console.log(
-            `Job de lembretes: ${result.created} criado(s), ${result.failed} falha(s).`
+            `Job de lembretes: ${result.created} criado(s), ${result.failed} falha(s), ${result.pendentes} sem envio aceito.`
         ))
         .catch((err) => console.error('Falha no job de lembretes:', err));
 
@@ -134,4 +221,4 @@ function startReminderJob() {
     return setInterval(execute, DAY_MS);
 }
 
-module.exports = { nextDayWindow, runReminderJob, startReminderJob, createReminderFor };
+module.exports = { nextDayWindow, runReminderJob, startReminderJob, createReminderFor, entregarPorEmail };

@@ -189,6 +189,15 @@ CREATE TABLE IF NOT EXISTS reminders (
     remind_at DATETIME NOT NULL,
     `read` TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Migração 008: o job gravava a linha e parava aí. Estas três colunas
+    -- separam as perguntas que depois importam: `sent_at` diz se saiu,
+    -- `send_channel` por onde, `send_error` por que não. Sem elas, uma
+    -- falha de envio e um usuário sem e-mail seriam indistinguíveis de um
+    -- envio bem-sucedido. NULL em sent_at = sem e-mail cadastrado, que é
+    -- diferente de erro — e o send_error separa os dois.
+    sent_at DATETIME NULL DEFAULT NULL,
+    send_channel VARCHAR(20) NULL DEFAULT NULL,
+    send_error VARCHAR(255) NULL DEFAULT NULL,
     CONSTRAINT fk_reminders_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     INDEX idx_reminders_user (user_id)
 ) ENGINE = InnoDB;
