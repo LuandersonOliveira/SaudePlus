@@ -261,3 +261,53 @@ manifesto. 6 dias de idade. **Aguardando decisão do usuário sobre restaurar.**
   O comando removeu todas as quebras de linha e corrompeu a codificação do arquivo. Reescrito
   com a ferramenta de escrita. Custo: um arquivo reescrito do zero, nenhuma perda de conteúdo.
   Regra: editar arquivo com a ferramenta de edit/write, nunca com PowerShell.
+## Fase 6 - MEDIUMs de seguranca (2026-10-18)
+
+Fechados os dois itens que restavam da secao "MEDIUM - endurecimento de seguranca" do
+docs/TECHNICAL_DEBT.md. Os tres MEDIUMs de correcao funcional tinham saido antes
+(df9f06b booking, 7bd8673 CPF, 8d6be81 auditoria).
+
+### 7cda47d - refresh token nao estende mais a vida da sessao
+
+A divida sugeria "teto de tentativas por familia" com mfaAttempts. **A recomendacao
+estava errada.** O access token expira em 15 min, entao um usuario ativo rotaciona
+~2.900 vezes em 30 dias: qualquer teto por contagem derrubaria sessoes legítimas.
+
+O defeito real era o **prazo deslizante**: cada rotacao emitia 
+ow + 30d, entao a
+familia nunca expirava, e o cookie httpOnly repetia maxAge: 30d. Um par roubado
+vivia para sempre e o titular legitimo nunca percebia.
+
+Corrigido conforme OAuth 2.0 BCP 4.14.2: a rotacao preserva o prazo absoluto da
+familia (MIN(expires_at) da familia = prazo do token original), e o cookie usa o
+restante desse prazo. A deteccao de reuso que ja existia continua valendo e agora tem
+teto de tempo.
+
+### 47176b8 - falha do GET_LOCK da auditoria vira metrica
+
+/ready passou a expor udit_lock: { ok, falhas, ultimaFalhaEm }. Antes o unico sinal
+era um console.warn, invisivel para alerta. AUDIT_LOCK ganhou override por
+AUDIT_LOCK_NAME, so para os testes.
+
+### O que estes dois testes custaram
+
+Tres testes novos que provocam condicoes de falha de proposito (banco descartavel e
+lock proprio) revelaram um padrao que vale registrar: **todo teste que escreve na
+udit_log de desenvolvimento corrompe a cadeia de hash**, e udit-details.test.js
+verifica essa cadeia. O projeto ja tinha ids isolados para os testes de corrida; o
+mesmo isolamento era necessario aqui.
+
+Ordem de descoberta: udit-orphan (linhas orfas) -> corrige com banco descartavel;
+udit-lock-sinal -> falha na suite com "linha 649 nao encadeia na 648" porque
+provocava escrita fora de ordem de proposito; e o lock, por ser nomeado no SERVIDOR,
+atrapalhava os arquivos que rodam em paralelo. Duas isolacoes, nao uma.
+
+### Estado
+
+290/290 + 7/7 em tres execucoes seguidas, smoke e doctor verdes. Arvore limpa.
+
+### Proximo
+
+LOW / divida de produto, em docs/TECHNICAL_DEBT.md: recuperacao de senha, envio real
+dos lembretes, lint/CI e E2E automatizado. Nao ha ordem definida entre eles - cada um e
+uma decisao de produto, nao uma correcao.
