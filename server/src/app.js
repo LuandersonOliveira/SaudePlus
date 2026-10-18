@@ -68,11 +68,21 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 
 // GET /ready — sonda de prontidão p/ monitoramento (Aula 1: disponibilidade).
 // Pública de propósito, sem PII: diz apenas se a API alcança o banco.
+//
+// `audit_lock` não é PII: é quantas vezes o mutex da cadeia de auditoria não
+// foi concedido. Sem ele a trilha podia bifurcar sob carga e nada além de
+// um console.warn registraria — um monitor que não lê o log do processo não
+// consegue alertar.
 app.get('/ready', readinessLimiter, async (req, res) => {
   try {
     const pool = require('./db');
     await pool.query('SELECT 1');
-    res.json({ ok: true, db: true, uptime: Math.floor(process.uptime()) });
+    res.json({
+      ok: true,
+      db: true,
+      uptime: Math.floor(process.uptime()),
+      audit_lock: require('./utils/audit').auditoriaLockStats(),
+    });
   } catch {
     res.status(503).json({ ok: false, db: false });
   }

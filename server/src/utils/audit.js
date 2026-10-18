@@ -51,7 +51,47 @@ function chainHash(prev, actorId, action, entityType, entityId, details, created
     .digest('hex');
 }
 
-const AUDIT_LOCK = 'saudeplus:audit-chain';
+// O nome é fixo de propósito: ele é o que serializa as escritas entre TODOS
+// os processos que apontam para a mesma base, então dois servidores em
+// produção precisam usar o mesmo nome para se serializarem. O override existe
+// para os testes, que provocam a falha do lock de propósito e não podem
+// disputa-lo com os demais arquivos rodando em paralelo.
+const AUDIT_LOCK = process.env.AUDIT_LOCK_NAME || 'saudeplus:audit-chain';
+
+/**
+ * Sinal observável de falha do mutex.
+ *
+ * Sem o `GET_LOCK` a escrita segue (ver `logAction`), e a linha pode entrar
+ * fora de ordem — aceitável. O que não é aceitável é isso acontecer sem
+ * ninguém saber: o único sinal era um `console.warn`, invisível para alerta
+ * e para qualquer leitura do `/ready`.
+ *
+ * O contador e o instante da última falha viram métrica em `GET /ready`
+ * (`audit_lock`), que um monitor vigia. É um contador de processo: zera no
+ * restart, então o que se observa é "aconteceu desde que o processo
+ * subiu", não "aconteceu alguma vez". Para um lock cujo modo de falha é
+ * saturação do MySQL, esse recorte é o que interessa.
+ */
+const auditLock = { falhas: 0, ultimaFalhaEm: null };
+
+function registrarFalhaDeLock(quando = Date.now()) {
+  auditLock.falhas += 1;
+  auditLock.ultimaFalhaEm = new Date(quando).toISOString();
+}
+
+/** Retorno para o `/ready` e para o doctor. */
+function auditoriaLockStats() {
+  return {
+    ok: auditLock.falhas === 0,
+    falhas: auditLock.falhas,
+    ultimaFalhaEm: auditLock.ultimaFalhaEm,
+  };
+}
+
+function resetAuditLockStats() {
+  auditLock.falhas = 0;
+  auditLock.ultimaFalhaEm = null;
+}
 
 async function logAction(actorId, action, entityType, entityId, details) {
   const clean = sanitizeDetails(details);
@@ -77,7 +117,10 @@ async function logAction(actorId, action, entityType, entityId, details) {
       // Sem o lock (5s de espera, MySQL sobrecarregado), seguimos mesmo assim
       // para não perder a auditoria. Registrar uma linha fora de ordem é
       // aceitável; perder o registro não é.
-      console.warn('audit: GET_LOCK não concedido — a linha pode entrar fora de ordem na cadeia');
+      registrarFalhaDeLock();
+      console.warn(
+        `audit: GET_LOCK não concedido (tentativa ${auditLock.falhas}) — a linha pode entrar fora de ordem na cadeia`
+      );
     }
     await conn.beginTransaction();
     let prev = 'GENESIS';
@@ -228,4 +271,14 @@ async function verifyChain(poolOrConn) {
   return { ok: true, checked: rows.length, head: elo };
 }
 
-module.exports = { logAction, sanitizeDetails, chainHash, verifyChain, DETAILS_MAX };
+module.exports = {
+  logAction,
+  sanitizeDetails,
+  chainHash,
+  verifyChain,
+  DETAILS_MAX,
+  AUDIT_LOCK,
+  registrarFalhaDeLock,
+  auditoriaLockStats,
+  resetAuditLockStats,
+};

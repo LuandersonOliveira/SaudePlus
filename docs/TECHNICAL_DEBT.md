@@ -67,7 +67,7 @@ _Todos os achados desta seção foram corrigidos._
 | Onde | Achado | Risco |
 |---|---|---|
 | `auth.routes.js` (`/auth/refresh`) | A doc sugeria "teto de tentativas por família". **A recomendação estava errada** — o defeito real era outro | Um teto por contagem derrubaria sessões legítimas: o access token expira em 15 min, e um usuário ativo rotaciona ~2.900 vezes em 30 dias. O que permitia "rotacionar indefinidamente" era o **prazo deslizante**: cada rotação emitia `now + 30d`, então a família nunca expirava, e o cookie httpOnly repetia `maxAge: 30d`. Um par roubado vivia para sempre e o titular legítimo nunca percebia. **Corrigido** — a rotação preserva o prazo absoluto da família (`MIN(expires_at)` da família = prazo do token original) e o cookie usa o restante desse prazo. OAuth 2.0 BCP §4.14.2. |
-| `server/src/utils/audit.js` | Se `GET_LOCK` não for concedido em 5s, a escrita prossegue sem o mutex | A trilha pode bifurcar de novo sob carga. O caminho é deliberado — perder registro é pior que gravar fora de ordem — mas hoje o único sinal é um `warn`. **Corrigido** — ver "Sinal observável" abaixo. |
+| `server/src/utils/audit.js` | Se `GET_LOCK` não for concedido em 5s, a escrita prossegue sem o mutex | A trilha pode bifurcar de novo sob carga. O caminho é deliberado — perder registro é pior que gravar fora de ordem — mas o único sinal era um `console.warn`. **Corrigido** — `GET /ready` passou a expor `audit_lock: { ok, falhas, ultimaFalhaEm }`, que é o que um monitor observa. O `AUDIT_LOCK` ganhou override por `AUDIT_LOCK_NAME` só para os testes. |
 
 > Os dois achados de segurança que **estavam** aqui foram corrigidos e estão
 > na tabela "Fechado na revisão": replay de TOTP (`c9a0271`, `e4068d3`) e o
