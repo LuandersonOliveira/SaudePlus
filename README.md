@@ -284,7 +284,7 @@
   | `JWT_SECRET` | string longa aleatória | Assinatura dos tokens (nunca commitar o real) |
   | `JWT_EXPIRES_IN` | `15m` | Validade do access token (curto, padrão RNDS; o front renova sozinho via refresh) |
   | `JWT_REFRESH_EXPIRES_IN` | `30d` | Validade do refresh token (rotativo, revogável via `POST /auth/logout`) |
-  | `DATA_ENCRYPTION_KEY` | hex 64 chars | Chave AES-256 da cripto em coluna (CPF/RG/CNS); produção: KMS/Vault |
+  | `DATA_ENCRYPTION_KEY` | hex 64 chars | Chave AES-256 da cripto em coluna (CPF/RG/CNS). **Sem ela o app não sobe** — ver "Gravar em texto puro" abaixo |
   | `DPO_NAME` / `DPO_EMAIL` | `...` | Encarregado LGPD exibido em `privacy.html` via `GET /public/dpo` |
   | `RETENTION_INACTIVE_YEARS` | `5` | Anos sem login até anonimização (`purge:retention`) |
   | `CNES_MUNICIPIO_CODE` / `INFODENGUE_GEOCODE` | `260850` / `2608503` | Município IBGE (syncs; sem credencial) |
@@ -294,6 +294,22 @@
 
   API sobe em `http://localhost:4000` — confira com `GET /health` → `{"ok":true}`
   ou `GET /ready` → `{"ok":true,"db":true}` (esse último também testa o banco).
+
+  ### Gravar documentos em texto puro é recusado por padrão
+
+  CPF, RG e CNS são cifrados em repouso com `DATA_ENCRYPTION_KEY`. **Sem essa
+  chave, a API não sobe** — a recusa é explícita, com o comando para gerar a
+  chave.
+
+  Localmente não é preciso ter a chave: `npm run dev` (e `npm run dev:api`) usam
+  `server/scripts/run-local.js`, que define `ALLOW_PLAINTEXT_DEV=1` de propósito
+  e imprime aviso no console. `npm run start:api` — o caminho de produção —
+  **não** define essa variável e continua fechado.
+
+  > A versão anterior só falhava com `NODE_ENV=production`, e nada no projeto
+  > definia `NODE_ENV`: um deploy que não conhecesse a variável gravava documento
+  > em claro com o fallback silenciosamente ligado. Um controle que se desliga
+  > sozinho porque alguém esqueceu de exportar outra coisa não é um controle.
 
   ### 3) Frontend e subir tudo junto
 
@@ -330,7 +346,8 @@
   | `npm run setup` | Instala as dependências, cria o banco, aplica todas as migrations e cria o admin. Idempotente. |
   | `npm run doctor` | Diagnóstico do ambiente: Node, `.env`, MySQL, migrations pendentes, porta 4000/8080 livre, e se falta `DATA_ENCRYPTION_KEY`. |
   | `npm run dev` | Sobe a API (:4000) e o front (:8080) juntos. |
-  | `npm run dev:api` / `npm run dev:web` | Sobe um lado só. |
+  | `npm run dev:api` / `npm run dev:web` | Sobe um lado só. O `dev:api` libera texto puro de propósito (modo local). |
+| `npm run start:api` | Sobe **só a API**, no modo fechado: sem `DATA_ENCRYPTION_KEY` ela recusa iniciar. É o caminho de produção. |
   | `npm test` | Suíte completa (`node:test`): contratos HTTP, RBAC, auditoria, cripto, front e banco. |
   | `npm run test:race` | Só o teste de concorrência do booking — precisa de duas conexões MySQL simultâneas. |
   | `npm run test:all` | `npm test` + `npm run test:race`. |
@@ -345,7 +362,8 @@
 
   | Script             | Comando                                             | Para quê                                                                                                                                                                   |
   | ------------------ | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `start`            | `node src/server.js`                                | Sobe a API + inicia job de lembretes. Antes do `listen`, valida `DATA_ENCRYPTION_KEY` e `JWT_SECRET` — em produção, config inválida impede o boot. |
+  | `start`            | `node src/server.js`                                | Sobe a API + inicia job de lembretes. Antes do `listen`, valida `DATA_ENCRYPTION_KEY`, `JWT_SECRET` e se as colunas de migration existem — config inválida impede o boot. |
+| `start:local`      | `node scripts/run-local.js`                         | Igual ao `start`, mas com `ALLOW_PLAINTEXT_DEV=1` — desenvolvimento local sem chave de cripto |
   | `dev`              | `nodemon src/server.js`                             | Dev com auto-reload                                                                                                                                                        |
   | `seed:admin`       | `node scripts/seed-admin.js`                        | Cria (ou promove a `superadmin`) o admin do `.env` com `bcryptjs`                                                                                                          |
   | `seed:demo` | `node scripts/seed-v3-demo.js [--reset]` | Popula agenda demo em 4 unidades (serviços, 6 profissionais, horários + 3 vagas ocupadas p/ testar conflito; idempotente) |
