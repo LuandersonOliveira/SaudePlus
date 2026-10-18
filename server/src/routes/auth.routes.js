@@ -14,6 +14,7 @@ const {
 const { PRIVACY_VERSION, anonymizeUser } = require('../utils/privacy');
 const { govbrConfig, buildAuthorizeUrl, exchangeCode, fetchUserInfo } = require('../services/govbr');
 const { randomSecret, verifyTotp, matchStep, replayBloqueia, otpauthUrl } = require('../utils/totp');
+const { acharPorCpf } = require('../utils/cpf');
 const {
   mfaAttempts,
   bloqueioMfa,
@@ -555,8 +556,10 @@ router.get('/govbr/callback', async (req, res, next) => {
       }
       if (!user && profile.cpf) {
         // CPF está cifrado: compara decifrando (troca pontual, só no vínculo).
-        const [rows] = await pool.query('SELECT * FROM users WHERE cpf IS NOT NULL');
-        user = rows.find((r) => { try { return req.decryptDoc(r.cpf) === profile.cpf; } catch { return false; } }) || null;
+        // Só `id` e `cpf` saem do banco — o `SELECT *` anterior trazia a
+        // tabela inteira, `password_hash` incluído, a cada tentativa.
+        const [cpfs] = await pool.query('SELECT id, cpf FROM users WHERE cpf IS NOT NULL');
+        user = acharPorCpf(cpfs, profile.cpf, (cifrado) => req.decryptDoc(cifrado));
       }
     }
 
@@ -565,6 +568,13 @@ router.get('/govbr/callback', async (req, res, next) => {
         error: 'Conta Gov.br sem vínculo. Complete o cadastro com estes dados.',
         govbr_profile: { nome: profile.nome, email: profile.email, cpf: profile.cpf, telefone: profile.telefone },
       });
+    }
+    // O vínculo por CPF devolveu só `id`/`cpf` (o mínimo para comparar sem
+    // arrastar a tabela). O resto do login precisa da linha completa — e
+    // agora que já temos o id, isso é um índice, não uma varredura.
+    if (!user.role) {
+      const [[completo]] = await pool.query('SELECT * FROM users WHERE id = ?', [user.id]);
+      user = completo || user;
     }
     if (user.account_status !== 'ativo') {
       return res.status(403).json({ error: 'Conta desativada. Entre em contato com a administração.' });

@@ -50,12 +50,12 @@ porque o **porquê** de cada decisão é o que evita a reintrodução.
 | Testes de MFA | `.catch(() => {})` escondia que o `DELETE` do usuário nunca funcionava (FK `audit_log` é RESTRICT) | Comentário explicando; `.catch` só engole `ER_ROW_IS_REFERENCED_2` |
 | `admin.html` / `atendente.html` | "XSS residual em onclick com aspas duplas" | **Falso positivo** — testado e fechado sem tocar em código |
 | `booking.js` + `dashboard.html` | Horário com 2 profissionais livres mostrava só o primeiro; o POST mandava o `professional_id` dele | **Falso positivo no `totalVagas`** — a contagem é de *horários*, e o front já escrevia "horário(s) livre(s)". O defeito real era outro: o segundo profissional era descartado em silêncio, e se o primeiro fosse ocupado entre listar e enviar o POST devolvia 409 sem saída. **Corrigido** — o slot carrega `professionals[]`, o painel achata hora × profissional em um botão cada. |
+| `auth.routes.js` (fallback CPF Gov.br) | `SELECT * FROM users WHERE cpf IS NOT NULL` + comparação com `===` dentro de `Array.find` | Três defeitos: a comparação sai no primeiro byte diferente (tempo reconstrói o CPF), o `find` parava no primeiro acerto (tempo dependia da posição), e o `SELECT *` trazia `password_hash` de toda a base a cada tentativa. **Corrigido** — `utils/cpf.js` com `timingSafeEqual` sobre 11 dígitos, varredura sem `break`, e `SELECT id, cpf` seguido de uma busca pelo índice. |
 
 ## MEDIUM — correção funcional, sem risco de segurança
 
 | Onde | Achado | Risco |
 |---|---|---|
-| `auth.routes.js` (fallback CPF Gov.br) | Faz `SELECT * FROM users` e compara CPF com `===` | Compara o usuário inteiro e **não é timing-safe**. **Resolver** `SELECT cpf` + `timingSafeEqual`. |
 | `admin.routes.js` (auditoria) | Lê `audit_log` com `INNER JOIN users`, que oculta linhas órfãs; `verifyChain` não usa join | A tela e o verificador discordam: o verificador acusa cadeia íntegra e a lista mostra menos linhas. **Resolver** `LEFT JOIN` e exibir o órfão marcado. |
 
 ## MEDIUM — endurecimento de segurança
