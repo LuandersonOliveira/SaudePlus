@@ -313,7 +313,13 @@ router.post('/mfa/verify', async (req, res, next) => {
       ? null
       : Number(user.totp_last_step);
 
-    if (!casou.ok || replayBloqueia(ultimoPasso, casou.step)) {
+    // Código ERRADO é o que a força bruta ataca. Código de REPLAY é outra
+    // coisa: o código estava certo, já foi usado, e a única coisa que a pessoa
+    // fez foi clicar duas vezes. Contar replay como falha trancava o titular
+    // por 5 minutos por um duplo clique — e ainda abria uma brecha contrária:
+    // o atacante que captura um código e o reapresenta várias vezes seria
+    // "beneficiado" pelo bloqueio, que só protege o titular de si mesmo.
+    if (!casou.ok) {
       registrarFalhaMfa(mfaAttempts, user.id);
       // Mesma regra do lockout de senha: o erro que completa a cota responde
       // 429, dizendo já quando pode tentar de novo. Quem descobre o bloqueio
@@ -324,18 +330,37 @@ router.post('/mfa/verify', async (req, res, next) => {
           error: `Muitas tentativas de verificação. Tente de novo em ${Math.ceil(travou.segundosRestantes / 60)} min.`,
         });
       }
-      return res.status(401).json({
-        error: casou.ok ? 'Código já utilizado. Aguarde o próximo.' : 'Código inválido.',
-      });
+      return res.status(401).json({ error: 'Código inválido.' });
     }
 
-    // Grava o passo usado ANTES de emitir a sessão: se o UPDATE falhar, é
-    // melhor perder um login do que aceitar o mesmo código para sempre.
+    if (replayBloqueia(ultimoPasso, casou.step)) {
+      // Sem contar como tentativa: foi o mesmo código, duas vezes.
+      return res.status(401).json({ error: 'Código já utilizado. Aguarde o próximo.' });
+    }
+
+    // Consome o passo do código na MESMA instrução que o grava.
+    //
+    // A versão anterior lia `totp_last_step`, comparava em JS e depois gravava
+    // — e essa janela é o defeito: duas requisições simultâneas com o mesmo
+    // ticket e o mesmo código liam o mesmo valor, as duas passavam na
+    // comparação e as duas emitiam sessão. Bastava F5 duas vezes dentro da
+    // janela de 30s. O booking já sabia disso e trava o profissional com
+    // SELECT … FOR UPDATE; aqui a defesa é mais barata — o próprio UPDATE só
+    // acontece para quem tem o passo estritamente maior.
+    //
+    // affectedRows === 0 significa que outro request consumiu este passo
+    // entre a leitura e agora: é replay, e o login é recusado.
     try {
-      await pool.query(
-        'UPDATE users SET totp_last_step = ?, last_login_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [casou.step, user.id]
+      const [gravou] = await pool.query(
+        `UPDATE users SET totp_last_step = ?, last_login_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND (totp_last_step IS NULL OR totp_last_step < ?)`,
+        [casou.step, user.id, casou.step]
       );
+      if (!gravou || gravou.affectedRows !== 1) {
+        // Replay, não erro: outra requisição consumiu este passo entre a
+        // leitura e agora. Não entra no contador de tentativas (ver acima).
+        return res.status(401).json({ error: 'Código já utilizado. Aguarde o próximo.' });
+      }
     } catch (updateError) {
       // Banco sem a coluna (migration não rodada): o login funciona, mas o
       // replay volta. Sinalizado no console — não é motivo para negar o
@@ -675,6 +700,38 @@ router.delete('/me', verifyToken, async (req, res, next) => {
   }
 });
 
+// Comprimento máximo por coluna, copiado de schema.sql.
+//
+// Sem isto, `state: "São Paulo"` numa coluna CHAR(2) chegava ao MySQL e volta
+// como ER_DATA_TOO_LONG — que o handler genérico traduz em 500 "Erro interno do
+// servidor". A pior resposta para um erro de digitação: o formulário diz ao
+// usuário que o servidor quebrou, e o culpado some. Os ENUM não entram aqui
+// (quem valida enum é validateEnum); VARCHAR grande também não precisa, porque
+// o front nunca manda mais que isso.
+const LIMITES_CAMPO = {
+  state: 2,                // CHAR(2) — sigla da UF
+  cep: 9,
+  phone: 30,
+  mobile: 30,
+  address_number: 10,
+  neighborhood: 100,
+  city: 100,
+  street: 180,
+  social_name: 150,
+  guardian_name: 150,
+  mother_name: 150,
+  father_name: 150,
+  job_role: 100,
+  reference_point: 255,
+};
+
+function erroDeTamanho(coluna) {
+  return Object.assign(
+    new Error(`Campo "${coluna}" excede o tamanho máximo (${LIMITES_CAMPO[coluna]} caracteres).`),
+    { status: 400 }
+  );
+}
+
 // PUT /auth/me — atualiza o perfil próprio (não pode mudar role nem status).
 //
 // É uma atualização PARCIAL, e isso é contrato, não detalhe:
@@ -727,6 +784,10 @@ router.put('/me', verifyToken, async (req, res, next) => {
     const texto = (coluna, valor, transformar) => {
       if (!temChave(coluna)) return;
       const bruto = valor === null || valor === undefined ? '' : String(valor).trim();
+      // 400 por tamanho, antes de chegar no MySQL. Vazio continua limpiando.
+      if (bruto !== '' && LIMITES_CAMPO[coluna] && bruto.length > LIMITES_CAMPO[coluna]) {
+        throw erroDeTamanho(coluna);
+      }
       const v = bruto === '' ? null : (transformar ? transformar(bruto) : bruto);
       sets.push(`${coluna}=?`);
       params.push(v);

@@ -6,9 +6,10 @@
   "scripts": {
     "setup": "npm install && npm --prefix server install && npm run db:setup",
     "dev": "concurrently -k -n api,web -c green,cyan \"npm:dev:api\" \"npm:dev:web\"",
-    "dev:api": "npm --prefix server run dev",
+    "dev:api": "npm --prefix server run start:local",
     "dev:web": "node scripts/serve-web.js",
     "start": "npm run dev",
+    "start:api": "node server/src/server.js",
     "db:setup": "node scripts/db-setup.js",
     "db:migrate": "npm --prefix server run migrate:all",
     "db:seed": "npm --prefix server run seed:admin && npm --prefix server run seed:demo",

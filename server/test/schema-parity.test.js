@@ -292,3 +292,58 @@ test('o README avisa que pular migrate:interop desliga o MFA', () => {
     'o README deveria avisar que pular migrate:interop desliga o MFA silenciosamente'
   );
 });
+
+// ===========================================================================
+// ENUMs: o validador e o schema não podem divergir
+// ===========================================================================
+
+test('as listas de ENUM do validador batem com o schema.sql', () => {
+  // `utils/validators.js` copia as listas de ENUM do schema — com um
+  // comentário pedindo para "manter em sincronia". Comentação não é garantia:
+  // quem acrescenta um valor no ENUM e esquece a lista faz o signup e o
+  // PUT /auth/me recusarem um valor que o banco aceitaria, com 400.
+  //
+  // O lado mais restritivo é o validador: uma lista menor rejeita um valor
+  // que o banco aceitaria.
+  const V = require('../src/utils/validators');
+  const schema = fs.readFileSync(path.join(ROOT, 'server', 'schema.sql'), 'utf8');
+  const bloco = /CREATE TABLE IF NOT EXISTS\s+users\s*\([\s\S]*?\) ENGINE/i.exec(schema);
+  assert.ok(bloco, 'schema.sql deveria criar users');
+
+  const colunas = {
+    gender: V.VALID_GENDERS,
+    priority: V.VALID_PRIORITIES,
+    race: V.VALID_RACES,
+    blood_type: V.VALID_BLOOD_TYPES,
+    zone: V.VALID_ZONES,
+  };
+
+  for (const [coluna, lista] of Object.entries(colunas)) {
+    const def = new RegExp(`\\b${coluna}\\s+ENUM\\s*\\(([^)]*)\\)`, 'i').exec(bloco[0]);
+    assert.ok(def, `schema.sql deveria ter ${coluna} como ENUM`);
+
+    const doSchema = def[1]
+      .split(',')
+      .map((s) => s.trim().replace(/^'(.*)'$/, '$1'))
+      .filter(Boolean);
+
+    assert.deepEqual(
+      lista,
+      doSchema,
+      `VALID_*.${coluna} divergiu do ENUM do schema. ` +
+      `schema: ${doSchema.join(', ')} | validador: ${lista.join(', ')}`
+    );
+  }
+});
+
+test('validateEnum rejeita valor fora do schema e aceita o vazio (limpar)', () => {
+  const { validateEnum } = require('../src/utils/validators');
+  assert.equal(validateEnum('blood_type', 'A+'), null);
+  assert.equal(validateEnum('blood_type', ''), null, 'vazio precisa significar "limpar", não erro');
+  assert.equal(validateEnum('blood_type', null), null);
+  assert.match(validateEnum('blood_type', 'Z+'), /sanguíneo/i);
+  // Coluna desconhecida é erro de PROGRAMAÇÃO, não entrada inválida: ela
+  // lança em vez de devolver mensagem (senão um nome digitado errado passaria
+  // despercebido e a coluna entraria no SET sem validação nenhuma).
+  assert.throws(() => validateEnum('genero_inexistente', 'x'), /sem lista/i);
+});

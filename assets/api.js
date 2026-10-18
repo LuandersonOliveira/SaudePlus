@@ -14,7 +14,7 @@
 
   function getToken() { return localStorage.getItem(TOKEN_KEY); }
   function getRefreshToken() { return localStorage.getItem(REFRESH_KEY); }
-function getStoredUser() {
+  function getStoredUser() {
     var raw = localStorage.getItem(USER_KEY);
     if (!raw) return null;
     try {

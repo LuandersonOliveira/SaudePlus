@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
-const { globalLimiter, authLimiter } = require('./middleware/rateLimit');
+const { globalLimiter, authLimiter, readinessLimiter } = require('./middleware/rateLimit');
 const { attachAudit } = require('./middleware/audit');
 const { attachDocs } = require('./middleware/crypto');
 
@@ -59,14 +59,16 @@ app.use(express.json({ limit: '100kb' }));
 // o express.json não parseia e a exclusão de conta devolve 400.
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
-// /health e /ready ANTES do globalLimiter. Um balanceador consultando a
-// prontidão a cada 5s estoura a janela de 300 req/15min em ~25 minutos e
-// passa a receber 429 no lugar de tráfego real.
+// /health e /ready ANTES do globalLimiter (mas com teto próprio — ver
+// readinessLimiter). Um balanceador consultando a cada 5s estourava a janela de
+// 300 req/15min em ~25 minutos e passava a receber 429 no lugar de tráfego
+// real; a alternativa ingênua (deixar sem limite) transformava a rota pública
+// em uma forma de esgotar o pool do MySQL.
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 // GET /ready — sonda de prontidão p/ monitoramento (Aula 1: disponibilidade).
 // Pública de propósito, sem PII: diz apenas se a API alcança o banco.
-app.get('/ready', async (req, res) => {
+app.get('/ready', readinessLimiter, async (req, res) => {
   try {
     const pool = require('./db');
     await pool.query('SELECT 1');

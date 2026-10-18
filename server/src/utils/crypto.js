@@ -30,7 +30,7 @@ function isEncrypted(value) {
 }
 
 /**
- * Falha FECHADA em produção.
+ * Falha FECHADA, com o padrão em "fechado".
  *
  * Sem chave válida, encryptField devolvia o valor em TEXTO PURO, com um
  * único console.warn, uma vez. CPF/RG/CNS iam para o MySQL em claro e o
@@ -38,20 +38,28 @@ function isEncrypted(value) {
  * ninguém para ver o aviso. Um controle de segurança que se desliga sozinho
  * é pior do que um que falha.
  *
- * Em desenvolvimento a degradação continua, senão `npm run setup` num
- * ambiente novo seria impossível para o aluno da faculdade.
+ * A degradação para desenvolvimento é explícita, e não implícita:
+ *
+ * - O padrão é NÃO gravar em claro. Sem nada configurado, o app não sobe.
+ * - Quem está depondo liberta a mão de propósito: `npm run dev` define
+ *   ALLOW_PLAINTEXT_DEV=1, e o console avisa a cada chamada.
+ *
+ * A versão anterior invertia isso — só falhava com NODE_ENV=production, e
+ * NADA no projeto definia NODE_ENV. Ou seja, o fail-closed nunca disparava em
+ * nenhum cenário real: um deploy que não conhecesse a variável gravava
+ * documento em claro com o FIELD-FALLBACK silenciosamente ligado.
  */
 function assertCryptoConfigured() {
   const key = getKey();
   if (key) return true;
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      'DATA_ENCRYPTION_KEY ausente ou inválida. Gere com: ' +
-        "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\" " +
-        'e coloque no server/.env. Recusar subir: gravar documento em claro é pior.'
-    );
-  }
-  return false;
+  if (process.env.ALLOW_PLAINTEXT_DEV === '1') return false;
+  throw new Error(
+    'DATA_ENCRYPTION_KEY ausente ou inválida — recusando gravar documento em texto puro.\n' +
+    'Gere com: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"\n' +
+    'e coloque DATA_ENCRYPTION_KEY no server/.env.\n' +
+    'Se você está só rodando localmente, use `npm run dev` (que define\n' +
+    'ALLOW_PLAINTEXT_DEV=1 de propósito).'
+  );
 }
 
 // Cifra um campo; null/vazio -> null; já cifrado -> devolve como está.

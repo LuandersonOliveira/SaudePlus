@@ -20,7 +20,9 @@ const pool = require('../db');
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Limite de reminders.message. Espelha o VARCHAR(255) do schema.
 const MESSAGE_MAX = 255;
-// title também é VARCHAR(255) e recebe specialty + exam_type.
+// title é VARCHAR(255) no schema e recebe a string fixa "Lembrete: consulta
+// amanhã" — specialty e exam_type vão na MENSAGEM, não no título. O teto
+// existe só como rede de segurança; 120 dá folga de sobra.
 const TITLE_MAX = 120;
 
 function toSqlDate(date) {

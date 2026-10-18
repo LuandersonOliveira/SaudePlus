@@ -75,9 +75,12 @@ async function subir() {
   });
 }
 
-// Só sobe quando executado diretamente (`npm start`). Os testes importam este
-// arquivo para exercitar conferirColunas/validarConfiguracao, e sem este
+// Só sobe quando executado diretamente (`npm start:api`). Os testes importam
+// este arquivo para exercitar conferirColunas/validarConfiguracao, e sem este
 // guard cada require() levantava um servidor na máquina de teste.
+//
+// A exceção é scripts/run-local.js, que importa e chama `subir()` de propósito
+// — é o caminho que define ALLOW_PLAINTEXT_DEV antes.
 if (require.main === module) {
   subir().catch((err) => {
     console.error(`Não foi possível subir: ${err.message}`);
@@ -85,4 +88,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { conferirColunas, validarConfiguracao, COLUNAS_OBRIGATORIAS };
+module.exports = { subir, conferirColunas, validarConfiguracao, COLUNAS_OBRIGATORIAS };
