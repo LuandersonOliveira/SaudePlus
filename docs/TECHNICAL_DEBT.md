@@ -29,6 +29,27 @@ derivar — o símbolo/trecho descrito é o que importa.
 |---|---|---|
 | `admin.html`, `atendente.html` | "`esc()` não cobre `onclick` com aspas duplas (XSS residual)" | **Falso positivo.** Duas camadas: (1) desde a Task 5 não existe mais `esc()` interpolado dentro de `onclick="…"` — o dado vai em `data-attribute` e um listener delegado lê; (2) `esc()` escapa `"` → `&quot;`, que é decodificado depois de o limite do atributo estar definido, então não abre aspas. Teste em `escaping.test.js` renderiza o botão com `x" onmouseover="alert(1)" x="` usando o `esc()` extraído da página de verdade, e confirma que o botão tem exatamente as duas aspas do atributo. Nenhum código alterado — mudar algo aqui seria mexer em código correto. |
 
+## Fechado na revisão (2026-10-16, pós-fases)
+
+Achados que a revisão do trabalho encontrou e que foram corrigidos. Estão aqui
+porque o **porquê** de cada decisão é o que evita a reintrodução.
+
+| Onde era | Achado | Como ficou |
+|---|---|---|
+| `scripts/db-setup.js` | Lista própria de 6 migrations enquanto `migrate:all` tinha 8 — `npm run db:setup` imprimia "Pronto." sem criar as colunas novas | Lista **derivada** do `package.json`; teste de paridade |
+| `scripts/doctor.js` | Não conhecia `totp_last_step` / `duration_minutes`: dizia "Ambiente pronto" na base quebrada | As três colunas na lista + teste que compara com o `schema.sql` |
+| `scripts/doctor.js` | Conectava num banco e **conferia outro** (`db.js` lê `process.env`; a checagem usava o valor do arquivo) | Precedência unificada: ambiente vence o `.env`, como no `db-setup` |
+| `booking.js` | `duration_minutes` sem fallback → 500 em todo agendamento | Boot **recusa** subir (degradar devolveria sobreposição silenciosa) |
+| `auth.routes.js` (`/auth/mfa/verify`) | Replay de TOTP por ler→comparar→gravar: duas requisições simultâneas abriam duas sessões | UPDATE condicional (`WHERE totp_last_step < ?`) + `affectedRows` |
+| `auth.routes.js` (`/auth/mfa/verify`) | Replay contava como tentativa errada: duplo clique trancava por 5 min | Só código **errado** conta; replay responde 401 |
+| `app.js` (`/ready`) | Público, sem rate limit, com `SELECT 1` a cada chamada → esgotamento de pool | `readinessLimiter` (60/min); `/health` fora do limite |
+| `auth.routes.js` (`PUT /auth/me`) | Sem validação de tamanho: `state: "São Paulo"` → **500** | `LIMITES_CAMPO` por coluna + 400; teste compara com o schema |
+| `server.js` / `utils/crypto.js` | Fail-closed só com `NODE_ENV=production`, que **nada** no projeto definia | Padrão fechado; liberação explícita por `ALLOW_PLAINTEXT_DEV` |
+| `test/race/audit-chain-race.test.js` | Escrevia 24 linhas permanentes na `audit_log` de desenvolvimento | Banco descartável, como o `booking-race` |
+| `utils/validators.js` | Listas de ENUM copiadas à mão do schema, sem verificação | Teste de paridade com os ENUMs do `schema.sql` |
+| Testes de MFA | `.catch(() => {})` escondia que o `DELETE` do usuário nunca funcionava (FK `audit_log` é RESTRICT) | Comentário explicando; `.catch` só engole `ER_ROW_IS_REFERENCED_2` |
+| `admin.html` / `atendente.html` | "XSS residual em onclick com aspas duplas" | **Falso positivo** — testado e fechado sem tocar em código |
+
 ## MEDIUM — correção funcional, sem risco de segurança
 
 | Onde | Achado | Risco |

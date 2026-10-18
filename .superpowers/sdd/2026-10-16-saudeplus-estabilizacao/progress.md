@@ -16,10 +16,31 @@ Ambiente verificado: Node v24.18.0 · MySQL80 rodando · banco `saude` existe e 
 
 Pre-flight: 6 filas, todos resolvidos sem conflito. Ruling: ordem de execução 1→2→3→4…→26 conforme o plano.
 
-Estado atual: **Fases 0, 1, 2 e 4 concluídas**; Fase 5 (dívida MEDIUM) em
-andamento. `saude` reconstruído com autorização do usuário (backup da trilha
-antiga em `server/backups/saude-2026-10-17.sql.gz`).
-Suíte: 225 testes + 5 de corrida, `smoke-test` verde, doctor pronto.
+Estado atual: **Fases 0, 1, 2 e 4 concluídas**, Fase 5 em andamento, e a
+**revisão do trabalho das fases feita e corrigida** (`e11d3e8`, `e4068d3`,
+`60728b5`).
+Suíte: **248 testes + 7 de corrida**, `smoke-test` verde, doctor pronto.
+
+## Revisão das fases — o que ela encontrou
+
+A revisão cruzou 30 commits / 73 arquivos procurando bug, não estilo. O padrão
+dos achados sérios foi **um só**: duas fontes de verdade para a mesma
+informação.
+
+- `db-setup.js` tinha uma lista de migrations e `package.json:migrate:all`
+  tinha outra. Divergiram quando a Fase 5 criou duas migrations — e
+  `npm run db:setup` passou a anunciar "Pronto." numa base sem as colunas.
+- `doctor.js` tinha uma lista de colunas, e a Fase 5 criou colunas que não
+  entraram nela: o doctor ficou verde justamente onde a API quebrava.
+- `doctor.js` ainda consultava o banco pelo valor do `.env` enquanto o pool
+  conectava pelo valor do ambiente — dois bancos ao mesmo tempo.
+- `validators.js` copiava os ENUMs do schema à mão, com um pedido de
+  sincronia em comentário.
+
+**Prova de que a correção é a causa, e não a coincidência:** cada teste novo
+foi rodado contra o código antigo antes de ser aceito — o replay sem mutex
+falha com "escrita 3 não encadeia na 2", o `db:setup` antigo deixava as colunas
+de fora numa base real, e o `doctor` antigo aprovava essa mesma base.
 
 ## Fase 5 — o que já saiu
 
