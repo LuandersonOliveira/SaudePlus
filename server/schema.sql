@@ -149,6 +149,30 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
+-- Recuperação de senha (Fase 7). Mesmo desenho do refresh_tokens: guarda-se
+-- só o SHA-256, então um dump da base não permite forjar um link.
+--
+-- `used_at` é o que torna o link de uso único. Sem ele, um link de
+-- redefinição continua valendo para sempre e um e-mail interceptado no
+-- caminho dá acesso à conta meses depois.
+--
+-- ON DELETE CASCADE: o token pertence à conta. Se o titular pedir
+-- anonimização (LGPD), um token vivo permitiria redefinir a senha de um
+-- usuário que já não existe.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id CHAR(36) NOT NULL PRIMARY KEY,
+    user_id CHAR(36) NOT NULL,
+    token_hash CHAR(64) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_password_reset_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    INDEX idx_password_reset_hash (token_hash),
+    INDEX idx_password_reset_user (user_id)
+) ENGINE = InnoDB;
+
+-- ---------------------------------------------------------------------
 -- Consultas médicas agendadas pelo usuário
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS appointments (

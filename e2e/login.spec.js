@@ -155,3 +155,76 @@ test.describe('a URL é uma só', () => {
     await expect(page).toHaveURL(/admin\.html$/);
   });
 });
+
+test.describe('recuperação de senha', () => {
+  test('o link no login leva ao pedido do link', async ({ page }) => {
+    await page.goto('/auth.html');
+    await page.click('#linkRecuperar');
+
+    await expect(page.locator('#forgotForm')).toBeVisible();
+    await expect(page.locator('#resetForm')).toBeHidden();
+  });
+
+  test('um link com token abre direto o formulário da nova senha, e limpa a URL', async ({ page }) => {
+    // O token não pode ficar na barra de endereço: ele sobreviveria no
+    // histórico do navegador e em qualquer "copiar endereço".
+    await page.goto('/auth.html?tab=reset&token=abc123def456');
+
+    await expect(page.locator('#resetForm')).toBeVisible();
+    await expect(page.locator('#forgotForm')).toBeHidden();
+    await expect(page).not.toHaveURL(/token=/);
+  });
+
+  test('as senhas diferentes são recusadas antes de qualquer chamada', async ({ page }) => {
+    await page.goto('/auth.html?tab=reset&token=abc123def456');
+
+    let chamouApi = false;
+    await page.route('**/auth/password/reset', (r) => { chamouApi = true; r.continue(); });
+
+    await page.fill('#resetPassword', 'senha-um-123');
+    await page.fill('#resetPassword2', 'senha-dois-456');
+    await page.click('#resetForm button[type=submit]');
+
+    await expect(page.locator('#toast, .toast, [role=alert]').first()).toBeVisible();
+    expect(chamouApi, 'senha que não confere não deve gastar uma redefinição').toBe(false);
+  });
+
+  test('a senha é enviada e a pessoa volta para o login', async ({ page }) => {
+    // Dublê: sem SMTP configurado a API responde 200 com "não foi possível
+    // enviar", e este teste é da TELA, não do envio.
+    await page.route('**/auth/password/reset', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true }),
+      }));
+
+    await page.goto('/auth.html?tab=reset&token=abc123def456');
+    await page.fill('#resetPassword', 'senha-nova-123456');
+    await page.fill('#resetPassword2', 'senha-nova-123456');
+    await page.click('#resetForm button[type=submit]');
+
+    await expect(page.locator('#loginForm')).toBeVisible();
+  });
+
+  test('sem SMTP a tela mostra o que a API respondeu, sem prometer envio', async ({ page }) => {
+    // A resposta do /forgot é a mesma exista ou não a conta. Se a tela
+    // inventasse uma confirmação ("Enviado!"), voltaria a enumerar contas
+    // pela UI mesmo com a rota correta.
+    await page.route('**/auth/password/forgot', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, message: 'Se houver uma conta com este e-mail, enviaremos um link.' }),
+      }));
+
+    await page.goto('/auth.html');
+    await page.click('#linkRecuperar');
+    await page.fill('#forgotEmail', 'ninguem@exemplo.org');
+    await page.click('#forgotForm button[type=submit]');
+
+    const aviso = page.locator('#toast, .toast, [role=alert]').first();
+    await expect(aviso).toBeVisible();
+    await expect(aviso).toContainText('Se houver uma conta');
+  });
+});

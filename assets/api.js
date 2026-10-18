@@ -135,6 +135,12 @@
     return request('POST', '/auth/signup', payload);
   };
 
+  // Recuperação de senha. Vai pelo `request` comum (e não por fetch solto como
+  // o signOut) para herdar o tratamento de erro e a prefixação de API_BASE.
+  window.authPost = function (path, body) {
+    return request('POST', path, body);
+  };
+
   window.setSession = setSession;
   window.signOut = function () {
     // Revoga o refresh no servidor (best-effort) antes de limpar a sessão local.

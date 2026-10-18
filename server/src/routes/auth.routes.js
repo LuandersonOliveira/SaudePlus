@@ -15,6 +15,7 @@ const { PRIVACY_VERSION, anonymizeUser } = require('../utils/privacy');
 const { govbrConfig, buildAuthorizeUrl, exchangeCode, fetchUserInfo } = require('../services/govbr');
 const { randomSecret, verifyTotp, matchStep, replayBloqueia, otpauthUrl } = require('../utils/totp');
 const { acharPorCpf } = require('../utils/cpf');
+const mailer = require('../services/mailer');
 const {
   mfaAttempts,
   bloqueioMfa,
@@ -487,6 +488,160 @@ router.post('/mfa/disable', verifyToken, async (req, res, next) => {
     await pool.query('UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?', [req.user.id]);
     await req.audit('mfa_disable', 'user', req.user.id, 'segundo fator desativado');
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ==========================================================================
+// Recuperação de senha (Fase 7).
+//
+// A rota `/forgot` devolve SEMPRE a mesma resposta, exista ou não a conta.
+// A diferença é o que impede que a rota vire um enumerador de contas — num
+// sistema de saúde, saber quem tem cadastro já é informação sensível. Por
+// isso o `forgot` não distingue "não existe" de "existe", e o e-mail só sai
+// para quem realmente tem conta.
+//
+// O token é como o `refresh_tokens`: só o SHA-256 vai para o banco, tem
+// prazo curto, é de uso único (`used_at`) e um pedido anterior invalida o
+// anterior. E redefinir a senha DERRUBA as sessões abertas — quem roubou o
+// link pode estar com um refresh válido, e a troca de senha é justamente o
+// que a vítima faz para expulsar quem roubou.
+// ==========================================================================
+const PASSWORD_RESET_EXPIRES_IN = process.env.PASSWORD_RESET_EXPIRES_IN || '1h';
+
+function passwordResetTtlMs() {
+  const m = String(PASSWORD_RESET_EXPIRES_IN).trim().match(/^(\d+)\s*([smhd])$/i);
+  if (!m) return 60 * 60 * 1000;
+  const n = Number(m[1]);
+  const unit = { s: 1000, m: 60000, h: 3600000, d: 86400000 }[m[2].toLowerCase()];
+  return n * unit;
+}
+
+// Mesmo teto do front (minlength=6 no formulário de cadastro) — o front não
+// é a validação, e um cliente direto não passa por ele.
+const SENHA_RESET_MIN = 6;
+
+/** Base do link enviado no e-mail. Vem do ambiente; nunca de entrada do usuário. */
+function baseDoApp() {
+  return String(process.env.APP_BASE_URL || process.env.PUBLIC_BASE_URL || 'http://localhost:8080').replace(/\/+$/, '');
+}
+
+// POST /auth/password/forgot — sempre 200, com a mesma mensagem.
+router.post('/password/forgot', async (req, res, next) => {
+  try {
+    const email = String((req.body || {}).email || '').toLowerCase().trim();
+    // Resposta fixa. Não muda com o e-mail existir, estar desativado ou o SMTP
+    // estar fora: qualquer variação aqui é um oráculo de enumeração.
+    const respostaFixa = {
+      ok: true,
+      message: 'Se houver uma conta com este e-mail, enviaremos um link para redefinir a senha.',
+    };
+
+    if (!email || !email.includes('@')) return res.status(200).json(respostaFixa);
+
+    const [[user]] = await pool.query(
+      'SELECT id, email, full_name, account_status FROM users WHERE email = ?',
+      [email]
+    );
+
+    // Conta inexistente ou desativada: mesma resposta, nenhum e-mail, nenhuma
+    // linha no banco. O operador não consegue distinguir daqui — e é isso.
+    if (!user || user.account_status !== 'ativo') return res.status(200).json(respostaFixa);
+
+    // Um pedido novo invalida os anteriores: o link que está no e-mail de
+    // alguém há uma semana deixa de valer assim que a pessoa pede outro.
+    await pool.query(
+      'UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL',
+      [user.id]
+    );
+
+    const raw = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + passwordResetTtlMs());
+    await pool.query(
+      'INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at) VALUES (?,?,?,?)',
+      [crypto.randomUUID(), user.id, hashRefreshToken(raw), expiresAt]
+    );
+
+    const link = `${baseDoApp()}/auth.html?tab=reset&token=${raw}`;
+    const envio = await mailer.enviar({
+      para: user.email,
+      assunto: 'Redefinição de senha — Saúde+',
+      texto: [
+        `Olá, ${user.full_name || ''}`.trim(),
+        '',
+        'Recebemos um pedido para redefinir sua senha do Saúde+.',
+        `O link vale até ${expiresAt.toLocaleString('pt-BR')} e só pode ser usado uma vez.`,
+        '',
+        link,
+        '',
+        'Se não foi você, ignore este e-mail: nada muda e ninguém precisa saber que você tem conta.',
+      ].join('\n'),
+    });
+
+    // Sem SMTP, a resposta continua a mesma. O e-mail não saiu, e a
+    // auditoria registra isso para o operador — mas quem pediu não recebe um
+    // "não conseguimos enviar", porque isso confirmaria que a conta existe.
+    try {
+      await req.audit('password_reset_pedido', 'user', user.id,
+        `pedido de redefinição; envio=${envio.enviado ? 'aceito' : (envio.motivo || 'recusado')}`,
+        user.id);
+    } catch { /* auditoria não bloqueia o pedido */ }
+
+    return res.status(200).json(respostaFixa);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /auth/password/reset — consome o token e troca a senha.
+router.post('/password/reset', async (req, res, next) => {
+  try {
+    const { token, password } = req.body || {};
+    if (!token || !password) {
+      return res.status(401).json({ error: 'Link inválido ou expirado. Peça um novo.' });
+    }
+    if (typeof password !== 'string' || password.length < SENHA_RESET_MIN) {
+      // 400 e o token NÃO é consumido: uma senha recusada por validação não
+      // pode queimar o link, senão um erro de digitação obriga a esperar de novo.
+      return res.status(400).json({ error: `A senha precisa ter pelo menos ${SENHA_RESET_MIN} caracteres.` });
+    }
+
+    const [[row]] = await pool.query(
+      `SELECT id, user_id, expires_at, used_at FROM password_reset_tokens WHERE token_hash = ?`,
+      [hashRefreshToken(String(token))]
+    );
+
+    const invalido = !row
+      || row.used_at
+      || new Date(row.expires_at).getTime() < Date.now();
+    if (invalido) {
+      return res.status(401).json({ error: 'Link inválido ou expirado. Peça um novo.' });
+    }
+
+    // UPDATE condicional: `used_at IS NULL` faz o uso único ser atômico.
+    // Dois cliques em paralelo no mesmo link não abrem duas redefinições.
+    const hash = await bcrypt.hash(password, 10);
+    const [consumido] = await pool.query(
+      'UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ? AND used_at IS NULL',
+      [row.id]
+    );
+    if (consumido.affectedRows === 0) {
+      return res.status(401).json({ error: 'Link inválido ou expirado. Peça um novo.' });
+    }
+
+    await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, row.user_id]);
+
+    // Derruba as sessões abertas. Sem isto, um refresh token roubado continua
+    // valendo depois da troca de senha — e a troca é justamente o que a vítima
+    // faz para expulsar quem roubou.
+    await pool.query('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND revoked = 0', [row.user_id]);
+
+    try {
+      await req.audit('password_reset_concluido', 'user', row.user_id, 'senha redefinida pelo titular', row.user_id);
+    } catch { /* auditoria não bloqueia a redefinição */ }
+
+    return res.json({ ok: true });
   } catch (err) {
     next(err);
   }

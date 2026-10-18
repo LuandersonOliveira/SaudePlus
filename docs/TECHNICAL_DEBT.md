@@ -83,6 +83,15 @@ _Todos os achados desta seção foram corrigidos._
   e-mail/SMS/WhatsApp.
 - **Lint/CI**: não há `eslint` nem pipeline; a suíte `npm test` é o portão.
 
+### Resolvido na Fase 7 (2026-10-18)
+
+| Onde era | O que ficou |
+|---|---|
+| Envio real dos lembretes | `services/mailer.js` (SMTP genérico) + `reminders.sent_at/send_channel/send_error`. O job grava **antes** de enviar; `sent_at` só quando o transporte aceita. |
+| Recuperação de senha | `POST /auth/password/forgot` + `/reset`, tabela `password_reset_tokens`, tela em `auth.html`. Resposta idêntica exista ou não a conta. |
+| `proxy-addr` (achado no `npm audit`) | **Crítico e pré-existente**: IP spoofing via IPv4-mapped IPv6, na dependência que o express usa no `trust proxy` — ou seja, no IP de que o lockout de login depende. Corrigido com `npm audit fix`. |
+| `nodemon`→`chokidar`→`braces` (3 high) | Sem correção upstream: a `braces` 3.0.3, a mais nova, continua sinalizada. Exposta só na máquina do desenvolvedor (DoS por glob malicioso no watcher). **Aceitada e documentada.** |
+
 ### E2E automatizado — resolvido (2026-10-18)
 
 A cobertura era de contrato no servidor + verificação estática do front.

@@ -41,12 +41,37 @@
       <button class="tab" data-tab="signup">Criar conta</button>
     </div>
 
+    <!-- RECUPERAÇÃO: pedido do link e troca da senha -->
+    <div class="tabpanel" id="reset">
+      <form id="forgotForm" aria-label="Pedir redefinição de senha">
+        <p class="muted" style="font-size:.9rem">Informe seu e-mail. Se houver uma conta com ele, você recebe um link para criar uma nova senha.</p>
+        <div class="field"><label for="forgotEmail">E-mail</label><input class="input" id="forgotEmail" type="email" name="email" required autocomplete="email"></div>
+        <button class="btn btn-primary" style="width:100%" type="submit">Enviar link</button>
+        <p class="muted" style="font-size:.85rem;margin:12px 0 0">
+          <a href="#" id="voltarParaLogin">Voltar para o login</a>
+        </p>
+      </form>
+
+      <form id="resetForm" aria-label="Criar nova senha" style="display:none">
+        <p class="muted" style="font-size:.9rem">Crie uma nova senha para sua conta.</p>
+        <div class="field"><label for="resetPassword">Nova senha</label><input class="input" id="resetPassword" type="password" name="password" required minlength="6" autocomplete="new-password"></div>
+        <div class="field"><label for="resetPassword2">Repita a senha</label><input class="input" id="resetPassword2" type="password" name="password2" required minlength="6" autocomplete="new-password"></div>
+        <button class="btn btn-primary" style="width:100%" type="submit">Salvar nova senha</button>
+        <p class="muted" style="font-size:.85rem;margin:12px 0 0">
+          <a href="#" id="pedirOutroLink">Pedir um novo link</a>
+        </p>
+      </form>
+    </div>
+
     <!-- LOGIN -->
     <div class="tabpanel active" id="login">
       <form id="loginForm" aria-label="Entrar na conta">
         <div class="field"><label for="loginEmail">E-mail</label><input class="input" id="loginEmail" type="email" name="email" required autocomplete="email"></div>
         <div class="field"><label for="loginPassword">Senha</label><input class="input" id="loginPassword" type="password" name="password" required minlength="6" autocomplete="current-password"></div>
         <button class="btn btn-primary" style="width:100%" type="submit">Entrar</button>
+        <p class="muted" style="font-size:.85rem;margin:12px 0 0;text-align:center">
+          <a href="#" id="linkRecuperar">Esqueci minha senha</a>
+        </p>
       </form>
       <!-- MFA (segundo fator): aparece quando a conta exige -->
       <form id="mfaForm" aria-label="Verificação em duas etapas" style="display:none;margin-top:16px">
@@ -433,6 +458,89 @@ async function submitSignup(){
   }catch(err){ toast(err.message||'Erro ao criar conta','error'); }
   finally{ btn.textContent='Criar conta'; btn.disabled=false; }
 }
+
+// ---------------------------------------------------------------------------
+// Recuperação de senha.
+//
+// A URL traz `?tab=reset&token=...`: o link do e-mail abre direto no formulário
+// da nova senha, com o token já preenchido. Sem token, abre no pedido do link.
+function abrirReset(token){
+  const formForgot = document.getElementById('forgotForm');
+  const formReset  = document.getElementById('resetForm');
+  if(token){
+    formForgot.style.display='none';
+    formReset.style.display='';
+  }else{
+    formForgot.style.display='';
+    formReset.style.display='none';
+  }
+  switchTab('reset');
+}
+
+document.getElementById('linkRecuperar').addEventListener('click',(e)=>{
+  e.preventDefault();
+  abrirReset(null);
+});
+document.getElementById('voltarParaLogin').addEventListener('click',(e)=>{
+  e.preventDefault();
+  switchTab('login');
+});
+document.getElementById('pedirOutroLink').addEventListener('click',(e)=>{
+  e.preventDefault();
+  abrirReset(null);
+});
+
+// Guarda o token em memória: ele sai da URL assim que a página lê, para não
+// sobrar no histórico do navegador nem em um "copiar endereço".
+let resetToken = null;
+const paramsReset = new URLSearchParams(location.search);
+if(paramsReset.get('tab')==='reset'){
+  resetToken = paramsReset.get('token') || null;
+  if(resetToken){
+    history.replaceState({}, '', location.pathname);
+  }
+  abrirReset(resetToken);
+}
+
+document.getElementById('forgotForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  const email = document.getElementById('forgotEmail').value.trim();
+  btn.disabled = true;
+  try{
+    const res = await authPost('/auth/password/forgot',{ email });
+    // A resposta é a mesma exista ou não a conta (a rota não pode enumerar
+    // usuários). A tela mostra o que a API disse, sem inventar certeza.
+    toast((res && res.message) || 'Se houver uma conta com este e-mail, enviaremos um link.','success');
+  }catch(err){ toast(err.message||'Não foi possível pedir o link agora','error'); }
+  finally{ btn.disabled=false; }
+});
+
+document.getElementById('resetForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  const senha = document.getElementById('resetPassword').value;
+  const repetir = document.getElementById('resetPassword2').value;
+  if(senha !== repetir){
+    toast('As senhas não conferem.','error');
+    return;
+  }
+  if(!resetToken){
+    toast('Este link não tem código. Peça um novo.','error');
+    abrirReset(null);
+    return;
+  }
+  btn.disabled = true;
+  try{
+    await authPost('/auth/password/reset',{ token: resetToken, password: senha });
+    resetToken = null;
+    toast('Senha trocada. Entre com a nova senha.','success');
+    document.getElementById('resetPassword').value='';
+    document.getElementById('resetPassword2').value='';
+    switchTab('login');
+  }catch(err){ toast(err.message||'Link inválido ou expirado.','error'); }
+  finally{ btn.disabled=false; }
+});
 </script>
 </body>
 </html>
