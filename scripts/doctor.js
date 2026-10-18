@@ -138,6 +138,42 @@ function escapingProblems(arquivos) {
   return achados;
 }
 
+/**
+ * O CORS bate com a URL que o front realmente anuncia?
+ *
+ * Este é o defeito que impediu o login de funcionar e que nenhuma fase
+ * anterior pegou: `serve-web.js` anunciava `http://127.0.0.1:8080`, o `.env`
+ * liberava `http://localhost:8080`, e a API vive em `localhost:4000`. Abrir a
+ * página pelo host anunciado produzia 403 "Origem não permitida" em todo fetch,
+ * que o navegador mostra como "Failed to fetch" — sem mensagem no servidor,
+ * sem erro no terminal, com o painel apenas vazio.
+ *
+ * A origem que o navegador manda é a URL que apareceu na barra de endereço.
+ * Por isso a comparação é feita contra ela.
+ *
+ * @returns {string|null} problema encontrado, ou null se estiver coerente
+ */
+function corsProblem(env, { webHost = 'localhost', webPort = 8080 } = {}) {
+   const raw = String(env.CORS_ORIGIN || '').trim();
+   if (!raw) return 'CORS_ORIGIN vazio: a API vai recusar toda origem do navegador.';
+
+   const permitidas = raw.split(',').map((s) => s.trim()).filter(Boolean);
+   const esperada = `http://${webHost}:${webPort}`;
+   if (!permitidas.includes(esperada)) {
+      return `CORS_ORIGIN não inclui a URL do front (${esperada}). `
+         + `Está em: ${permitidas.join(', ')}. Sem isso, todo fetch do navegador `
+         + `volta 403 e aparece como "Failed to fetch".`;
+   }
+   // Avisa o caso inverso também: liberar 127.0.0.1 e announce localhost é
+   // inofensivo, mas costuma ser sinal de configuração pela metade.
+   const extranhos = permitidas.filter((o) => o !== esperada);
+   if (extranhos.length) {
+      return `CORS_ORIGIN libera ${extranhos.join(', ')} além de ${esperada}. `
+         + `Se a intenção é uma origem só, remova as extras.`;
+   }
+   return null;
+}
+
 function dpoWarning(env) {
   const name = String(env.DPO_NAME || '').trim();
   const email = String(env.DPO_EMAIL || '').trim();
@@ -275,6 +311,15 @@ async function main() {
     }
     const dpo = dpoWarning(env);
     if (dpo) aviso('dpo', dpo);
+
+    // CORS × URL do front. É o que impede o login de funcionar sem nenhum
+    // sinal no terminal — o navegador só mostra "Failed to fetch".
+    const cors = corsProblem(env, {
+      webHost: process.env.WEB_HOST || 'localhost',
+      webPort: Number(process.env.WEB_PORT) || 8080,
+    });
+    if (cors) falha('cors', cors);
+    else ok('cors', `origem do front permitida (${env.CORS_ORIGIN})`);
   }
 
   // 5/6/7) MySQL, banco e migrations
@@ -366,6 +411,7 @@ module.exports = {
   parsePairs,
   main,
   configAlvo,
+  corsProblem,
   // Exportado para o teste de paridade (server/test/doctor.test.js): a lista
   // de colunas tem que refletir o que o código referencia, senão o doctor
   // fica verde em uma base quebrada — que é o que ele existe para evitar.

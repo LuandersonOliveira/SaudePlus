@@ -189,6 +189,77 @@ test('o doctor confere o MESMO banco que o pool conectou', () => {
   assert.equal(configAlvo({}).DB_PORT, 3306);
 });
 
+test('o doctor percebe que o CORS não cobre a URL do front', () => {
+  // Este é o defeito que travou o login: `serve-web.js` anunciava
+  // http://127.0.0.1:8080, o .env liberava http://localhost:8080, e a API está
+  // em localhost:4000. Abrir pelo host anunciado dava 403 em todo fetch —
+  // que o navegador mostra como "Failed to fetch", sem nada no terminal.
+  const { corsProblem } = require('../../scripts/doctor');
+
+  // O caso real: front em localhost, CORS só em 127.
+  const erro = corsProblem(
+    { CORS_ORIGIN: 'http://127.0.0.1:8080' },
+    { webHost: 'localhost', webPort: 8080 }
+  );
+  assert.ok(erro, 'divergência de host deveria ser detectada');
+  assert.match(erro, /localhost:8080/, 'a mensagem precisa apontar a URL que falta');
+  assert.match(erro, /Failed to fetch/, 'a mensagem precisa ligar a causa ao sintoma');
+
+  // Configuração correta: passa.
+  assert.equal(
+    corsProblem({ CORS_ORIGIN: 'http://localhost:8080' }, { webHost: 'localhost', webPort: 8080 }),
+    null
+  );
+
+  // Porta diferente também é divergência.
+  assert.ok(corsProblem({ CORS_ORIGIN: 'http://localhost:8080' }, { webHost: 'localhost', webPort: 3000 }));
+
+  // CORS vazio é problema.
+  assert.match(corsProblem({ CORS_ORIGIN: '' }, {}), /vazio/);
+
+  // Liberar origens extras também é sinal de configuração pela metade.
+  const extras = corsProblem(
+    { CORS_ORIGIN: 'http://localhost:8080,http://127.0.0.1:8080' },
+    { webHost: 'localhost', webPort: 8080 }
+  );
+  assert.ok(extras && /127\.0\.0\.1:8080/.test(extras), 'origem extra deveria ser apontada');
+});
+
+test('serve-web anuncia a mesma origem que o CORS espera', () => {
+  // Trava o acoplamento: se alguém voltar a anunciar 127.0.0.1, este teste
+  // falha — porque o bug volta junto.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '..', '..', 'scripts', 'serve-web.js'), 'utf8');
+  const m = /WEB_HOST\s*\|\|\s*'([^']+)'/.exec(src);
+  assert.ok(m, 'serve-web deveria ter um host padrão explícito');
+  assert.equal(m[1], 'localhost', "o host padrão precisa ser 'localhost' — é o que o CORS e a API esperam");
+
+  const { corsProblem } = require('../../scripts/doctor');
+  assert.equal(
+    corsProblem({ CORS_ORIGIN: 'http://localhost:8080' }, { webHost: m[1], webPort: 8080 }),
+    null,
+    'o host padrão do front tem que satisfazer o CORS padrão'
+  );
+});
+
+test('a URL que o front usa para a API é a mesma em todo o projeto', () => {
+  // assets/api.js, README e serve-web têm que falar da mesma API, senão o
+  // navegador chama uma porta e a outra ponta não responde.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const raiz = path.join(__dirname, '..', '..');
+  const api = fs.readFileSync(path.join(raiz, 'assets', 'api.js'), 'utf8');
+  assert.match(api, /DEFAULT_BASE\s*=\s*'http:\/\/localhost:4000'/);
+
+  const serve = fs.readFileSync(path.join(raiz, 'scripts', 'serve-web.js'), 'utf8');
+  assert.match(serve, /localhost:4000/);
+  assert.ok(
+    !/127\.0\.0\.1:4000/.test(serve),
+    'serve-web não deve anunciar 127.0.0.1 como se fosse a API'
+  );
+});
+
 test('npm run setup instala as dependências da RAIZ, não só as do server', () => {
   // Achado seguindo a verificação do README do zero, num clone limpo:
   // `npm run setup` rodava `npm --prefix server install` e nada mais. Mas

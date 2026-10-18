@@ -86,6 +86,22 @@ function resolveRequest(urlPath) {
 
   if (PAGE_SET.has(rel)) return rel;
 
+  // Página sem extensão (`/admin`): responde 301 para `/admin.html`.
+  //
+  // O sintoma real foi o navegador ter `localhost:8080/admin` no histórico —
+  // a URL antiga do projeto, de quando as páginas eram rotas e não arquivos.
+  // Abrir essa URL devolvia 404 "Rota não encontrada", e a pessoa concluía
+  // que a aplicação estava quebrada.
+  //
+  // `PAGE_SET.has` garante que o destino é uma página allowlisted: isto não
+  // abre caminho novo para nada, só escreve a URL canônica. Qualquer coisa
+  // fora da lista (`/server`, `/scripts`, `/admin.html.js`) continua 404 —
+  // o prefixo precisa ser a página INTEIRA, não um começo dela.
+  const semExt = rel.endsWith('.') ? rel.slice(0, -1) : rel;
+  if (!semExt.includes('.') && PAGE_SET.has(`${semExt}.html`)) {
+    return { redirect: `${semExt}.html` };
+  }
+
   if (!rel.startsWith('assets/')) return null;
   if (segments.length < 2) return null;
 
@@ -114,6 +130,12 @@ function createWebServer() {
 
     const rel = resolveRequest(urlPath);
     if (!rel) return sendJson(res, 404, { error: 'Rota não encontrada.' });
+
+    // Página pedida sem extensão: 301 para a URL canônica.
+    if (typeof rel === 'object' && rel.redirect) {
+      res.writeHead(301, { Location: `/${rel.redirect}`, 'Cache-Control': 'no-store' });
+      return res.end();
+    }
 
     // Segunda barreira: mesmo que a allowlist deixasse passar algo, o
     // caminho final precisa estar dentro da raiz do repositório.
@@ -151,10 +173,23 @@ function createWebServer() {
 
 if (require.main === module) {
   const port = Number(process.env.WEB_PORT) || 8080;
-  const host = process.env.WEB_HOST || '127.0.0.1';
+
+  // `localhost`, não `127.0.0.1`.
+  //
+  // A URL anunciada é a origem que o navegador manda no cabeçalho `Origin`,
+  // e é ela que o CORS da API compara com `CORS_ORIGIN`. Anunciar `127.0.0.1`
+  // enquanto o `.env` libera `localhost` produzia: página abre, todo fetch
+  // morre com "Failed to fetch", e o painel fica vazio sem mensagem — porque o
+  // CORS barra `http://127.0.0.1:8080` com 403.
+  //
+  // `localhost` resolve para 127.0.0.1 E ::1, então os dois funcionam aqui.
+  // Para acesso pela rede, defina WEB_HOST explicitamente (e acrescente a
+  // origem correspondente ao CORS_ORIGIN).
+  const host = process.env.WEB_HOST || 'localhost';
   createWebServer().listen(port, host, () => {
     console.log(`Saúde+ front em http://${host}:${port}`);
-    console.log('API esperada em http://localhost:4000 — confira CORS_ORIGIN no server/.env');
+    console.log(`Abra http://${host}:${port} — a API espera CORS_ORIGIN=http://${host}:${port} no server/.env`);
+    console.log('API em http://localhost:4000 (confira com GET /health)');
   });
 }
 

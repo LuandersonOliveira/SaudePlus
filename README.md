@@ -278,7 +278,7 @@
   | Var                                                           | Exemplo                                 | Para quê                                                          |
   | ------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
   | `PORT`                                                        | `4000`                                  | Porta da API                                                      |
-  | `CORS_ORIGIN`                                                 | `http://localhost:8080`                 | Deve bater com a URL do front (inclui porta). `npm run dev` já deixa consistente: o `serve-web.js` serve em 8080 |
+  | `CORS_ORIGIN`                                                 | `http://localhost:8080`                 | Deve bater **exatamente** com a URL do front. `npm run doctor` compara com o que o `serve-web.js` anuncia: se divergirem, todo `fetch` do navegador volta 403 e aparece como "Failed to fetch" no login, sem nada no terminal |
   | `TRUST_PROXY_HOPS`                                            | `0`                                     | Atrás de nginx/Cloudflare: nº de proxies (1 para um nginx). Sem isso o rate limit e o lockout de login vêm do IP do proxy |
   | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | `localhost / 3306 / root / *** / saude` | Conexão MySQL                                                     |
   | `JWT_SECRET` | string longa aleatória | Assinatura dos tokens (nunca commitar o real) |
@@ -325,8 +325,23 @@
   `assets/` — qualquer outro caminho responde 404. **Não troque por `npx serve .`**
   nem por `http-server`: servido a partir da raiz do repositório, exporia
   `server/.env` (senha do MySQL, `JWT_SECRET`, `DATA_ENCRYPTION_KEY`) e
-  `server/backups/`. Para usar outra porta, ajuste `WEB_PORT` no comando e
-  `CORS_ORIGIN` no `server/.env`.
+  `server/backups/`.
+
+  Acesse **`http://localhost:8080`** — e só essa. O endereço importa porque é
+  ele que o navegador manda no cabeçalho `Origin`, e é contra ele que a API
+  compara com `CORS_ORIGIN`. Abrir por `127.0.0.1:8080` faz cada chamada
+  returning 403: o navegador mostra "Failed to fetch", o terminal não mostra
+  nada, e o painel fica vazio. Por isso `npm run dev` anuncia `localhost` e o
+  `npm run doctor` avisa quando as duas URLs não batem.
+
+  Se mudar a porta, ajuste as duas pontas: `WEB_PORT` e `CORS_ORIGIN`.
+
+  ### Rota antiga sem extensão
+
+  O navegador pode ter `localhost:8080/admin` salvo no histórico (a URL antiga,
+  de quando as páginas eram rotas e não arquivos). O servidor responde **301**
+  para `/admin.html` — o mesmo vale para `/auth`, `/dashboard`, `/atendente`,
+  `/index` e `/privacy`. Qualquer outro caminho continua 404.
 
   Acesse `http://localhost:8080`.
 
@@ -477,6 +492,9 @@
 | --------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `Failed to fetch` no console      | API fora do ar, ou `CORS_ORIGIN` no `.env` ≠ URL do front (inclui porta). Rode `npm run doctor` — ele verifica os dois lados |
 | `GET /server/.env` devolve 404    | **Comportamento correto.** O front é servido por allowlist (`scripts/serve-web.js`); `server/` nunca é servido. Foi assim que a auditoria provou que o `.env` não está exposto |
+| Login dá **"Failed to fetch"**     | A URL do front não bate com `CORS_ORIGIN`: abra em `http://localhost:8080` (não `127.0.0.1:8080`). `npm run doctor` compara as duas e diz qual está errada |
+| Página abre mas fica vazia         | Mesma causa do item acima — o 403 do CORS não aparece no terminal. Confira `npm run doctor` → linha `cors` |
+| Abro `/admin` e dá "Rota não encontrada" | É uma URL antiga salva no histórico do navegador. O servidor responde 301 para `/admin.html`; se persistir, limpe o histórico ou digite a URL completa |
 | Login não pede o segundo fator    | `migrate:interop` não rodou (sem `users.totp_enabled`, o MFA desliga em silêncio). Rode `npm run db:migrate` |
 | "Muitos intentos de login"        | Lockout por conta: 5 tentativas por `ip|email` travam por 15 min. Espere ou ajuste `TRUST_PROXY_HOPS` se está atrás de proxy |
 | `Token inválido ou expirado`      | Access expira em 15 min — o front renova sozinho; se persistir, logar de novo                         |

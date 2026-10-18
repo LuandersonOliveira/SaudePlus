@@ -90,6 +90,52 @@ test('/ redireciona para /index.html', async () => {
   });
 });
 
+test('caminho de página SEM extensão redireciona para o .html', async () => {
+  // Sintoma real: o navegador tinha `localhost:8080/admin` no histórico (a
+  // URL antiga do projeto, antes das páginas virarem arquivos .html) e abria
+  // essa URL, que o servidor recusava com 404 "Rota não encontrada" — a
+  // pessoa achava que a aplicação estava quebrada.
+  //
+  // O redirecionamento é barato e resolve: quando o caminho sem extensão bate
+  // com uma página da allowlist, responde 301 para a versão com `.html`. O
+  // destino é sempre allowlisted, então isto não abre nenhuma rota nova.
+  await withServer(async (base) => {
+    for (const pagina of PAGINAS) {
+      const semExt = pagina.replace(/\.html$/, '');
+      const res = await fetch(base + semExt, { redirect: 'manual' });
+      assert.equal(res.status, 301, `${semExt} deveria dar 301, deu ${res.status}`);
+      assert.equal(res.headers.get('location'), pagina, `${semExt} deveria ir para ${pagina}`);
+    }
+  });
+});
+
+test('caminho sem extensão que NÃO é página continua sendo 404', async () => {
+  // A regra acima não pode virar atalho para qualquer arquivo: `/server` e
+  // `/scripts` continuam inexistentes.
+  await withServer(async (base) => {
+    for (const p of ['/server', '/scripts', '/assets', '/docs', '/inexistente']) {
+      const res = await fetch(base + p, { redirect: 'manual' });
+      assert.equal(res.status, 404, `${p} deveria dar 404, deu ${res.status}`);
+    }
+  });
+});
+
+test('o redirect de página sem extensão não vira bypass da allowlist', async () => {
+  // `/index.html` existe; `/index` redireciona para ele. Mas
+  // `/index.html.bak` ou `/admin.html.js` NÃO podem virar caminho para
+  // arquivo fora da allowlist.
+  await withServer(async (base) => {
+    for (const p of ['/admin.html.js', '/index.html.bak', '/admin.', '/adminx']) {
+      const res = await fetch(base + p, { redirect: 'manual' });
+      assert.ok(res.status === 404 || res.status === 301, `${p} deu ${res.status}`);
+      if (res.status === 301) {
+        const destino = res.headers.get('location');
+        assert.ok(PAGINAS.includes(destino), `${p} redirecionou para fora da allowlist: ${destino}`);
+      }
+    }
+  });
+});
+
 test('rejeita travessia de caminho', async () => {
   await withServer(async (base) => {
     const alvos = [
