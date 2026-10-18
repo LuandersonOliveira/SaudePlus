@@ -49,39 +49,27 @@ porque o **porquê** de cada decisão é o que evita a reintrodução.
 | `utils/validators.js` | Listas de ENUM copiadas à mão do schema, sem verificação | Teste de paridade com os ENUMs do `schema.sql` |
 | Testes de MFA | `.catch(() => {})` escondia que o `DELETE` do usuário nunca funcionava (FK `audit_log` é RESTRICT) | Comentário explicando; `.catch` só engole `ER_ROW_IS_REFERENCED_2` |
 | `admin.html` / `atendente.html` | "XSS residual em onclick com aspas duplas" | **Falso positivo** — testado e fechado sem tocar em código |
+| `booking.js` + `dashboard.html` | Horário com 2 profissionais livres mostrava só o primeiro; o POST mandava o `professional_id` dele | **Falso positivo no `totalVagas`** — a contagem é de *horários*, e o front já escrevia "horário(s) livre(s)". O defeito real era outro: o segundo profissional era descartado em silêncio, e se o primeiro fosse ocupado entre listar e enviar o POST devolvia 409 sem saída. **Corrigido** — o slot carrega `professionals[]`, o painel achata hora × profissional em um botão cada. |
 
 ## MEDIUM — correção funcional, sem risco de segurança
 
 | Onde | Achado | Risco |
 |---|---|---|
-| `booking.js` (`findAvailabilityByService`) | Um horário com 2 profissionais disponíveis é reportado como 1 vaga; `totalVagas` subconta | O usuário vê "1 vaga" e escolhe por engano, ou desiste de um horário que tem 2 profissionais. |
 | `auth.routes.js` (fallback CPF Gov.br) | Faz `SELECT * FROM users` e compara CPF com `===` | Compara o usuário inteiro e **não é timing-safe**. **Resolver** `SELECT cpf` + `timingSafeEqual`. |
 | `admin.routes.js` (auditoria) | Lê `audit_log` com `INNER JOIN users`, que oculta linhas órfãs; `verifyChain` não usa join | A tela e o verificador discordam: o verificador acusa cadeia íntegra e a lista mostra menos linhas. **Resolver** `LEFT JOIN` e exibir o órfão marcado. |
-
-## Pendente de decisão do usuário
-
-**A `audit_log` do banco de desenvolvimento tem uma bifurcação na linha 156**
-(`71cf732d-29fe-4a52-95c6-0fc813ce49df`, de 2026-10-16 22:08, gravada antes do
-mutex `GET_LOCK`). A partir dali, duas linhas compartilham o mesmo elo.
-
-`audit_log` é append-only por trigger (`trg_audit_no_update` /
-`trg_audit_no_delete`), então consertar exigiria **reescrever a trilha** — que é
-exatamente o que a trigger existe para impedir. As saídas possíveis:
-
-1. Deixar como está. O verificador aponta a divergência corretamente, e isso é
-   honesto: a trilha realmente tem uma bifurcação.
-2. Reconstruir a base de desenvolvimento (`npm run db:setup -- --fresh saude`),
-   perdendo os dados de teste.
-3. Manter uma tabela de correções de auditoria para casos como esse.
-
-**Nenhuma foi feita** — reescrever log de auditoria não é decisão de agente.
 
 ## MEDIUM — endurecimento de segurança
 
 | Onde | Achado | Risco |
 |---|---|---|
-| `auth.routes.js` / `totp.js` | TOTP sem proteção de replay e `/mfa/verify` sem contador de tentativas | Um código TOTP válido (30s de janela) pode ser reapresentado dentro dessa janela, e o endpoint aceita tentativas ilimitadas. **Resolver** guardar o último código usado + lockout por verificação. |
-| `admin.html`, `atendente.html` | `esc()` não cobre `onclick` com aspas duplas em vários pontos | XSS residual: um dado do banco com aspeto de atributo ainda escapa do atributo. |
+| `auth.routes.js` (`/auth/refresh`) | Rotação de refresh token sem limite de **tentativas** por família | O login tem lockout por conta e o MFA tem teto de 5 tentativas; o refresh não. Alguém com um token roubado pode rotacionar a família indefinidamente. **Resolver** aplicar `mfaAttempts` (ou um limite próprio) em `/auth/refresh`. |
+| `server/src/utils/audit.js` | Se `GET_LOCK` não for concedido em 5s, a escrita prossegue sem o mutex | A trilha pode bifurcar de novo sob carga. O caminho é deliberado — perder registro é pior que gravar fora de ordem — mas hoje o único sinal é um `warn`. **Resolver** métrica/alert quando `GET_LOCK` falhar. |
+
+> Os dois achados de segurança que **estavam** aqui foram corrigidos e estão
+> na tabela "Fechado na revisão": replay de TOTP (`c9a0271`, `e4068d3`) e o
+> XSS residual em `onclick`, que se provou falso positivo (`cc26cca`). Eles
+> permaneceram nesta tabela até a revisão de 2026-10-16 e só saíram agora,
+> depois de confirmados contra o código.
 
 ## LOW / dívida de produto
 

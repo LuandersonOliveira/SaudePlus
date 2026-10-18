@@ -488,13 +488,36 @@ async function findAvailabilityByService(pool, opts) {
           const dayMap = unitDays.get(unitId);
           if (!dayMap.has(dateStr)) dayMap.set(dateStr, new Map());
           const slotMap = dayMap.get(dateStr);
-          if (!slotMap.has(hora)) {
+
+          // TODOS os profissionais livres nesta hora entram na lista.
+          //
+          // A versão anterior guardava só o primeiro (ordem alfabética) e
+          // descartava os demais em silêncio. Como o front envia o
+          // `professional_id` que foi exibido, o cenário era: Ana e Beto
+          // livres às 09:00, aparece só a Ana; alguém ocupa a Ana; o POST
+          // valida a Ana e devolve 409 — mesmo com o Beto livre, que a tela
+          // nunca mostrou. O usuário ficava sem saída.
+          const disponivel = {
+            id: profId,
+            professional_id: profId,
+            name: prof.name,
+            professional_name: prof.name,
+            job_title: prof.job,
+          };
+
+          const jaExiste = slotMap.get(hora);
+          if (!jaExiste) {
+            // Primeiro profissional: preenche também os campos legados, que
+            // continuam sendo o que o front usa por padrão.
             slotMap.set(hora, {
               hora,
               professional_id: profId,
               professional_name: prof.name,
               job_title: prof.job,
+              professionals: [disponivel],
             });
+          } else if (!jaExiste.professionals.some((p) => p.id === profId)) {
+            jaExiste.professionals.push(disponivel);
           }
         }
       }

@@ -537,15 +537,33 @@
         s.unidades.map((u) => unitCardHtml(s, kindKey, u)).join('');
     }
 
+    // Um horário pode ter VÁRIOS profissionais livres. Achatar cada par
+    // (hora × profissional) num botão mostra a verdade: às 09:00 com Ana e
+    // Beto livres, aparecem "09:00 Ana" e "09:00 Beto". Antes havia só o
+    // primeiro, e se ele fosse ocupado o POST devolvia 409 sem saída.
+    function slotEntries(day) {
+      const entries = [];
+      for (const t of day.slots) {
+        const profs = Array.isArray(t.professionals) && t.professionals.length
+          ? t.professionals
+          : [{ id: t.professional_id, name: t.professional_name, job_title: t.job_title }];
+        for (const p of profs) {
+          entries.push({ hora: t.hora, professional_id: p.id, professional_name: p.name, job_title: p.job_title });
+        }
+      }
+      return entries;
+    }
+
     function unitCardHtml(s, kindKey, u) {
       const openDate = s.diaAberto[u.id] || (u.dias[0] && u.dias[0].date);
       const days = u.dias.map((d) =>
         `<button type="button" class="slot-day${d.date === openDate ? ' active' : ''}" onclick="toggleSlotDay('${kindKey}','${u.id}','${d.date}')" aria-pressed="${d.date === openDate ? 'true' : 'false'}">${esc(fmtDayLabel(d.date))}</button>`
       ).join('');
       const day = u.dias.find((d) => d.date === openDate) || u.dias[0];
-      const times = day.slots.map((t) => {
-        const selected = s.selecao && s.selecao.unit_id === u.id && s.selecao.date === day.date && s.selecao.hora === t.hora;
-        return `<button type="button" class="slot-time${selected ? ' selected' : ''}" onclick="pickSlot('${kindKey}','${u.id}','${day.date}','${t.hora}')" aria-pressed="${selected ? 'true' : 'false'}">${esc(t.hora)}<small>${esc(t.professional_name || '')}</small></button>`;
+      const times = slotEntries(day).map((t) => {
+        const selected = s.selecao && s.selecao.unit_id === u.id && s.selecao.date === day.date
+          && s.selecao.hora === t.hora && (s.selecao.professional_id || '') === (t.professional_id || '');
+        return `<button type="button" class="slot-time${selected ? ' selected' : ''}" onclick="pickSlot('${kindKey}','${u.id}','${day.date}','${t.hora}','${t.professional_id || ''}')" aria-pressed="${selected ? 'true' : 'false'}">${esc(t.hora)}<small>${esc(t.professional_name || '')}</small></button>`;
       }).join('');
       const meta = [u.type, u.neighborhood].filter(Boolean).join(' · ');
       return `<div class="slot-unit"><div class="slot-unit-head"><div><div class="slot-unit-name">${esc(u.name)}</div>` +
@@ -669,35 +687,37 @@
       scheduleDraftSave(kindKey);
     }
 
-    function findSlot(s, unitId, scheduledAt) {
+    function findSlot(s, unitId, scheduledAt, professionalId) {
       const date = (scheduledAt || '').slice(0, 10);
       const hora = (scheduledAt || '').slice(11, 16);
       const u = (s.unidades || []).find((x) => x.id === unitId);
       if (!u) return null;
       const day = u.dias.find((d) => d.date === date);
       if (!day) return null;
-      const t = day.slots.find((x) => x.hora === hora);
-      if (!t) return null;
+      const entry = slotEntries(day).find((e) => e.hora === hora
+        && (!professionalId || (e.professional_id || '') === professionalId));
+      if (!entry) return null;
       return {
         unit_id: u.id, unit_name: u.name,
-        professional_id: t.professional_id, professional_name: t.professional_name, job_title: t.job_title,
+        professional_id: entry.professional_id, professional_name: entry.professional_name, job_title: entry.job_title,
         date, hora, scheduled_at: `${date} ${hora}:00`,
       };
     }
 
-    window.pickSlot = function (kindKey, unitId, date, hora) {
+    window.pickSlot = function (kindKey, unitId, date, hora, professionalId) {
       const s = bookingState[kindKey];
       const u = s.unidades.find((x) => x.id === unitId);
       if (!u) return;
       const day = u.dias.find((d) => d.date === date);
       if (!day) return;
-      const t = day.slots.find((x) => x.hora === hora);
-      if (!t) return;
+      const entry = slotEntries(day).find((e) => e.hora === hora
+        && (!professionalId || (e.professional_id || '') === professionalId));
+      if (!entry) return;
       Object.assign(s, {
         diaAberto: { ...s.diaAberto, [unitId]: date },
         selecao: {
           unit_id: u.id, unit_name: u.name,
-          professional_id: t.professional_id, professional_name: t.professional_name, job_title: t.job_title,
+          professional_id: entry.professional_id, professional_name: entry.professional_name, job_title: entry.job_title,
           date, hora, scheduled_at: `${date} ${hora}:00`,
         },
         erro: '',
@@ -1170,7 +1190,7 @@
         if (s.servico && !s.manual) {
           await fetchSlotsFor(kindKey, null);
           if (draft.selecao) {
-            const still = findSlot(s, draft.selecao.unit_id, draft.selecao.scheduled_at);
+            const still = findSlot(s, draft.selecao.unit_id, draft.selecao.scheduled_at, draft.selecao.professional_id);
             if (still) {
               s.selecao = still;
               if (kindKey === bookingTipo) renderBooking();
@@ -1251,7 +1271,7 @@
         guided = true;
         if (!rebook) {
           // pré-seleciona a vaga atual se ainda existir
-          const still = record.unit_id ? findSlot(s, record.unit_id, record.scheduled_at) : null;
+          const still = record.unit_id ? findSlot(s, record.unit_id, record.scheduled_at, record.professional_id) : null;
           if (still) {
             s.selecao = still;
             s.diaAberto = { [still.unit_id]: still.date };
