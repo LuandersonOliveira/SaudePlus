@@ -366,12 +366,19 @@
   | `npm test` | Suíte completa (`node:test`): contratos HTTP, RBAC, auditoria, cripto, front e banco. |
   | `npm run test:race` | Só o teste de concorrência do booking — precisa de duas conexões MySQL simultâneas. |
   | `npm run test:all` | `npm test` + `npm run test:race`. |
-  | `npm run smoke-test` | Verificação curta (segundos): saúde, headers, CORS, 17 asserts de RBAC e os validadores. |
-  | `npm run db:setup` / `db:migrate` / `db:seed` | Criar o banco / aplicar migrations / semear admin e dados demo. |
+| `npm run smoke-test` | Verificação curta (segundos): saúde, headers, CORS, 17 asserts de RBAC e os validadores. |
+| `npm run test:e2e` | Testes de ponta a ponta com navegador real (Playwright). Sobe o `dev` sozinho. Precisa do Chromium: `npm run test:e2e:install` (uma vez). |
+| `npm run db:setup` / `db:migrate` / `db:seed` | Criar o banco / aplicar migrations / semear admin e dados demo. |
   | `npm run backup` | Dump do banco (gzip + SHA-256 + manifesto), com retenção. |
 
   O `npm test` roda contra o banco de desenvolvimento e é seguro: usa usuários
   de teste com UUID fixo e limpa o que cria.
+
+  O `npm run test:e2e` **também** roda contra o banco de desenvolvimento e
+  precisa de `npm run db:seed` semeado: ele faz login de verdade, no navegador,
+  com a conta do `.env`. Sem o seed, os testes que dependem do demo são pulados
+  (aparecem como `skipped`) em vez de falharem. Ele sobe o `npm run dev` por
+  conta própria e derruba no fim; com o `dev` já rodando, reaproveita.
 
   ### Dentro de `server/` (`npm run <script>`)
 

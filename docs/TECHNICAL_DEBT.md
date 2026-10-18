@@ -82,8 +82,28 @@ _Todos os achados desta seção foram corrigidos._
 - **Envio real dos lembretes**: o job monta e persiste a linha, mas não envia
   e-mail/SMS/WhatsApp.
 - **Lint/CI**: não há `eslint` nem pipeline; a suíte `npm test` é o portão.
-- **E2E automatizado**: a cobertura é de contrato no servidor + verificação
-  estática do front. Não há navegador de verdade no pipeline.
+
+### E2E automatizado — resolvido (2026-10-18)
+
+A cobertura era de contrato no servidor + verificação estática do front.
+Nenhuma das duas abre uma página, então a lacuna era exatamente a que o
+usuário vê: botão que não faz nada por erro de sintaxe no script, `onclick`
+apontando para função renomeada, painel que carrega e trava ao renderizar.
+
+`npm run test:e2e` (Playwright + Chromium) cobre login dos papéis, sessão
+sobrevindo a reload, logout, guarda de painel sem sessão, a URL única e a
+abertura dos painéis sem erro de JS nem resposta 4xx. Sobe o `dev` sozinho.
+
+O que o navegador encontrou que nenhuma outra camada via:
+
+- `dashboard.html:880` manda o admin para o painel administrativo — a regra
+  existia no código sem nenhum teste; agora está travada.
+- Um teste que falhou por **corrida sua**, não por defeito: `page.goto()`
+  logo após clicar em Entrar aborta o POST em voo, o painel abre sem sessão
+  e `requireAuth()` joga para o login. O `entrar()` agora espera a resposta.
+
+Continua pendente: E2E de **agendamento** (criar consulta de ponta a ponta) e
+de outros papéis, que dependem do seed demo.
 
 ---
 

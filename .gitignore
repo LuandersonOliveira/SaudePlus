@@ -2,3 +2,7 @@
 node_modules/
 *.log
 .superpowers/
+
+# Playwright: relatório HTML e artefatos de falha (trace/screenshot).
+playwright-report/
+test-results/
