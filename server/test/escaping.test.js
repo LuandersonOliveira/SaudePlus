@@ -49,11 +49,6 @@ function extrairEsc(html) {
   return new Function('ESC_MAP', `return function esc(s) ${corpo};`)(globalThis.ESC_MAP || {});
 }
 
-/** Reproduz a interpolação real: onclick="fn('a','b')" e mede se quebra. */
-function montarOnclick(fnNome, a, b) {
-  return new Function(`return ${fnNome}('${a}','${b}')`);
-}
-
 test('todo painel define esc()', () => {
   for (const p of PAINEIS) {
     assert.equal(typeof extrairEsc(htmlDe(p)), 'function', `${p} não define esc()`);
@@ -150,7 +145,6 @@ function extrairDelegado(html, alvo) {
     cancelItem: duble('cancelItem'),
     console,
   };
-  // eslint-disable-next-line no-new-func
   new Function(...Object.keys(contexto), corpo)(...Object.values(contexto));
   return chamadas;
 }

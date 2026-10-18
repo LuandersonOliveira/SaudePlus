@@ -374,6 +374,8 @@
   | `npm run test:all` | `npm test` + `npm run test:race`. |
 | `npm run smoke-test` | Verificação curta (segundos): saúde, headers, CORS, 17 asserts de RBAC e os validadores. |
 | `npm run test:e2e` | Testes de ponta a ponta com navegador real (Playwright). Sobe o `dev` sozinho. Precisa do Chromium: `npm run test:e2e:install` (uma vez). |
+| `npm run lint` | ESLint: erro de digitação, variável morta, sintaxe. Segundos, sem MySQL. |
+| `npm run check` | `lint` + `test:all` — o portão local completo. |
 | `npm run db:setup` / `db:migrate` / `db:seed` | Criar o banco / aplicar migrations / semear admin e dados demo. |
   | `npm run backup` | Dump do banco (gzip + SHA-256 + manifesto), com retenção. |
 
@@ -386,7 +388,29 @@
   (aparecem como `skipped`) em vez de falharem. Ele sobe o `npm run dev` por
   conta própria e derruba no fim; com o `dev` já rodando, reaproveita.
 
-  ### Dentro de `server/` (`npm run <script>`)
+  ### Continuous Integration
+
+`.github/workflows/ci.yml` roda em cada push e pull request, em três jobs
+que saem na ordem mais barata para a mais cara:
+
+| Job | O que roda | Precisa de |
+|---|---|---|
+| **Lint** | `npm run lint` | nada |
+| **Suíte + E2E** | `db:setup` → `db:seed` → `doctor` → `test:all` → `test:e2e` | MySQL 8.4 |
+| **Auditoria** | `npm audit --audit-level=critical` | nada |
+
+O job de testes sobe o MySQL como *service container*, com segredos de teste
+versionados no próprio workflow (que não servem para nada fora do CI). O
+`SMTP_HOST` fica **vazio** de propósito: é a mesma política de "sem
+credencial, o sistema funciona mas não finge" que vale em produção.
+
+A auditoria falha só em severidade **crítica**. As 3 `high` restantes são de
+`nodemon → chokidar → braces`, que não têm correção upstream e só existem na
+máquina do desenvolvedor — descritas em
+[`docs/TECHNICAL_DEBT.md`](docs/TECHNICAL_DEBT.md). Um portão que falha todo
+dia por algo que ninguém pode corrigir é um portão que ninguém lê.
+
+### Dentro de `server/` (`npm run <script>`)
 
   | Script             | Comando                                             | Para quê                                                                                                                                                                   |
   | ------------------ | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

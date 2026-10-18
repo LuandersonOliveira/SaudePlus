@@ -16,7 +16,6 @@ const pool = require('../src/db');
 const { anonymizeUser } = require('../src/utils/privacy');
 
 const ALVO = { id: '00000000-0000-4000-8000-00000000c0de', email: 'lgpd-alvo@caps.local' };
-const UNIDADE = '00000000-0000-4000-8000-00000000abcd';
 const SERVICO = 'Clínica Geral';
 
 let server;

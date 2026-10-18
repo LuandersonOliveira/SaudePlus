@@ -1,0 +1,157 @@
+# ==========================================================================
+# Saúde+ — pipeline
+#
+# Três portões, na ordem mais barata para a mais cara:
+#
+#   1. lint       — segundos, não precisa de MySQL
+#   2. suíte      — minutos, precisa de MySQL
+#   3. E2E        — minutos, precisa de MySQL e de navegador
+#
+# O teste de concorrência (`test:race`) entra junto com a suíte: ele precisa
+# de duas conexões simultâneas, que o service container dá de graça.
+#
+# Sobre segredos: o `JWT_SECRET` e o `DATA_ENCRYPTION_KEY` abaixo são valores
+# de teste, versionados de propósito, e não servem para nada fora daqui. Um
+# segredo real em CI pertence a `secrets` do repositório — e mesmo assim, um
+# banco de teste não deve ser um banco real.
+# ==========================================================================
+name: CI
+
+on:
+  push:
+    branches: [main, 'stabilize/**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # Uma execução por ref. Sem isso, dois pushes seguidos brigam pela mesma
+  # porta e o mais novo perde para um run mais velho.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---- 1. Lint: o mais barato, então sai primeiro e falha cedo ----
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar ESLint
+        run: npm run lint
+
+  # ---- 2 e 3. Suíte e E2E: precisam de MySQL ----
+  tests:
+    name: Suíte + E2E
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: saude
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      NODE_ENV: test
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: saude
+      PORT: '4000'
+      CORS_ORIGIN: http://localhost:8080
+      # Valores de teste, versionados de propósito. Fora daqui não servem.
+      JWT_SECRET: ci-jwt-secret-nao-usar-em-producao-0000000000000000
+      DATA_ENCRYPTION_KEY: ci-chave-de-teste-nao-usar-em-producao-000000
+      ADMIN_EMAIL: admin@saude.app
+      ADMIN_PASSWORD: SenhaDeTesteCI!2026
+      # Sem SMTP, de propósito: o job de lembretes e a recuperação de senha
+      # têm de funcionar (e registrar a pendência) sem serviço externo.
+      # É a mesma política de "sem credencial, funciona mas não finge".
+      SMTP_HOST: ''
+      ALLOW_PLAINTEXT_DEV: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci && npm --prefix server ci
+
+      - name: Esperar o MySQL
+        run: |
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -uroot -proot --silent; then
+              echo "MySQL pronto"; exit 0
+            fi
+            sleep 2
+          done
+          echo "MySQL não respondeu a tempo"; exit 1
+
+      - name: Criar o banco (schema + migrations)
+        run: npm run db:setup
+
+      - name: Semear admin e dados demo
+        run: npm run db:seed
+
+      - name: Diagnóstico do ambiente
+        run: npm run doctor
+
+      - name: Suíte completa (inclui concorrência)
+        run: npm run test:all
+
+      - name: Instalar o Chromium do Playwright
+        run: npm run test:e2e:install
+
+      - name: E2E com navegador
+        run: npm run test:e2e
+
+      - name: Guardar o relatório do E2E
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # ---- npm audit: falha o pipeline só em severidade crítica ----
+  audit:
+    name: Auditoria de dependências
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci && npm --prefix server ci
+
+      # As 3 `high` de nodemon→chokidar→braces estão documentadas em
+      # docs/TECHNICAL_DEBT.md: sem correção upstream (a braces 3.0.3, a mais
+      # nova, continua sinalizada) e expostas só na máquina do desenvolvedor.
+      # Falhar aqui por elas seria treinar a equipe a ignorar o portão.
+      - name: npm audit
+        run: |
+          npm --prefix server audit --audit-level=critical
+          npm audit --audit-level=critical

@@ -10,7 +10,6 @@
    Uso:  npm run doctor     (saída 0 = tudo pronto, 1 = há problema)
    ========================================================================== */
 const fs = require('fs');
-const fsp = require('fs/promises');
 const net = require('net');
 const path = require('path');
 

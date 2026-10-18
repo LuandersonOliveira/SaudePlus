@@ -61,7 +61,7 @@ function nextDayWindow(now = new Date()) {
  * lembrete continua gravado (a parte que importa) e o job segue.
  */
 async function entregarPorEmail(reminderId, userId, { title, message }) {
-    let destino = null;
+    let destino;
     try {
         const [[u]] = await pool.query('SELECT email FROM users WHERE id = ?', [userId]);
         destino = u ? u.email : null;

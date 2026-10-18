@@ -120,10 +120,7 @@ test.before(async () => {
     [crypto.randomUUID(), unidadeA, ana, 'consulta', 'Clínica Geral']
   );
 
-  const dia = amanhaNaSegundaFeira();
-  const dataSql = `${dia.getFullYear()}-${pad(dia.getMonth() + 1)}-${pad(dia.getDate())}`;
-
-  // Ana atende nos dois dias-sábados… quer dizer, nos dois lugares.
+// Ana atende nos dois dias-sábados… quer dizer, nos dois lugares.
   for (const u of [unidadeA, unidadeB]) {
     await conn.query(
       `INSERT INTO work_schedules

@@ -58,13 +58,6 @@ function semComentarios(hoje) {
   return String(hoje).replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
-/** Primeira chave de abertura que não esteja dentro de comentário. */
-function primeiraChaveForaDeComentario(hoje) {
-  const limpo = semComentarios(hoje);
-  const i = limpo.indexOf('{');
-  return i === -1 ? -1 : i;
-}
-
 test('não há terminador de comentário órfão (a raiz do bug que engolia .sr-only)', () => {
   const r = inspecionar(css);
   assert.deepEqual(

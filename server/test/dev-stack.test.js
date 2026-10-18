@@ -36,7 +36,6 @@ let api;
 let web;
 let frontBase;
 let apiBase;
-let admin;
 let token;
 
 // A allowlist do CORS é lida do `.env` quando o app carrega — não dá para
@@ -60,7 +59,6 @@ test.before(async () => {
     "SELECT id, email, full_name, admin_level FROM users WHERE role = 'admin' AND account_status = 'ativo' AND email NOT LIKE 'removido%' LIMIT 1"
   );
   assert.ok(u, 'precisa de um admin ativo — rode npm run db:seed');
-  admin = u;
 
   token = jwt.sign(
     { id: u.id, email: u.email, role: 'admin', admin_level: u.admin_level, full_name: u.full_name },

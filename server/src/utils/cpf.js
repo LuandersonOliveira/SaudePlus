@@ -56,7 +56,7 @@ function acharPorCpf(linhas, cpfInformado, decrypt) {
   if (!Array.isArray(linhas) || !linhas.length) return null;
   let achado = null;
   for (const linha of linhas) {
-    let decifrado = null;
+    let decifrado;
     try {
       decifrado = decrypt(linha.cpf);
     } catch {

@@ -190,7 +190,7 @@ test('duas linhas penduradas no mesmo elo = divergência real', async () => {
 test('encadeamento fora da ordem do seq é aceito quando não há divergência', async () => {
   // Um backfill (ou uma escrita que entrou depois, com seq menor) não
   // invalida a cadeia: o que define a ordem é o elo de hash, não o número.
-  const { pool, linhas } = cadeiaDe(4);
+  const { linhas } = cadeiaDe(4);
   // Reordena o array como o banco devolveria por seq, mas a cadeia continua
   // certa — o único caminho válido é seguir prev_hash.
   const bagunado = linhas.slice().reverse();

@@ -16,7 +16,6 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
 const path = require('node:path');
 

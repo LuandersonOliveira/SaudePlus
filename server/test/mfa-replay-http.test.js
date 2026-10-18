@@ -8,7 +8,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
-const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
 
 const app = require('../src/app');
