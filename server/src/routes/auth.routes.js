@@ -55,26 +55,51 @@ function signAccessToken(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: ACCESS_EXPIRES_IN });
 }
 
-function setRefreshCookie(res, raw) {
+function setRefreshCookie(res, raw, ttlMs = refreshTtlMs()) {
   res.cookie(REFRESH_COOKIE, raw, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/auth',
-    maxAge: refreshTtlMs(),
+    maxAge: ttlMs,
   });
 }
 
-async function issueRefreshToken(userId, family) {
+/**
+ * Prazo ABSOLUTO de uma família: o `expires_at` mais antigo que existe
+ * nela, que é o do token original.
+ *
+ * A rotação precisa deste valor. Emitir com `Date.now() + TTL` a cada
+ * vez faria o prazo andar junto com o uso — a família nunca venceria, e
+ * um refresh token roubado viveria indefinidamente enquanto o titular
+ * legítimo nunca perceberia. É o OAuth 2.0 BCP §4.14.2: rotacionar
+ * preserva o prazo da família.
+ */
+async function prazoDaFamilia(family) {
+  const [[minimo]] = await pool.query(
+    'SELECT MIN(expires_at) AS prazo FROM refresh_tokens WHERE family = ?',
+    [family]
+  );
+  if (!minimo || !minimo.prazo) return Date.now() + refreshTtlMs();
+  const ms = new Date(minimo.prazo).getTime();
+  return Number.isFinite(ms) && ms > 0 ? ms : Date.now() + refreshTtlMs();
+}
+
+/** Quanto ainda resta de vida, em ms, sem passar do prazo da família. */
+function restanteDaFamilia(deadlineMs, agora = Date.now()) {
+  return Math.max(0, Number(deadlineMs) - agora);
+}
+
+async function issueRefreshToken(userId, family, expiresAt = null) {
   const raw = crypto.randomBytes(48).toString('hex');
   const id = crypto.randomUUID();
   const fam = family || crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + refreshTtlMs());
+  const prazo = expiresAt || new Date(Date.now() + refreshTtlMs());
   await pool.query(
     'INSERT INTO refresh_tokens (id, user_id, token_hash, family, expires_at) VALUES (?,?,?,?,?)',
-    [id, userId, hashRefreshToken(raw), fam, expiresAt]
+    [id, userId, hashRefreshToken(raw), fam, prazo]
   );
-  return { raw, id, family: fam };
+  return { raw, id, family: fam, expiresAt: new Date(prazo).getTime() };
 }
 
 function readRefreshRaw(req) {
@@ -486,9 +511,12 @@ router.post('/refresh', async (req, res, next) => {
       return res.status(401).json({ error: 'Sessão invalidada por segurança. Entre novamente.' });
     }
 
-    // Emite o substituto ANTES de revogar o atual: se a emissão falhar,
+// Emite o substituto ANTES de revogar o atual: se a emissão falhar,
     // a sessão antiga continua válida (sem logout acidental).
-    const { raw: nextRaw, id: nextId } = await issueRefreshToken(stored.user_id, stored.family);
+    // O prazo vem da FAMÍLIA, não de agora: rotacionar não pode estender a
+    // vida da sessão, senão o par nunca expira.
+    const deadline = await prazoDaFamilia(stored.family);
+    const { raw: nextRaw, id: nextId } = await issueRefreshToken(stored.user_id, stored.family, new Date(deadline));
     const [upd] = await pool.query(
       'UPDATE refresh_tokens SET revoked = 1, replaced_by = ? WHERE id = ? AND revoked = 0',
       [nextId, stored.id]
@@ -499,7 +527,7 @@ router.post('/refresh', async (req, res, next) => {
       res.clearCookie(REFRESH_COOKIE, { path: '/auth' });
       return res.status(401).json({ error: 'Sessão invalidada por segurança. Entre novamente.' });
     }
-    setRefreshCookie(res, nextRaw);
+    setRefreshCookie(res, nextRaw, restanteDaFamilia(deadline));
 
     const [users] = await pool.query(
       'SELECT id, email, role, admin_level, full_name, job_role, account_status FROM users WHERE id = ?',
