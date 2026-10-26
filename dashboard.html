@@ -16,15 +16,15 @@
     <a class="brand rail-brand" href="index.html"><span class="brand-dot"></span>Saúde+</a>
     <nav class="tabs sidebar" role="tablist" aria-label="Navegação do painel">
       <button class="tab active" data-tab="inicio" role="tab" aria-selected="true" id="tab-inicio"
-        aria-controls="inicio">Início</button>
+        aria-controls="inicio" tabindex="0">Início</button>
       <button class="tab" data-tab="agendar" role="tab" aria-selected="false" id="tab-agendar"
-        aria-controls="agendar">Agendar</button>
+        aria-controls="agendar" tabindex="-1">Agendar</button>
       <button class="tab" data-tab="agendamentos" role="tab" aria-selected="false" id="tab-agendamentos"
-        aria-controls="agendamentos">Meus agendamentos</button>
+        aria-controls="agendamentos" tabindex="-1">Meus agendamentos</button>
       <button class="tab" data-tab="alertas" role="tab" aria-selected="false" id="tab-alertas"
-        aria-controls="alertas">Alertas</button>
+        aria-controls="alertas" tabindex="-1">Alertas</button>
       <button class="tab" data-tab="minha-conta" role="tab" aria-selected="false" id="tab-minha-conta"
-        aria-controls="minha-conta">Minha conta</button>
+        aria-controls="minha-conta" tabindex="-1">Minha conta</button>
     </nav>
     <div class="rail-user">
       <div class="rail-user-head">
@@ -42,17 +42,19 @@
     <p class="muted">Acompanhe seus agendamentos, exames e alertas de saúde.</p>
 
     <!-- INÍCIO -->
-    <section class="tabpanel active" id="inicio" role="tabpanel" aria-labelledby="tab-inicio">
+    <section class="tabpanel active" id="inicio" role="tabpanel" aria-labelledby="tab-inicio" tabindex="0">
       <div id="welcomeBanner"></div>
       <div id="profileBanner"></div>
-      <div class="grid grid-5" id="stats"></div>
-      <div class="card" style="margin-top:16px">
+      <div class="stats-grid" id="stats" aria-live="polite">
+        <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+      </div>
+      <div class="card mt-4">
         <h2>Próximos eventos</h2>
         <div id="upcoming">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
-      <div class="card" style="margin-top:16px">
+      <div class="card mt-4">
         <h2>Lembretes</h2>
         <div id="reminders">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
@@ -61,22 +63,22 @@
     </section>
 
     <!-- MEUS AGENDAMENTOS -->
-    <section class="tabpanel" id="agendamentos" role="tabpanel" aria-labelledby="tab-agendamentos">
+    <section class="tabpanel" id="agendamentos" role="tabpanel" aria-labelledby="tab-agendamentos" tabindex="0">
       <div class="card">
         <h2>Todos os meus agendamentos</h2>
-        <p class="muted" style="margin-top:-8px;margin-bottom:16px">Consultas e exames — ativos, confirmados e
+        <p class="muted card-sub mb-4">Consultas e exames — ativos, confirmados e
           cancelados.</p>
         <div id="allScheduled">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
-      <div class="card" style="margin-top:16px">
+      <div class="card mt-4">
         <h2>Minhas consultas</h2>
         <div id="appts">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
-      <div class="card" style="margin-top:16px">
+      <div class="card mt-4">
         <h2>Meus exames</h2>
         <div id="exams">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
@@ -85,30 +87,32 @@
     </section>
 
     <!-- AGENDAR (consulta ou exame) -->
-    <section class="tabpanel" id="agendar" role="tabpanel" aria-labelledby="tab-agendar">
-      <div class="tabs" role="tablist" aria-label="Tipo de agendamento" style="margin-bottom:16px">
-        <button class="tab active" type="button" id="kindAppt" onclick="setBookingKind('appointments')">Consulta</button>
-        <button class="tab" type="button" id="kindExam" onclick="setBookingKind('exams')">Exame</button>
+    <section class="tabpanel" id="agendar" role="tabpanel" aria-labelledby="tab-agendar" tabindex="0">
+      <div class="tabs mb-4" role="tablist" aria-label="Tipo de agendamento">
+        <button class="tab active" type="button" role="tab" id="kindAppt" aria-controls="apptFormCard"
+          aria-selected="true" tabindex="0" onclick="setBookingKind('appointments')">Consulta</button>
+        <button class="tab" type="button" role="tab" id="kindExam" aria-controls="examFormCard"
+          aria-selected="false" tabindex="-1" onclick="setBookingKind('exams')">Exame</button>
       </div>
-      <div class="card" id="apptFormCard">
+      <div class="card" id="apptFormCard" role="tabpanel" aria-labelledby="kindAppt" tabindex="0">
         <p class="edit-banner" id="apptEditBanner" style="display:none">Você está editando este agendamento.</p>
         <h2 id="apptFormTitle">Agendar consulta</h2>
         <form id="apptForm" class="grid grid-2" novalidate>
-          <div class="field" style="grid-column:1/-1">
+          <div class="field col-full">
             <label for="apptServiceSelect">Especialidade *</label>
             <select class="select" id="apptServiceSelect">
               <option value="">Carregando serviços...</option>
             </select>
             <label for="specialtyOutra" class="sr-only">Digite a especialidade</label>
-            <input class="input" name="specialty_outra" id="specialtyOutra" placeholder="Digite a especialidade"
-              style="display:none;margin-top:8px">
+            <input class="input mt-2" name="specialty_outra" id="specialtyOutra" placeholder="Digite a especialidade"
+              style="display:none">
             <small class="help-text" id="apptServiceHelp" style="display:none"></small>
           </div>
-          <div class="field" style="grid-column:1/-1">
-            <div class="muted" id="apptSlotsHint" style="font-size:.9rem">Escolha um serviço para ver as vagas livres.</div>
+          <div class="field col-full">
+            <div class="muted text-sm" id="apptSlotsHint">Escolha um serviço para ver as vagas livres.</div>
             <div id="apptSlotsPanel" class="slots-panel" aria-live="polite"></div>
           </div>
-          <div id="apptManualBlock" style="grid-column:1/-1;display:none">
+          <div class="col-full" id="apptManualBlock" style="display:none">
             <div class="grid grid-2">
               <div class="field">
                 <label for="apptManualUnit">Unidade *</label>
@@ -119,14 +123,14 @@
                 <input class="input" id="apptManualDate" type="datetime-local">
               </div>
             </div>
-            <p class="muted" style="font-size:.9rem">Sem vaga na grade? A unidade aloca o atendimento e confirma depois.</p>
+            <p class="muted text-sm">Sem vaga na grade? A unidade aloca o atendimento e confirma depois.</p>
           </div>
-          <div class="field" id="apptSummaryField" style="grid-column:1/-1;display:none">
+          <div class="field col-full" id="apptSummaryField" style="display:none">
             <div class="slot-summary" id="apptSelectionSummary"></div>
           </div>
-          <div class="field" style="grid-column:1/-1"><label for="apptNotes">Observações</label><textarea class="textarea"
+          <div class="field col-full"><label for="apptNotes">Observações</label><textarea class="textarea"
               name="notes" id="apptNotes"></textarea></div>
-          <div class="row" style="grid-column:1/-1">
+          <div class="row col-full">
             <button class="btn btn-primary" type="submit" id="apptSubmitBtn" disabled>Agendar</button>
             <button type="button" id="apptCancel" class="btn btn-outline btn-sm"
               onclick="clearApptForm()">Cancelar</button>
@@ -135,25 +139,25 @@
           </div>
         </form>
       </div>
-      <div class="card" id="examFormCard" style="margin-top:16px;display:none">
+      <div class="card mt-4" id="examFormCard" role="tabpanel" aria-labelledby="kindExam" tabindex="0" style="display:none">
         <p class="edit-banner" id="examEditBanner" style="display:none">Você está editando este agendamento.</p>
         <h2 id="examFormTitle">Agendar exame</h2>
         <form id="examForm" class="grid grid-2" novalidate>
-          <div class="field" style="grid-column:1/-1">
+          <div class="field col-full">
             <label for="examServiceSelect">Tipo de exame *</label>
             <select class="select" id="examServiceSelect">
               <option value="">Carregando serviços...</option>
             </select>
             <label for="examTypeOutro" class="sr-only">Digite o tipo de exame</label>
-            <input class="input" name="exam_type_outro" id="examTypeOutro" placeholder="Digite o tipo de exame"
-              style="display:none;margin-top:8px">
+            <input class="input mt-2" name="exam_type_outro" id="examTypeOutro" placeholder="Digite o tipo de exame"
+              style="display:none">
             <small class="help-text" id="examServiceHelp" style="display:none"></small>
           </div>
-          <div class="field" style="grid-column:1/-1">
-            <div class="muted" id="examSlotsHint" style="font-size:.9rem">Escolha um serviço para ver as vagas livres.</div>
+          <div class="field col-full">
+            <div class="muted text-sm" id="examSlotsHint">Escolha um serviço para ver as vagas livres.</div>
             <div id="examSlotsPanel" class="slots-panel" aria-live="polite"></div>
           </div>
-          <div id="examManualBlock" style="grid-column:1/-1;display:none">
+          <div class="col-full" id="examManualBlock" style="display:none">
             <div class="grid grid-2">
               <div class="field">
                 <label for="examManualUnit">Unidade *</label>
@@ -164,14 +168,14 @@
                 <input class="input" id="examManualDate" type="datetime-local">
               </div>
             </div>
-            <p class="muted" style="font-size:.9rem">Sem vaga na grade? A unidade aloca o atendimento e confirma depois.</p>
+            <p class="muted text-sm">Sem vaga na grade? A unidade aloca o atendimento e confirma depois.</p>
           </div>
-          <div class="field" id="examSummaryField" style="grid-column:1/-1;display:none">
+          <div class="field col-full" id="examSummaryField" style="display:none">
             <div class="slot-summary" id="examSelectionSummary"></div>
           </div>
-          <div class="field" style="grid-column:1/-1"><label for="examNotes">Observações</label><textarea class="textarea"
+          <div class="field col-full"><label for="examNotes">Observações</label><textarea class="textarea"
               name="notes" id="examNotes"></textarea></div>
-          <div class="row" style="grid-column:1/-1">
+          <div class="row col-full">
             <button class="btn btn-primary" type="submit" id="examSubmitBtn" disabled>Agendar</button>
             <button type="button" id="examCancel" class="btn btn-outline btn-sm"
               onclick="clearExamForm()">Cancelar</button>
@@ -183,7 +187,7 @@
     </section>
 
     <!-- ALERTAS -->
-    <section class="tabpanel" id="alertas" role="tabpanel" aria-labelledby="tab-alertas">
+    <section class="tabpanel" id="alertas" role="tabpanel" aria-labelledby="tab-alertas" tabindex="0">
       <div class="card">
         <h2>Doenças em alerta na sua região</h2>
         <div id="diseases">
@@ -193,26 +197,27 @@
     </section>
 
     <!-- MINHA CONTA (perfil + LGPD + MFA + privacidade + DPO) -->
-    <section class="tabpanel" id="minha-conta" role="tabpanel" aria-labelledby="tab-minha-conta">
-      <div class="grid grid-2" style="align-items:start">
+    <section class="tabpanel" id="minha-conta" role="tabpanel" aria-labelledby="tab-minha-conta" tabindex="0">
+      <div class="grid grid-2 items-start">
       <div class="card">
         <h2>Complete seu perfil</h2>
-        <p class="muted" style="margin-top:-8px">Quanto mais completo, melhor o atendimento — e alguns dados
+        <p class="muted card-sub">Quanto mais completo, melhor o atendimento — e alguns dados
           (como o CNS) ligam seu histórico ao SUS.</p>
-        <div style="display:flex;align-items:center;gap:12px;margin:12px 0">
-          <div style="flex:1;height:10px;border-radius:var(--radius-xs);background:var(--border);overflow:hidden">
-            <div id="profileBar" style="height:100%;width:0%;background:var(--primary,#0F7A6B)"></div>
+        <div class="meter">
+          <div class="meter-track">
+            <div id="profileBar" class="meter-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+              aria-label="Progresso do preenchimento do perfil"></div>
           </div>
-          <strong id="profilePct">0%</strong>
+          <strong id="profilePct" class="meter-value">0%</strong>
         </div>
         <form id="profileForm" novalidate aria-label="Meu perfil">
-          <h3 style="margin-top:8px">Identificação</h3>
-          <div class="grid grid-2" style="gap:12px">
-            <div class="field" style="grid-column:1/-1">
+          <h3 class="mt-2">Identificação</h3>
+          <div class="grid grid-2 gap-3">
+            <div class="field col-full">
               <label for="p_full_name">Nome completo *</label>
               <input class="input" id="p_full_name" required autocomplete="name">
             </div>
-            <div class="field" style="grid-column:1/-1">
+            <div class="field col-full">
               <label for="p_social_name">Nome social <span class="opt">(opcional)</span></label>
               <input class="input" id="p_social_name" maxlength="150">
             </div>
@@ -238,13 +243,13 @@
               <label for="p_father_name">Nome do pai <span class="opt">(opcional)</span></label>
               <input class="input" id="p_father_name">
             </div>
-            <div class="field" id="p_guardianField" style="grid-column:1/-1;display:none">
+            <div class="field col-full" id="p_guardianField" style="display:none">
               <label for="p_guardian">Responsável legal *</label>
               <input class="input" id="p_guardian" maxlength="150">
             </div>
           </div>
-          <h3 style="margin-top:16px">Documentos</h3>
-          <div class="grid grid-2" style="gap:12px">
+          <h3 class="mt-4">Documentos</h3>
+          <div class="grid grid-2 gap-3">
             <div class="field">
               <label for="p_cpf">CPF *</label>
               <input class="input" id="p_cpf" placeholder="000.000.000-00" maxlength="14" required inputmode="numeric">
@@ -253,14 +258,14 @@
               <label for="p_rg">RG</label>
               <input class="input" id="p_rg" placeholder="00.000.000-0" maxlength="12" oninput="maskRg(this)">
             </div>
-            <div class="field" style="grid-column:1/-1">
+            <div class="field col-full">
               <label for="p_cns">Cartão SUS (CNS)</label>
               <input class="input" id="p_cns" inputmode="numeric" placeholder="000 0000 0000 0000" maxlength="18">
               <small class="help-text">Liga seu histórico ao SUS. Opcional se não tiver em mãos.</small>
             </div>
           </div>
-          <h3 style="margin-top:16px">Contato e saúde</h3>
-          <div class="grid grid-2" style="gap:12px">
+          <h3 class="mt-4">Contato e saúde</h3>
+          <div class="grid grid-2 gap-3">
             <div class="field">
               <label for="p_mobile">Celular *</label>
               <input class="input" id="p_mobile" placeholder="(00) 90000-0000" maxlength="16" required inputmode="tel">
@@ -303,8 +308,8 @@
               </select>
             </div>
           </div>
-          <h3 style="margin-top:16px">Endereço</h3>
-          <div class="grid grid-2" style="gap:12px">
+          <h3 class="mt-4">Endereço</h3>
+          <div class="grid grid-2 gap-3">
             <div class="field">
               <label for="p_cep">CEP</label>
               <input class="input" id="p_cep" placeholder="00000-000" maxlength="9" oninput="maskCep(this)" onblur="lookupCep('p_cep',{street:'p_street',neighborhood:'p_neighborhood',city:'p_city',state:'p_state'})">
@@ -313,7 +318,7 @@
               <label for="p_number">Número</label>
               <input class="input" id="p_number" placeholder="413">
             </div>
-            <div class="field" style="grid-column:1/-1">
+            <div class="field col-full">
               <label for="p_street">Rua / Logradouro</label>
               <input class="input" id="p_street" placeholder="Preenchido pelo CEP (editável)">
             </div>
@@ -325,9 +330,9 @@
               <label for="p_city">Cidade</label>
               <input class="input" id="p_city">
             </div>
-            <div class="field" style="flex:0 0 80px">
+            <div class="field field-uf">
               <label for="p_state">UF</label>
-              <input class="input" id="p_state" maxlength="2" placeholder="UF" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')">
+              <input class="input text-upper" id="p_state" maxlength="2" placeholder="UF" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')">
             </div>
             <div class="field">
               <label for="p_zone">Zona</label>
@@ -337,51 +342,51 @@
                 <option value="rural">Rural</option>
               </select>
             </div>
-            <div class="field" style="grid-column:1/-1">
+            <div class="field col-full">
               <label for="p_reference">Ponto de referência</label>
               <input class="input" id="p_reference" placeholder="Ex: Próximo à Igreja São José...">
             </div>
           </div>
-          <div class="row" style="margin-top:16px">
+          <div class="row mt-4">
             <button class="btn btn-primary" type="submit" id="profileSubmit">Salvar perfil</button>
           </div>
         </form>
       </div>
 
-        <div class="grid" style="gap:16px">
+        <div class="grid gap-4">
           <div class="card">
             <h2>Meus dados (LGPD)</h2>
             <p class="muted">Baixe tudo que o sistema guarda sobre você ou peça a exclusão da conta.</p>
-            <div id="consentLine" class="muted" style="font-size:.9rem">
+            <div id="consentLine" class="muted text-sm" role="status" aria-live="polite">
               <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
             </div>
-            <div class="row" style="margin-top:14px">
-              <button class="btn btn-outline btn-sm" type="button" onclick="downloadMyData()">Baixar meus dados (JSON)</button>
-              <button class="btn btn-outline btn-sm" type="button" onclick="deleteMyAccount()" style="color:var(--danger)">Excluir minha conta…</button>
+            <div class="row mt-3">
+              <button class="btn btn-outline btn-sm" type="button" id="lgpdDownloadBtn" onclick="downloadMyData(this)">Baixar meus dados (JSON)</button>
+              <button class="btn btn-outline btn-sm text-danger" type="button" id="lgpdDeleteBtn" onclick="deleteMyAccount(this)">Excluir minha conta…</button>
             </div>
           </div>
           <div class="card">
             <h2>Verificação em duas etapas (MFA)</h2>
-            <p class="muted" id="mfaStatus">Verificando…</p>
+            <p class="muted" id="mfaStatus" role="status" aria-live="polite">Verificando…</p>
             <div id="mfaSetup" style="display:none">
               <p class="muted">1. Cadastre este segredo no app autenticador (Google/Microsoft Authenticator):</p>
-              <p><code id="mfaSecret" style="user-select:all"></code></p>
+              <p><code id="mfaSecret" class="select-all"></code></p>
               <div class="row">
                 <label for="mfaEnableCode" class="sr-only">Código de 6 dígitos do app autenticador</label>
-                <input class="input" id="mfaEnableCode" inputmode="numeric" maxlength="6" placeholder="Código de 6 dígitos" style="max-width:220px">
-                <button class="btn btn-primary btn-sm" type="button" onclick="enableMfa()">Ativar</button>
+                <input class="input field-code" id="mfaEnableCode" inputmode="numeric" maxlength="6" placeholder="Código de 6 dígitos">
+                <button class="btn btn-primary btn-sm" type="button" id="mfaEnableBtn" onclick="enableMfa(this)">Ativar</button>
               </div>
             </div>
-            <div class="row" style="margin-top:8px">
+            <div class="row mt-2">
               <button class="btn btn-outline btn-sm" type="button" id="mfaSetupBtn" onclick="startMfaSetup()">Ativar verificação em 2 etapas</button>
-              <button class="btn btn-outline btn-sm" type="button" id="mfaDisableBtn" onclick="disableMfa()" style="display:none">Desativar</button>
+              <button class="btn btn-outline btn-sm" type="button" id="mfaDisableBtn" onclick="disableMfa(this)" style="display:none">Desativar</button>
             </div>
           </div>
           <div class="card">
             <h2>Privacidade</h2>
             <p class="muted">Coletamos o mínimo necessário para o atendimento público. A base legal é o dever legal do
               SUS (art. 11, II, <em>f</em> da LGPD), não o consentimento — por isso não há caixa de aceite genérico.</p>
-            <ul class="muted" style="font-size:.9rem;padding-left:18px;margin:10px 0">
+            <ul class="muted list-plain">
               <li>Dados de saúde são sensíveis e ficam restritos à equipe que presta o atendimento.</li>
               <li>CPF, RG e CNS são gravados criptografados no banco.</li>
               <li>Cada acesso da equipe a documentos pessoais fica registrado na auditoria.</li>
@@ -392,7 +397,7 @@
           <div class="card">
             <h2>Encarregado (DPO)</h2>
             <p class="muted">Canal oficial para qualquer assunto sobre seus dados pessoais (LGPD, art. 41).</p>
-            <p id="dpoLine" style="font-weight:600;margin:10px 0 0"><span class="spinner"></span></p>
+            <p id="dpoLine" class="dpo-contact" role="status" aria-live="polite"><span class="spinner"></span></p>
           </div>
         </div>
       </div><!-- /grid Minha conta -->
@@ -533,7 +538,7 @@
       if (!s.unidades.length) {
         return `<div class="slot-empty">${esc(s.erro || 'Nenhuma vaga livre para este serviço nos próximos dias.')}</div>`;
       }
-      return `<p class="muted" style="font-size:.9rem;margin:0 0 4px">${s.totalVagas} horário(s) livre(s) em ${s.unidades.length} unidade(s).</p>` +
+      return `<p class="muted text-sm mb-1">${s.totalVagas} horário(s) livre(s) em ${s.unidades.length} unidade(s).</p>` +
         s.unidades.map((u) => unitCardHtml(s, kindKey, u)).join('');
     }
 
@@ -840,6 +845,13 @@
       document.getElementById('examFormCard').style.display = isAppt ? 'none' : '';
       document.getElementById('kindAppt').classList.toggle('active', isAppt);
       document.getElementById('kindExam').classList.toggle('active', !isAppt);
+      // Roving tabindex + aria-selected (APG) nas abas Consulta/Exame.
+      const apptTab = document.getElementById('kindAppt');
+      const examTab = document.getElementById('kindExam');
+      apptTab.setAttribute('aria-selected', isAppt ? 'true' : 'false');
+      examTab.setAttribute('aria-selected', isAppt ? 'false' : 'true');
+      apptTab.tabIndex = isAppt ? 0 : -1;
+      examTab.tabIndex = isAppt ? -1 : 0;
       renderBooking();
     };
 
@@ -914,7 +926,7 @@
         await restoreDraft('exams');
       } catch (err) {
         console.error(err);
-        toast(err.message || 'Erro ao carregar o painel', 'error');
+        toast(loadErrorMessage(err, 'Erro ao carregar o painel'), 'error');
       }
     });
 
@@ -924,6 +936,9 @@
         const active = t.dataset.tab === name;
         t.classList.toggle('active', active);
         t.setAttribute('aria-selected', active ? 'true' : 'false');
+        // Roving tabindex (APG): só a aba ativa entra na ordem do Tab, senão
+        // o teclado atravessa 5 paradas ocias antes de chegar ao conteúdo.
+        t.tabIndex = active ? 0 : -1;
       });
       document.querySelectorAll('.tabpanel').forEach(p =>
         p.classList.toggle('active', p.id === name)
@@ -941,8 +956,8 @@
         const p = data.profile || {};
         const quando = p.consent_at ? fmtDate(p.consent_at) : 'não registrado';
         document.getElementById('consentLine').innerHTML =
-          `<p style="margin:0">Política de privacidade na versão <strong>${esc(data.privacy_version || p.privacy_version || '—')}</strong></p>` +
-          `<p style="margin:4px 0 0">Consentimento registrado em: <strong>${esc(quando)}</strong></p>`;
+          `<p class="m-0">Política de privacidade na versão <strong>${esc(data.privacy_version || p.privacy_version || '—')}</strong></p>` +
+          `<p class="m-0 mt-1">Consentimento registrado em: <strong>${esc(quando)}</strong></p>`;
       } catch (err) {
         document.getElementById('consentLine').textContent = err.message || 'Não foi possível ler os registros de consentimento.';
       }
@@ -972,96 +987,169 @@
       } catch (err) {
         console.error('GET /health-units:', err);
         healthUnits = [];
-        toast(err.message || 'Erro ao carregar unidades de saúde', 'error');
+        toast(loadErrorMessage(err, 'Erro ao carregar unidades de saúde'), 'error');
       }
     }
 
-    async function loadAll() {
-      try {
-        const [A, E, D, R] = await Promise.all([
-          apiGet('/me/appointments'),
-          apiGet('/me/exams'),
-          apiGet('/diseases?active=true'),
-          apiGet('/me/reminders')
-        ]);
-        lastAppointments = Array.isArray(A) ? A : [];
-        lastExams = Array.isArray(E) ? E : [];
-        const unread = Array.isArray(R) ? R.filter(r => !r.read).length : 0;
+    /* Mensagem de erro por causa: rede caída (fetch rejeita com TypeError),
+       validação (4xx — a mensagem do servidor já vem em português) e falha
+       do servidor (5xx, genérica). Antes tudo virava um toast que sumia em
+       3,5 s e a lista ficava com skeleton para sempre. */
+    function loadErrorMessage(err, fallback) {
+      if (!err) return fallback;
+      if (err.name === 'TypeError') return 'Sem conexão com o servidor. Verifique sua internet e tente de novo.';
+      if (err.status >= 500) return 'O servidor teve um problema. Tente de novo em instantes.';
+      return err.message || fallback;
+    }
 
-        document.getElementById('welcomeBanner').innerHTML =
-          (A.length === 0 && E.length === 0)
-            ? `<div class="card" style="margin-bottom:16px;background:var(--primary-100);border-color:var(--primary)">
-           <h2 style="margin-bottom:4px">Bem-vindo(a) ao Saúde+</h2>
-            <p style="margin:0">Use a aba <strong>Agendar</strong> para fazer seu primeiro agendamento.</p>
+    /* As quatro fontes alimentam mais de um container cada. allSettled para
+       que a falha de uma não mate as outras; cada seção quebrada mostra
+       erro + "Tentar de novo" no próprio container. */
+    async function loadAll() {
+      const retry = () => loadAll();
+      const [aRes, eRes, dRes, rRes] = await Promise.allSettled([
+        apiGet('/me/appointments'),
+        apiGet('/me/exams'),
+        apiGet('/diseases?active=true'),
+        apiGet('/me/reminders'),
+      ]);
+      const ok = (r) => r.status === 'fulfilled';
+      const val = (r) => (ok(r) ? r.value : []);
+      const failErr = (r) => (ok(r) ? null : r.reason);
+
+      const A = Array.isArray(val(aRes)) ? val(aRes) : [];
+      const E = Array.isArray(val(eRes)) ? val(eRes) : [];
+      const D = Array.isArray(val(dRes)) ? val(dRes) : [];
+      const R = Array.isArray(val(rRes)) ? val(rRes) : [];
+      lastAppointments = A;
+      lastExams = E;
+
+      // Topo: erro só se TODAS falharam; se só uma caiu, o marcador dela
+      // vira "—" em vez de um 0 mentiroso.
+      const statsEl = document.getElementById('stats');
+      if (!ok(aRes) && !ok(eRes) && !ok(dRes) && !ok(rRes)) {
+        statsEl.innerHTML = '';
+        statsEl.appendChild(stateMessage('error', loadErrorMessage(failErr(aRes), 'Erro ao carregar os números do painel.'), retry));
+      } else {
+        const unread = R.filter((r) => !r.read).length;
+        statsEl.innerHTML =
+          stat('Consultas', ok(aRes) ? A.length : '—') +
+          stat('Exames', ok(eRes) ? E.length : '—') +
+          stat('Alertas ativos', ok(dRes) ? D.length : '—') +
+          stat('Lembretes', ok(rRes) ? unread : '—');
+      }
+
+      document.getElementById('welcomeBanner').innerHTML =
+        (ok(aRes) && ok(eRes) && A.length === 0 && E.length === 0)
+          ? `<div class="card card-highlight mb-4">
+           <h2 class="mb-1">Bem-vindo(a) ao Saúde+</h2>
+            <p class="m-0">Use a aba <strong>Agendar</strong> para fazer seu primeiro agendamento.</p>
          </div>` : '';
 
-        document.getElementById('stats').innerHTML =
-          stat('Consultas', A.length) + stat('Exames', E.length) +
-          stat('Alertas ativos', D.length) + stat('Lembretes', unread);
-
+      // Próximos eventos (precisa de A e E)
+      const upcomingEl = document.getElementById('upcoming');
+      if (!ok(aRes) || !ok(eRes)) {
+        upcomingEl.innerHTML = '';
+        upcomingEl.appendChild(stateMessage('error', loadErrorMessage(failErr(aRes) || failErr(eRes), 'Erro ao carregar os próximos eventos.'), retry));
+      } else {
         const upcoming = [
           ...A.map(x => ({ type: 'Consulta', title: x.specialty, at: x.scheduled_at, sub: x.location, status: x.status })),
           ...E.map(x => ({ type: 'Exame', title: x.exam_type, at: x.scheduled_at, sub: x.location, status: x.status }))
         ].filter(x => new Date(x.at) >= new Date() && x.status !== 'cancelado')
           .sort((a, b) => new Date(a.at) - new Date(b.at)).slice(0, 5);
 
-        document.getElementById('upcoming').innerHTML = upcoming.length
-          ? upcoming.map(x => `<div class="item"><div><h3><span class="badge" style="margin-right:6px">${esc(x.type)}</span>${esc(x.title)}</h3><p>${esc(x.sub)}</p></div><span class="muted">${fmtDate(x.at)}</span></div>`).join('')
+        upcomingEl.innerHTML = upcoming.length
+          ? upcoming.map(x => `<div class="item"><div><h3><span class="badge mr-1">${esc(x.type)}</span>${esc(x.title)}</h3><p>${esc(x.sub)}</p></div><span class="muted">${fmtDate(x.at)}</span></div>`).join('')
           : '<div class="empty">Nenhum evento futuro agendado.</div>';
+      }
 
-        document.getElementById('reminders').innerHTML = R.length
+      // Lembretes (precisa de R)
+      const remindersEl = document.getElementById('reminders');
+      if (!ok(rRes)) {
+        remindersEl.innerHTML = '';
+        remindersEl.appendChild(stateMessage('error', loadErrorMessage(failErr(rRes), 'Erro ao carregar os lembretes.'), retry));
+      } else {
+        remindersEl.innerHTML = R.length
           ? R.slice(0, 5).map(r => `<div class="item"><div><h3>${esc(r.title)}</h3><p>${esc(r.message || '')}</p></div><span class="badge ${r.read ? '' : 'badge-warning'}">${r.read ? 'Lido' : 'Novo'}</span></div>`).join('')
           : '<div class="empty">Nenhum lembrete no momento.</div>';
+      }
 
+      // Todos os agendamentos (precisa de A e E)
+      const allEl = document.getElementById('allScheduled');
+      if (!ok(aRes) || !ok(eRes)) {
+        allEl.innerHTML = '';
+        allEl.appendChild(stateMessage('error', loadErrorMessage(failErr(aRes) || failErr(eRes), 'Erro ao carregar seus agendamentos.'), retry));
+      } else {
         const allItems = [
           ...A.map(r => ({ ...r, _type: 'Consulta', _title: r.specialty, _sub: r.location, _kind: 'appointments' })),
           ...E.map(r => ({ ...r, _type: 'Exame', _title: r.exam_type, _sub: r.location, _kind: 'exams' }))
         ].sort((a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at));
 
-        document.getElementById('allScheduled').innerHTML = allItems.length
+        allEl.innerHTML = allItems.length
           ? allItems.map(r => `<div class="item"><div>
-          <h3><span class="badge" style="margin-right:6px">${esc(r._type)}</span>${esc(r._title)}</h3>
+          <h3><span class="badge mr-1">${esc(r._type)}</span>${esc(r._title)}</h3>
           <p>${esc(r._sub)} · <span class="badge ${statusClass(r.status)}">${esc(r.status)}</span>
           ${isOverdue(r.scheduled_at, r.status) ? ' <span class="badge badge-warning">atrasado</span>' : ''}</p>
         </div><div class="row">
           <span class="muted">${fmtDate(r.scheduled_at)}</span>
-          ${r.status === 'cancelado' ? `<button class="btn btn-outline btn-sm" data-act="rebook" data-kind="${esc(r._kind)}" data-id="${esc(r.id)}">Tentar agendar novamente</button>` : ''}
+          ${r.status === 'cancelado' ? `<button class="btn btn-outline btn-sm" data-act="rebook" data-kind="${esc(r._kind)}" data-id="${esc(r.id)}" aria-label="Tentar agendar novamente: ${esc(r._title)}">Tentar agendar novamente</button>` : ''}
         </div></div>`).join('')
           : '<div class="empty">Nenhum agendamento encontrado.</div>';
+      }
 
+      // Listas dedicadas (1:1 com a fonte)
+      const apptsEl = document.getElementById('appts');
+      if (!ok(aRes)) {
+        apptsEl.innerHTML = '';
+        apptsEl.appendChild(stateMessage('error', loadErrorMessage(failErr(aRes), 'Erro ao carregar suas consultas.'), retry));
+      } else {
         renderList('appts', A,
           a => `<h3>${esc(a.specialty)} ${a.doctor ? 'com ' + esc(a.doctor) : ''}</h3>
           <p>${esc(a.location)} · <span class="badge ${statusClass(a.status)}">${esc(a.status)}</span>
           ${isOverdue(a.scheduled_at, a.status) ? ' <span class="badge badge-warning">atrasado</span>' : ''}</p>`,
-          a => fmtDate(a.scheduled_at), 'appointments', 'editAppt');
+          a => fmtDate(a.scheduled_at), 'appointments', 'editAppt',
+          a => `a consulta de ${a.specialty}${a.doctor ? ' com ' + a.doctor : ''}`);
+      }
 
+      const examsEl = document.getElementById('exams');
+      if (!ok(eRes)) {
+        examsEl.innerHTML = '';
+        examsEl.appendChild(stateMessage('error', loadErrorMessage(failErr(eRes), 'Erro ao carregar seus exames.'), retry));
+      } else {
         renderList('exams', E,
           e => `<h3>${esc(e.exam_type)}</h3>
           <p>${esc(e.location)} · <span class="badge ${statusClass(e.status)}">${esc(e.status)}</span>
           ${isOverdue(e.scheduled_at, e.status) ? ' <span class="badge badge-warning">atrasado</span>' : ''}</p>`,
-          e => fmtDate(e.scheduled_at), 'exams', 'editExam');
+          e => fmtDate(e.scheduled_at), 'exams', 'editExam',
+          e => `o exame de ${e.exam_type}`);
+      }
 
-        document.getElementById('diseases').innerHTML = D.length
+      const diseasesEl = document.getElementById('diseases');
+      if (!ok(dRes)) {
+        diseasesEl.innerHTML = '';
+        diseasesEl.appendChild(stateMessage('error', loadErrorMessage(failErr(dRes), 'Erro ao carregar os alertas da sua região.'), retry));
+      } else {
+        diseasesEl.innerHTML = D.length
           ? D.map(d => `<div class="item"><div><h3>${esc(d.name)} <span class="badge ${levelClass(d.alert_level)}">${esc(d.alert_level)}</span></h3><p>${esc(d.description || '')} ${d.region ? '· ' + esc(d.region) : ''}</p></div></div>`).join('')
           : '<div class="empty">Sem alertas ativos.</div>';
-      } catch (err) {
-        console.error(err);
-        toast(err.message || 'Erro ao carregar dados', 'error');
       }
     }
 
-    function renderList(id, rows, title, right, kind, editFn) {
+    // label: função que devolve o nome do item para os aria-label. Sem ela, N
+    // botões "Editar" numa lista soariam igual no leitor de tela (DESIGN.md).
+    function renderList(id, rows, title, right, kind, editFn, label) {
       const elList = document.getElementById(id);
       if (!rows.length) { elList.innerHTML = '<div class="empty">Nenhum registro.</div>'; return; }
       elList.innerHTML = rows.map(r => {
         const canEdit = editFn && (r.status === 'pendente' || r.status === 'confirmado');
         const canCancel = r.status === 'pendente' || r.status === 'confirmado';
         const canRebook = r.status === 'cancelado'; // item 2.6
+        const nome = label ? esc(label(r)) : '';
         return `<div class="item"><div>${title(r)}</div><div class="row">
       <span class="muted">${right(r)}</span>
-      ${canEdit ? `<button class="btn btn-outline btn-sm" data-act="edit" data-fn="${esc(editFn)}" data-id="${esc(r.id)}">Editar</button>` : ''}
-      ${canCancel ? `<button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" data-act="cancel" data-kind="${esc(kind)}" data-id="${esc(r.id)}" data-type="${esc(r._type || '')}">Cancelar</button>` : ''}
-      ${canRebook ? `<button class="btn btn-outline btn-sm" data-act="rebook" data-kind="${esc(kind)}" data-id="${esc(r.id)}">Tentar agendar novamente</button>` : ''}
+      ${canEdit ? `<button class="btn btn-outline btn-sm" data-act="edit" data-fn="${esc(editFn)}" data-id="${esc(r.id)}" aria-label="Editar ${nome}">Editar</button>` : ''}
+      ${canCancel ? `<button class="btn btn-outline btn-sm btn-outline-danger" data-act="cancel" data-kind="${esc(kind)}" data-id="${esc(r.id)}" data-type="${esc(r._type || '')}" aria-label="Cancelar ${nome}">Cancelar</button>` : ''}
+      ${canRebook ? `<button class="btn btn-outline btn-sm" data-act="rebook" data-kind="${esc(kind)}" data-id="${esc(r.id)}" aria-label="Tentar agendar novamente: ${nome}">Tentar agendar novamente</button>` : ''}
     </div></div>`;
       }).join('');
     }
@@ -1073,15 +1161,16 @@
     let pendingBooking = null;
     function ensureReviewModal() {
       if (document.getElementById('reviewModal')) return;
-      const style = document.createElement('style');
-      style.textContent = `#reviewModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
-  #reviewModal.show{display:flex}#reviewModal .cancel-modal-card{width:min(480px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
-  #reviewModal h2{margin:0 0 10px}#reviewModal .review-lines{margin:0 0 6px;line-height:1.7}#reviewModal .cancel-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}`;
-      document.head.appendChild(style);
-      document.body.insertAdjacentHTML('beforeend', `<div id="reviewModal" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
-    <div class="cancel-modal-card"><h2 id="reviewModalTitle">Confirmar agendamento</h2>
+      // Componente de modal único (styles.css): .modal-overlay liga o modal ao
+      // gerenciador do ui.js (foco preso, retorno de foco, trava de scroll, Esc).
+      // data-modal-persist desliga o fechamento genérico do backdrop, porque
+      // este modal limpa pendingBooking ao fechar (o handler de clique abaixo
+      // chama closeReviewModal). data-modal-close diz ao Esc do ui.js qual
+      // função chamar.
+      document.body.insertAdjacentHTML('beforeend', `<div id="reviewModal" class="modal-overlay" data-modal-persist="1" data-modal-close="closeReviewModal" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
+    <div class="modal-card"><h2 id="reviewModalTitle">Confirmar agendamento</h2>
     <div class="review-lines" id="reviewModalLines"></div>
-    <div class="cancel-modal-actions"><button type="button" class="btn btn-outline" id="reviewModalBack">Voltar</button>
+    <div class="modal-actions"><button type="button" class="btn btn-outline" id="reviewModalBack">Voltar</button>
     <button type="button" class="btn btn-primary" id="reviewModalConfirm">Confirmar</button></div></div></div>`);
       document.getElementById('reviewModalBack').addEventListener('click', closeReviewModal);
       document.getElementById('reviewModal').addEventListener('click', e => { if (e.target.id === 'reviewModal') closeReviewModal(); });
@@ -1099,7 +1188,7 @@
         ['Data e hora', when],
       ];
       if (data.notes) rows.push(['Observações', data.notes]);
-      return rows.map(([k, v]) => `<p style="margin:2px 0"><span class="muted">${esc(k)}:</span> <strong>${esc(String(v))}</strong></p>`).join('');
+      return rows.map(([k, v]) => `<p><span class="muted">${esc(k)}:</span> <strong>${esc(String(v))}</strong></p>`).join('');
     }
     // Abre a revisão; o envio real acontece em confirmBooking().
     // submitFn: async () => void — já com botão em estado "Enviando...".
@@ -1109,26 +1198,25 @@
       document.getElementById('reviewModalTitle').textContent = title;
       document.getElementById('reviewModalLines').innerHTML = linesHtml;
       document.getElementById('reviewModalConfirm').textContent = confirmLabel;
-      document.getElementById('reviewModal').classList.add('show');
+      openModal('reviewModal');
     }
     function closeReviewModal() {
-      const m = document.getElementById('reviewModal');
-      if (m) m.classList.remove('show');
+      closeModal('reviewModal');
       pendingBooking = null;
     }
+    window.closeReviewModal = closeReviewModal;
     async function confirmBooking() {
       if (!pendingBooking) return;
       const { submitFn } = pendingBooking;
       const b = document.getElementById('reviewModalConfirm');
-      b.disabled = true;
-      try {
-        await submitFn();
-        closeReviewModal();
-      } catch (err) {
-        toast(err.message || 'Erro ao salvar', 'error');
-      } finally {
-        b.disabled = false;
-      }
+      await loadingButton(b, async () => {
+        try {
+          await submitFn();
+          closeReviewModal();
+        } catch (err) {
+          toast(loadErrorMessage(err, 'Erro ao salvar'), 'error');
+        }
+      });
     }
 
     /* ---- Rascunho local (P5.3, formato v2) ----
@@ -1207,16 +1295,15 @@
 
     function ensureCancelModal() {
       if (document.getElementById('cancelModal')) return;
-      const style = document.createElement('style');
-      style.textContent = `#cancelModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
-  #cancelModal.show{display:flex}#cancelModal .cancel-modal-card{width:min(460px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
-  #cancelModal h2{margin:0 0 10px}#cancelModal p{margin:0;line-height:1.55}#cancelModal .cancel-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}`;
-      document.head.appendChild(style);
-      document.body.insertAdjacentHTML('beforeend', `<div id="cancelModal" role="dialog" aria-modal="true" aria-labelledby="cancelModalTitle">
-    <div class="cancel-modal-card"><h2 id="cancelModalTitle">Cancelar agendamento?</h2>
+      // Ação destrutiva → role="alertdialog" + aria-describedby (o leitor de
+      // tela lê o aviso junto com o título). Componente .modal-overlay +
+      // data-modal-close ligam ao gerenciador do ui.js (foco preso, retorno,
+      // trava, Esc).
+      document.body.insertAdjacentHTML('beforeend', `<div id="cancelModal" class="modal-overlay" data-modal-persist="1" data-modal-close="closeCancelModal" role="alertdialog" aria-modal="true" aria-labelledby="cancelModalTitle" aria-describedby="cancelModalText">
+    <div class="modal-card"><h2 id="cancelModalTitle">Cancelar agendamento?</h2>
     <p id="cancelModalText">Se você cancelar, pode não haver outra vaga disponível tão cedo.</p>
-    <div class="cancel-modal-actions"><button type="button" class="btn btn-outline" id="cancelModalBack">Voltar</button>
-    <button type="button" class="btn btn-primary" id="cancelModalConfirm" style="background:var(--danger);border-color:var(--danger)">Sim, cancelar</button></div></div></div>`);
+    <div class="modal-actions"><button type="button" class="btn btn-outline" id="cancelModalBack">Voltar</button>
+    <button type="button" class="btn btn-danger" id="cancelModalConfirm">Sim, cancelar</button></div></div></div>`);
       document.getElementById('cancelModalBack').addEventListener('click', closeCancelModal);
       document.getElementById('cancelModal').addEventListener('click', e => { if (e.target.id === 'cancelModal') closeCancelModal(); });
       document.getElementById('cancelModalConfirm').addEventListener('click', confirmCancel);
@@ -1227,18 +1314,19 @@
       const label = type || (kind === 'appointments' ? 'consulta' : 'exame');
       document.getElementById('cancelModalTitle').textContent = `Cancelar ${label.toLowerCase()}?`;
       document.getElementById('cancelModalText').textContent = 'Se você cancelar, pode não haver outra vaga disponível tão cedo. O agendamento continuará visível no histórico como cancelado.';
-      document.getElementById('cancelModal').classList.add('show');
+      openModal('cancelModal');
     };
-    function closeCancelModal() { const m = document.getElementById('cancelModal'); if (m) m.classList.remove('show'); pendingCancel = null; }
+    function closeCancelModal() { closeModal('cancelModal'); pendingCancel = null; }
+    window.closeCancelModal = closeCancelModal;
     async function confirmCancel() {
       if (!pendingCancel) return;
       const { kind, id } = pendingCancel, b = document.getElementById('cancelModalConfirm');
-      b.disabled = true; b.textContent = 'Cancelando...';
-      try {
-        await apiPatch('/me/' + encodeURIComponent(kind) + '/' + encodeURIComponent(id) + '/cancel', {});
-        closeCancelModal(); toast('Agendamento cancelado', 'success'); await loadAll();
-      } catch (err) { toast(err.message || 'Erro ao cancelar', 'error'); }
-      finally { b.disabled = false; b.textContent = 'Sim, cancelar'; }
+      await loadingButton(b, async () => {
+        try {
+          await apiPatch('/me/' + encodeURIComponent(kind) + '/' + encodeURIComponent(id) + '/cancel', {});
+          closeCancelModal(); toast('Agendamento cancelado', 'success'); await loadAll();
+        } catch (err) { toast(loadErrorMessage(err, 'Erro ao cancelar'), 'error'); }
+      });
     }
 
     /* ---------------------- abrir formulário para editar / reagendar ---------------------- */
@@ -1437,19 +1525,21 @@
         document.getElementById('mfaSetup').style.display = 'block';
         toast('Segredo gerado — cadastre no app autenticador', 'success');
       } catch (err) {
-        toast(err.message || 'Erro', 'error');
+        toast(loadErrorMessage(err, 'Erro'), 'error');
         // Senha errada: a tela de setup não abre e o botão continua lá, para
         // o usuário poder tentar de novo.
         document.getElementById('mfaSetupBtn').style.display = '';
       }
     }
-    async function enableMfa() {
+    async function enableMfa(btn) {
       const code = document.getElementById('mfaEnableCode').value.trim();
-      try {
-        await apiPost('/auth/mfa/enable', { code });
-        toast('Verificação em 2 etapas ativada', 'success');
-        refreshMfaStatus();
-      } catch (err) { toast(err.message || 'Código inválido', 'error'); }
+      await loadingButton(btn, async () => {
+        try {
+          await apiPost('/auth/mfa/enable', { code });
+          toast('Verificação em 2 etapas ativada', 'success');
+          refreshMfaStatus();
+        } catch (err) { toast(loadErrorMessage(err, 'Código inválido'), 'error'); }
+      });
     }
     /* ---- Meu perfil (P4: completa o cadastro mínimo) ----
        Campos opcionais rastreados para a barra de progresso. */
@@ -1509,12 +1599,13 @@
         }
         const pct = profileCompleteness(user);
         document.getElementById('profileBar').style.width = pct + '%';
+        document.getElementById('profileBar').setAttribute('aria-valuenow', String(pct));
         document.getElementById('profilePct').textContent = pct + '%';
         if (pct < 100) {
           document.getElementById('profileBanner').innerHTML =
-            `<div class="card" style="margin-bottom:16px;background:var(--primary-100);border-color:var(--primary)">
-               <h2 style="margin-bottom:4px">Complete seu perfil (${pct}%)</h2>
-               <p style="margin:0 0 12px">Faltam dados como CNS e endereço — eles melhoram seu atendimento.</p>
+            `<div class="card card-highlight mb-4">
+               <h2 class="mb-1">Complete seu perfil (${pct}%)</h2>
+               <p class="m-0 mb-3">Faltam dados como CNS e endereço — eles melhoram seu atendimento.</p>
                <button class="btn btn-primary btn-sm" type="button" onclick="switchTab('minha-conta')">Completar agora</button>
              </div>`;
         }
@@ -1545,30 +1636,30 @@
         showFirstError(document.getElementById('p_cep'));
         return;
       }
-      btn.disabled = true;
-      try {
-        await apiPut('/auth/me', {
-          // campo() devolve o valor do input (string vazia se o usuário
-          // apagou) e undefined só quando o campo não existe na página.
-          // O back faz atualização parcial: ausente mantém, vazio limpa.
-          // Antes, `|| undefined` transformava "apagar de propósito" em
-          // "não enviar", e o dado sumia sem aviso.
-          full_name: campo('p_full_name'),
-          social_name: campo('p_social_name'), birth_date: campo('p_birth_date'),
-          gender: campo('p_gender'), mother_name: campo('p_mother_name'), father_name: campo('p_father_name'),
-guardian_name: campo('p_guardian'),
-    // cpf/rg/cns: campo vazio = "não me mexa" (o input não vem preenchido).
-    cpf: campo('p_cpf') || undefined, rg: campo('p_rg') || undefined, cns: campo('p_cns') || undefined,
-          mobile: campo('p_mobile'), phone: campo('p_phone'),
-          blood_type: campo('p_blood_type'), priority: campo('p_priority'), race: campo('p_race'),
-          cep: campo('p_cep'), street: campo('p_street'), address_number: campo('p_number'),
-          neighborhood: campo('p_neighborhood'), city: campo('p_city'), state: campo('p_state'),
-          zone: campo('p_zone'), reference_point: campo('p_reference'),
-        });
-        toast('Perfil salvo', 'success');
-        initProfile();
-      } catch (err) { toast(err.message || 'Erro ao salvar perfil', 'error'); }
-      finally { btn.disabled = false; }
+      await loadingButton(btn, async () => {
+        try {
+          await apiPut('/auth/me', {
+            // campo() devolve o valor do input (string vazia se o usuário
+            // apagou) e undefined só quando o campo não existe na página.
+            // O back faz atualização parcial: ausente mantém, vazio limpa.
+            // Antes, `|| undefined` transformava "apagar de propósito" em
+            // "não enviar", e o dado sumia sem aviso.
+            full_name: campo('p_full_name'),
+            social_name: campo('p_social_name'), birth_date: campo('p_birth_date'),
+            gender: campo('p_gender'), mother_name: campo('p_mother_name'), father_name: campo('p_father_name'),
+            guardian_name: campo('p_guardian'),
+            // cpf/rg/cns: campo vazio = "não me mexa" (o input não vem preenchido).
+            cpf: campo('p_cpf') || undefined, rg: campo('p_rg') || undefined, cns: campo('p_cns') || undefined,
+            mobile: campo('p_mobile'), phone: campo('p_phone'),
+            blood_type: campo('p_blood_type'), priority: campo('p_priority'), race: campo('p_race'),
+            cep: campo('p_cep'), street: campo('p_street'), address_number: campo('p_number'),
+            neighborhood: campo('p_neighborhood'), city: campo('p_city'), state: campo('p_state'),
+            zone: campo('p_zone'), reference_point: campo('p_reference'),
+          });
+          toast('Perfil salvo', 'success');
+          initProfile();
+        } catch (err) { toast(loadErrorMessage(err, 'Erro ao salvar perfil'), 'error'); }
+      });
     }
     /* ---- Modal de senha (P2a.1: substitui prompt()/confirm() nativos) ----
        Senha em <input type="password"> (nunca em texto claro), com nome
@@ -1576,18 +1667,18 @@ guardian_name: campo('p_guardian'),
     let passwordResolve = null;
     function ensurePasswordModal() {
       if (document.getElementById('passwordModal')) return;
-      const style = document.createElement('style');
-      style.textContent = `#passwordModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
-  #passwordModal.show{display:flex}#passwordModal .cancel-modal-card{width:min(460px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
-  #passwordModal h2{margin:0 0 10px}#passwordModal p{margin:0 0 12px;line-height:1.55}#passwordModal .cancel-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
-  #passwordModalError{color:var(--danger);font-size:.85rem;margin:8px 0 0}`;
-      document.head.appendChild(style);
-      document.body.insertAdjacentHTML('beforeend', `<div id="passwordModal" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
-    <div class="cancel-modal-card"><h2 id="passwordModalTitle">Confirme sua senha</h2>
+      // Componente .modal-overlay + data-modal-close ligam ao gerenciador do
+      // ui.js: Esc chama closePasswordModal (resolve a Promise com null), o
+      // Tab fica preso no diálogo e o foco volta ao gatilho ao fechar.
+      // data-modal-persist desliga o fechar genérico do backdrop, porque este
+      // modal precisa passar por finishPassword (senão a Promise penduraria o
+      // caller).
+      document.body.insertAdjacentHTML('beforeend', `<div id="passwordModal" class="modal-overlay" data-modal-persist="1" data-modal-close="closePasswordModal" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
+    <div class="modal-card"><h2 id="passwordModalTitle">Confirme sua senha</h2>
     <p id="passwordModalText"></p>
-    <div class="field" id="passwordModalField"><label for="passwordModalInput">Senha</label><input class="input" id="passwordModalInput" type="password" autocomplete="current-password"></div>
-    <p id="passwordModalError" style="display:none"></p>
-    <div class="cancel-modal-actions"><button type="button" class="btn btn-outline" id="passwordModalBack">Voltar</button>
+    <div class="field" id="passwordModalField"><label for="passwordModalInput">Senha</label><input class="input" id="passwordModalInput" type="password" autocomplete="current-password" data-modal-autofocus></div>
+    <p id="passwordModalError" class="field-msg" style="display:none"></p>
+    <div class="modal-actions"><button type="button" class="btn btn-outline" id="passwordModalBack">Voltar</button>
     <button type="button" class="btn btn-primary" id="passwordModalConfirm">Confirmar</button></div></div></div>`);
       document.getElementById('passwordModalBack').addEventListener('click', () => finishPassword(null));
       document.getElementById('passwordModal').addEventListener('click', e => { if (e.target.id === 'passwordModal') finishPassword(null); });
@@ -1600,15 +1691,15 @@ guardian_name: campo('p_guardian'),
       });
       document.getElementById('passwordModalInput').addEventListener('keydown', e => {
         if (e.key === 'Enter') document.getElementById('passwordModalConfirm').click();
-        if (e.key === 'Escape') finishPassword(null);
       });
     }
     function finishPassword(value) {
-      document.getElementById('passwordModal').classList.remove('show');
+      closeModal('passwordModal');
       const resolve = passwordResolve;
       passwordResolve = null;
       if (resolve) resolve(value);
     }
+    window.closePasswordModal = function () { finishPassword(null); };
     // Etapa 1: pede a senha. Resolve com a senha digitada (string, pode ser '')
     // ou null se o usuário voltar/fechar.
     function askPassword({ title, text, confirmLabel, error }) {
@@ -1620,11 +1711,10 @@ guardian_name: campo('p_guardian'),
       passwordModalError(error || '');
       const btn = document.getElementById('passwordModalConfirm');
       btn.textContent = confirmLabel || 'Confirmar';
-      btn.style.background = ''; btn.style.borderColor = '';
+      btn.classList.remove('btn-danger');
       return new Promise((resolve) => {
         passwordResolve = resolve;
-        document.getElementById('passwordModal').classList.add('show');
-        setTimeout(() => document.getElementById('passwordModalInput').focus(), 50);
+        openModal('passwordModal'); // foca o input (data-modal-autofocus)
       });
     }
     // Etapa 2 (ações destrutivas): confirmação explícita, sem senha.
@@ -1636,11 +1726,13 @@ guardian_name: campo('p_guardian'),
       document.getElementById('passwordModalError').style.display = 'none';
       const btn = document.getElementById('passwordModalConfirm');
       btn.textContent = confirmLabel;
-      btn.style.background = 'var(--danger)'; btn.style.borderColor = 'var(--danger)';
+      btn.classList.add('btn-danger');
       return new Promise((resolve) => {
         passwordResolve = resolve;
-        document.getElementById('passwordModal').classList.add('show');
-        setTimeout(() => btn.focus(), 50);
+        openModal('passwordModal');
+        // Campo de senha oculto: o autofoco do modal cairia no input escondido;
+        // move para o botão destrutivo.
+        btn.focus();
       });
     }
     function passwordModalError(message) {
@@ -1649,7 +1741,7 @@ guardian_name: campo('p_guardian'),
       el.style.display = message ? '' : 'none';
     }
 
-    async function disableMfa() {
+    async function disableMfa(btn) {
       let error = '';
       for (;;) {
         const pwd = await askPassword({
@@ -1660,36 +1752,38 @@ guardian_name: campo('p_guardian'),
         });
         if (pwd === null) return; // usuário voltou/fechou
         try {
-          await apiPost('/auth/mfa/disable', { password: pwd });
+          await loadingButton(btn, () => apiPost('/auth/mfa/disable', { password: pwd }));
           toast('MFA desativado', 'success');
           refreshMfaStatus();
           return;
         } catch (err) {
           if (/senha/i.test(err.message || '')) { error = err.message; continue; }
-          toast(err.message || 'Erro', 'error');
+          toast(loadErrorMessage(err, 'Erro'), 'error');
           return;
         }
       }
     }
 
     // ---- Meus dados (LGPD, Fase 1): portabilidade e eliminação ----
-    async function downloadMyData() {
-      try {
-        const data = await apiGet('/auth/me/export');
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'meus-dados-saude-mais.json';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-        toast('Dados baixados', 'success');
-      } catch (err) {
-        toast(err.message || 'Erro ao baixar dados', 'error');
-      }
+    async function downloadMyData(btn) {
+      await loadingButton(btn, async () => {
+        try {
+          const data = await apiGet('/auth/me/export');
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'meus-dados-saude-mais.json';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+          toast('Dados baixados', 'success');
+        } catch (err) {
+          toast(loadErrorMessage(err, 'Erro ao baixar dados'), 'error');
+        }
+      });
     }
 
-    async function deleteMyAccount() {
+    async function deleteMyAccount(btn) {
       // Etapa 1: senha. Etapa 2: confirmação. Se a senha estiver errada, o
       // DELETE devolve 401 e o fluxo volta para a etapa 1 com o erro visível.
       let pwd = null;
@@ -1711,31 +1805,31 @@ guardian_name: campo('p_guardian'),
         if (!ok) return;
         try {
           // apiDelete não envia corpo; usa fetch direto com a senha de confirmação.
-          var token = localStorage.getItem('saude_token');
-          var res = await fetch(window.API_BASE + '/auth/me', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-            body: JSON.stringify({ password: pwd })
+          await loadingButton(btn, async () => {
+            var token = localStorage.getItem('saude_token');
+            var res = await fetch(window.API_BASE + '/auth/me', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+              body: JSON.stringify({ password: pwd })
+            });
+            if (!res.ok) {
+              var body = null;
+              try { body = await res.json(); } catch (_e) { /* sem corpo */ }
+              throw new Error((body && body.error) || ('Erro inesperado (' + res.status + ')'));
+            }
           });
-          if (!res.ok) {
-            var body = null;
-            try { body = await res.json(); } catch (_e) { /* sem corpo */ }
-            throw new Error((body && body.error) || ('Erro inesperado (' + res.status + ')'));
-          }
           toast('Conta excluída. Até logo!', 'success');
           setTimeout(signOut, 1200);
           return;
         } catch (err) {
           if (/senha/i.test(err.message || '')) { error = err.message; continue; }
-          toast(err.message || 'Erro ao excluir conta', 'error');
+          toast(loadErrorMessage(err, 'Erro ao excluir conta'), 'error');
           return;
         }
       }
     }
 
-    function statusClass(s) { return s === 'cancelado' ? 'badge-danger' : s === 'concluido' ? 'badge-success' : s === 'pendente' ? 'badge-warning' : ''; }
-    function stat(label, value) { return `<div class="card"><p class="muted" style="margin:0;font-size:.8rem;text-transform:uppercase">${esc(label)}</p><h2 style="margin:.2em 0 0;font-size:2rem">${value}</h2></div>`; }
-    function levelClass(l) { return l === 'alto' ? 'badge-danger' : l === 'medio' ? 'badge-warning' : 'badge-success'; }
+    // statusClass, stat e levelClass agora vêm do assets/ui.js (globais).
 
     // Delegação: as listas são renderizadas por innerHTML, então os botões
 // carregam data-act/data-* em vez de interpolar valores em onclick="…".
@@ -1751,25 +1845,6 @@ document.addEventListener('click', (ev) => {
     if (typeof fn === 'function') return fn(btn.dataset.id);
   }
 });
-
-document.querySelectorAll('.tabs').forEach(tabContainer => {
-      const tabs = Array.from(tabContainer.querySelectorAll('.tab'));
-
-      tabs.forEach((tab, index) => {
-        tab.addEventListener('keydown', (e) => {
-          if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-            e.preventDefault();
-            let newIndex = e.key === 'ArrowRight' ? index + 1 : index - 1;
-
-            if (newIndex >= tabs.length) newIndex = 0;
-            if (newIndex < 0) newIndex = tabs.length - 1;
-
-            tabs[newIndex].focus();
-            tabs[newIndex].click();
-          }
-        });
-      });
-    });
 
     ensureCancelModal();
     ensureReviewModal();

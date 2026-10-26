@@ -30,24 +30,28 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 > `JWT_SECRET`, `DATA_ENCRYPTION_KEY`). O `npm run dev` usa
 > `scripts/serve-web.js`, que só entrega as páginas e `assets/`.
 
-## 1) Papel: aluno (usuário comum)
+## 1) Papel: aluno (paciente)
 
-1. Abrir a página inicial → **Criar conta** → preencher nome, e-mail e senha fictícios.
+1. Abrir a página inicial → **Criar conta** → preencher o wizard de 2 passos (Você → Acesso) com nome, e-mail e senha fictícios.
 2. Fazer login com a conta recém-criada.
 3. Verificar que caiu em `dashboard.html` (não em `admin.html`).
-4. Aba **Consultas** → agendar uma consulta fictícia → confirmar que aparece na lista "Minhas consultas".
-5. Aba **Exames** → agendar um exame fictício → confirmar que aparece em "Meus exames".
-6. Aba **Início** → confirmar que a consulta e o exame aparecem em "Próximos eventos" e que os números do topo (cards) bateram.
-7. Clicar **Sair** → confirmar que volta para a tela de login.
+4. Aba **Agendar** → alternar **Consulta** e **Exame**, escolher serviço, unidade e um horário com vaga → conferir o resumo antes de confirmar.
+5. Aba **Meus agendamentos** → confirmar que a consulta e o exame aparecem, e testar reagendar e cancelar um deles.
+6. Aba **Início** → confirmar que os próximos eventos e os cards do topo refletem o que foi agendado; testar também o rascunho automático ao sair e voltar.
+7. Aba **Minha conta** → conferir perfil, barra de progresso, privacidade, DPO e a opção de exportar os dados (LGPD).
+8. Clicar **Sair** → confirmar que volta para a tela de login.
 
 ## 2) Papel: você (admin)
 
 1. Login com a conta admin (criada pelo `seed:admin`).
 2. Confirmar que caiu direto em `admin.html`.
-3. Aba **Visão geral** → confirmar que aparecem as consultas e exames **de todos os alunos que testaram**, não só os seus.
-4. Aba **Histórico de consultas** → buscar pelo e-mail de um aluno específico → confirmar que aparece *só* o histórico daquele aluno.
-5. Aba **Doenças** → cadastrar um alerta (ex: "Dengue", região "Centro", nível "alto") → salvar.
-6. Pedir para um aluno recarregar a aba **Alertas** no painel dele → confirmar que o alerta aparece lá.
+3. Aba **Início** → confirmar que os números e os recentes incluem **todos os alunos que testaram**, não só os seus.
+4. Aba **Atendimentos** → abrir a agenda de hoje e confirmar/cancelar/reagendar um atendimento fictício; conferir que a ação aparece em **Auditoria**.
+5. Aba **Cadastros → Pessoas** → criar uma conta de atendente, ativá-la e vinculá-la a um profissional; testar também desativar e excluir (soft delete) uma conta de teste.
+6. Aba **Cadastros → Rede** → cadastrar uma unidade, um serviço e um horário de profissional para ela.
+7. Aba **Cadastros → Doenças** → cadastrar um alerta (ex.: "Dengue", região "Centro", nível "alto") → salvar.
+8. Pedir para um aluno recarregar a aba **Alertas** no painel dele → confirmar que o alerta aparece lá.
+9. Aba **Auditoria** → localizar as ações feitas e clicar em **Verificar integridade**; o resultado deve ser de cadeia íntegra.
 
 ## 3) Teste de segurança (a parte que realmente importa)
 
@@ -59,12 +63,18 @@ promessa da interface — é uma regra do servidor.
 2. Pedir para um aluno (não-admin) digitar a URL `admin.html` diretamente
    na barra de endereço, estando logado → deve ser redirecionado
    automaticamente para `dashboard.html` com um aviso de "acesso restrito".
-3. Abrir o DevTools (F12) → aba **Network** → refazer uma ação qualquer →
+3. Criar um atendente sem vínculo profissional, ativá-lo e entrar com ele: a
+   agenda e os exames devem vir **vazios** (fail-closed), nunca a lista de
+   todos os pacientes. Depois, vincular o profissional em **Cadastros →
+   Pessoas** e confirmar que a agenda aparece.
+4. Desativar ou excluir uma conta de teste pelo admin e tentar usá-la em
+   outra aba: a sessão deve cair (refresh revogado), não continuar válida.
+5. Abrir o DevTools (F12) → aba **Network** → refazer uma ação qualquer →
    mostrar para a turma que toda chamada à API carrega um cabeçalho
    `Authorization: Bearer ...` — é esse token que a API usa para saber
    quem está pedindo o quê, e por isso o front sozinho não basta para
    proteger nada: a regra real está no `server/src/middleware/auth.js`.
-4. Deslogar (botão **Sair**) e tentar digitar `dashboard.html` direto na
+6. Deslogar (botão **Sair**) e tentar digitar `dashboard.html` direto na
    URL → deve redirecionar para `auth.html` (ninguém vê nada sem login).
 
 ## 4) Problemas comuns

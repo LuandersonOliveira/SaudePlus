@@ -10,7 +10,7 @@ web
 
 Paciente + família de Lagoa de Itaenga (PE), incluindo pessoas com baixa familiaridade digital e internet rural instável. Tarefa crítica no piloto: criar conta em ~1 minuto e agendar consulta/exame para si ou família em poucos cliques, depois acompanhar em Meus agendamentos + Alertas da região.
 
-Atendentes e admins são secundários nesta fase (piloto é index + auth públicas).
+Atendentes e admins operam o piloto no balcão e na gestão; a experiência pública (index + auth) continua sendo a porta de entrada do paciente.
 
 ## Product Purpose
 
@@ -26,8 +26,8 @@ Uso diurno, mobile-first (360px+), sidebar vira barra rolável; balcão com aten
 
 ## Capabilities and Constraints
 
-Capacidades: wizard signup + login + MFA TOTP, catálogo/serviços/slots 30 dias, Meus agendamentos com editar/cancelar/reagendar, Alertas ativos, Minha conta LGPD (export/portabilidade, eliminação/anonimização), DPO público.
-Restrições duras (usuário vinculou): vanilla HTML/CSS/JS sem build + identidade lagoa (verde-lagoa, tom simples) preservadas; core funciona offline após instalado; sem dependência externa obrigatória (só Inter via Google Fonts hoje); LGPD Fase 1 (AES-256-GCM CPF/RG/CNS, consentimento, audit hash encadeado); JWT curto 15min + refresh rotativo; validação real no servidor (booking.js: janela 366 dias, sem overlap 30min, blocks).
+Capacidades: wizard signup em 2 passos + login + MFA TOTP + recuperação de senha, catálogo/serviços/slots 30 dias, Meus agendamentos com editar/cancelar/reagendar, Alertas ativos, Minha conta LGPD (export/portabilidade, eliminação/anonimização), DPO público; admin com CRUD de usuários/profissionais/unidades/doenças, soft delete, revogação de sessões, relatórios CSV e auditoria verificável; atendente com agenda fail-closed e busca de pacientes; lembretes por e-mail.
+Restrições duras (usuário vinculou): vanilla HTML/CSS/JS sem build + identidade lagoa (verde-lagoa, tom simples) preservadas; core funciona offline após instalado; sem dependência externa obrigatória (fonte Inter autohospedada em `assets/fonts/`); LGPD Fase 1 (AES-256-GCM CPF/RG/CNS, consentimento, audit hash encadeado); JWT curto 15min + refresh rotativo; validação real no servidor (booking.js: janela 366 dias, sem overlap 30min, blocks).
 
 ## Brand Commitments
 

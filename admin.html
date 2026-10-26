@@ -3,28 +3,28 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Painel ADM | Saúde+</title>
   <link rel="stylesheet" href="assets/styles.css">
   <script defer src="assets/api.js"></script>
 </head>
 
-<body>
+<body class="app-admin">
   <a class="sr-only" href="#conteudo">Pular para o conteúdo</a>
   <div class="app-shell">
   <aside class="app-rail">
     <a class="brand rail-brand" href="index.html"><span class="brand-dot"></span>Saúde+</a>
     <nav class="tabs sidebar" role="tablist" aria-label="Navegação administrativa">
       <button class="tab active" data-tab="overview" role="tab" aria-selected="true" id="tab-overview"
-        aria-controls="overview">Início</button>
+        aria-controls="overview" tabindex="0">Início</button>
       <button class="tab" data-tab="atendimentos" role="tab" aria-selected="false" id="tab-atendimentos"
-        aria-controls="atendimentos">Atendimentos</button>
+        aria-controls="atendimentos" tabindex="-1">Atendimentos</button>
       <button class="tab" data-tab="cadastros" role="tab" aria-selected="false" id="tab-cadastros"
-        aria-controls="cadastros">Cadastros</button>
+        aria-controls="cadastros" tabindex="-1">Cadastros</button>
       <button class="tab" data-tab="auditoria" role="tab" aria-selected="false" id="tab-auditoria"
-        aria-controls="auditoria">Auditoria</button>
+        aria-controls="auditoria" tabindex="-1">Auditoria</button>
       <button class="tab" data-tab="minha-conta" role="tab" aria-selected="false" id="tab-minha-conta"
-        aria-controls="minha-conta">Minha conta</button>
+        aria-controls="minha-conta" tabindex="-1">Minha conta</button>
     </nav>
 
     <div class="rail-user">
@@ -41,20 +41,22 @@
     <p class="muted">Monitore atendimentos, usuários e alertas de saúde.</p>
 
     <!-- ===== VISÃO GERAL ===== -->
-    <section class="tabpanel active" id="overview" role="tabpanel" aria-labelledby="tab-overview">
-      <div class="grid grid-5" id="stats"></div>
-      <div class="card" style="margin-top:16px">
-        <h2>Precisa da sua atenção</h2>
-        <div id="attention">
-          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+    <section class="tabpanel active" id="overview" role="tabpanel" aria-labelledby="tab-overview" tabindex="0">
+      <div class="stats-grid" id="stats" aria-live="polite"></div>
+      <div class="overview-main">
+        <div class="card overview-attention">
+          <h2>Precisa da sua atenção</h2>
+          <div id="attention">
+            <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+          </div>
+        </div>
+        <div class="row mt-4 overview-actions">
+          <button class="btn btn-primary btn-sm" type="button" id="shortcutAgenda" onclick="gotoAtendimentos()">Ver atendimentos de hoje</button>
+          <button class="btn btn-outline btn-sm" type="button" id="shortcutPessoas" onclick="gotoPessoas('pendente')">Ver contas aguardando ativação</button>
+          <button class="btn btn-outline btn-sm" type="button" id="shortcutCSV" onclick="downloadSummaryReport(this)">Baixar resumo CSV</button>
         </div>
       </div>
-      <div class="row" style="margin-top:16px">
-        <button class="btn btn-primary btn-sm" type="button" id="shortcutAgenda" onclick="gotoAtendimentos()">Ver atendimentos de hoje</button>
-        <button class="btn btn-outline btn-sm" type="button" id="shortcutPessoas" onclick="gotoPessoas('pendente')">Ativar contas pendentes</button>
-        <button class="btn btn-outline btn-sm" type="button" id="shortcutCSV" onclick="downloadSummaryReport()">Baixar resumo CSV</button>
-      </div>
-      <div class="card" style="margin-top:16px">
+      <div class="card overview-activity">
         <h2>Atividade recente</h2>
         <div id="recentActivity">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
@@ -63,21 +65,21 @@
     </section>
 
     <!-- ===== ATENDIMENTOS (agenda de hoje + recentes) ===== -->
-    <section class="tabpanel" id="atendimentos" role="tabpanel" aria-labelledby="tab-atendimentos">
+    <section class="tabpanel" id="atendimentos" role="tabpanel" aria-labelledby="tab-atendimentos" tabindex="0">
       <div class="card">
         <h2>Agenda de hoje</h2>
-        <p class="muted" style="margin-top:-8px">Consultas e exames marcados para hoje — confirme, cancele ou reagende.</p>
+        <p class="muted card-sub">Consultas e exames marcados para hoje — confirme, cancele ou reagende.</p>
         <div id="agendaToday">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
-      <div class="card" style="margin-top:16px">
+      <div class="card mt-4">
         <h2>Consultas recentes</h2>
         <div id="recentAppts">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
-      <div class="card" style="margin-top:16px">
+      <div class="card mt-4">
         <h2>Exames recentes</h2>
         <div id="recentExams">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
@@ -86,30 +88,33 @@
     </section>
 
     <!-- ===== CADASTROS (pessoas + rede + doenças) ===== -->
-    <section class="tabpanel" id="cadastros" role="tabpanel" aria-labelledby="tab-cadastros">
-      <style>.subpanel{display:none}.subpanel.active{display:block}</style>
-      <div class="tabs" role="tablist" aria-label="Cadastros" style="margin-bottom:16px">
-        <button class="tab active" type="button" data-subtab="pessoas" onclick="setSubTab('pessoas')">Pessoas</button>
-        <button class="tab" type="button" data-subtab="rede" onclick="setSubTab('rede')">Rede de saúde</button>
-        <button class="tab" type="button" data-subtab="doencas" onclick="setSubTab('doencas')">Doenças e alertas</button>
+    <section class="tabpanel" id="cadastros" role="tabpanel" aria-labelledby="tab-cadastros" tabindex="0">
+      <div class="tabs tabbar-sub" role="tablist" aria-label="Cadastros">
+        <button class="tab active" type="button" role="tab" id="subtab-pessoas" data-subtab="pessoas"
+          aria-selected="true" aria-controls="sub-pessoas" tabindex="0">Pessoas</button>
+        <button class="tab" type="button" role="tab" id="subtab-rede" data-subtab="rede"
+          aria-selected="false" aria-controls="sub-rede" tabindex="-1">Rede de saúde</button>
+        <button class="tab" type="button" role="tab" id="subtab-doencas" data-subtab="doencas"
+          aria-selected="false" aria-controls="sub-doencas" tabindex="-1">Doenças e alertas</button>
       </div>
-      <div class="subpanel active" id="sub-pessoas">
+      <div class="subpanel active" id="sub-pessoas" role="tabpanel" aria-labelledby="subtab-pessoas" tabindex="0">
       <div class="card">
         <h2>Gestão de usuários</h2>
-        <p class="muted" style="margin-top:-8px">Localize contas, revise pendências e abra o perfil ou o histórico de
+        <p class="muted card-sub">Localize contas, revise pendências e abra o perfil ou o histórico de
           atendimento.</p>
-        <form id="userSearchForm" class="row" aria-label="Buscar usuários">
+            <button class="btn btn-primary" type="button" id="userCreateBtn" onclick="openUserCreate()">Novo usuário</button>
+            <form id="userSearchForm" class="row" aria-label="Buscar usuários">
           <label for="userSearchQ" class="sr-only">Nome, e-mail ou telefone</label>
-          <input class="input" id="userSearchQ" name="q" placeholder="Nome, e-mail ou telefone" style="flex:1;min-width:220px">
+          <input class="input grow" id="userSearchQ" name="q" placeholder="Nome, e-mail ou telefone…" autocomplete="off" spellcheck="false">
           <label for="userSearchRole" class="sr-only">Filtrar por papel</label>
-          <select class="select" id="userSearchRole" name="role" style="width:160px" aria-label="Filtrar por papel">
+          <select class="select filter-select" id="userSearchRole" name="role" aria-label="Filtrar por papel">
             <option value="">Todos os papéis</option>
             <option value="paciente">Paciente</option>
             <option value="atendente">Atendente</option>
             <option value="admin">Admin</option>
           </select>
           <label for="userSearchStatus" class="sr-only">Filtrar por status</label>
-          <select class="select" id="userSearchStatus" name="status" style="width:170px" aria-label="Filtrar por status">
+          <select class="select filter-select" id="userSearchStatus" name="status" aria-label="Filtrar por status">
             <option value="">Todos os status</option>
             <option value="pendente">Aguardando ativação</option>
             <option value="ativo">Ativos</option>
@@ -117,13 +122,13 @@
           </select>
           <button class="btn btn-primary" type="submit">Buscar</button>
         </form>
-        <div id="userSummary" class="muted" style="margin-top:14px;font-size:.88rem"></div>
-        <div id="userList" style="margin-top:18px"></div>
+        <div id="userSummary" class="muted mt-3 text-sm" role="status" aria-live="polite"></div>
+        <div id="userList" class="mt-4"></div>
       </div>
-      <div id="userEditBox" style="margin-top:16px;display:none"></div>
-      <div id="userHistoryBox" style="margin-top:16px;display:none"></div>
+      <div id="userEditBox" class="mt-4" style="display:none"></div>
+      <div id="userHistoryBox" class="mt-4" style="display:none"></div>
       </div><!-- /sub-pessoas -->
-      <div class="subpanel" id="sub-doencas">
+      <div class="subpanel" id="sub-doencas" role="tabpanel" aria-labelledby="subtab-doencas" tabindex="0">
       <div class="card">
         <h2>Cadastrar doença / alerta</h2>
         <form id="diseaseForm" class="grid grid-2" aria-label="Cadastrar alerta de doença">
@@ -131,7 +136,7 @@
           <div class="field">
             <label for="diseaseRegionSelect">Região (Bairro)</label>
             <select class="select" name="region" id="diseaseRegionSelect" required>
-              <option value="">Carregando regiões...</option>
+              <option value="">Carregando regiões…</option>
             </select>
           </div>
           <div class="field"><label for="diseaseLevel">Nível</label>
@@ -141,23 +146,26 @@
               <option value="alto">Alto</option>
             </select>
           </div>
-          <div class="field"><span aria-hidden="true">&nbsp;</span><button class="btn btn-primary" type="submit"
-              style="width:100%">Adicionar</button></div>
-          <div class="field" style="grid-column:1/-1"><label for="diseaseDescription">Descrição</label><textarea class="textarea"
+          <div class="field"><button class="btn btn-primary btn-block" type="submit">Adicionar</button></div>
+          <div class="field col-full"><label for="diseaseDescription">Descrição</label><textarea class="textarea"
               name="description" id="diseaseDescription"></textarea></div>
         </form>
       </div>
-      <div class="card" style="margin-top:16px">
+      <div class="card mt-4">
         <h2>Doenças cadastradas</h2>
+        <div class="row mt-3">
+          <label for="diseaseFilter" class="sr-only">Filtrar alertas pelo nome ou região</label>
+          <input class="input grow" id="diseaseFilter" placeholder="Filtrar por nome ou região…" autocomplete="off" spellcheck="false">
+        </div>
         <div id="diseaseList">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
       </div><!-- /sub-doencas -->
-      <div class="subpanel" id="sub-rede">
-      <div class="card">
+      <div class="subpanel" id="sub-rede" role="tabpanel" aria-labelledby="subtab-rede" tabindex="0">
+      <div class="card" id="unitFormCard">
         <h2 id="unitFormTitle">Cadastrar unidade de saúde</h2>
-        <form id="unitForm" class="grid grid-2">
+        <form id="unitForm" class="grid grid-2" aria-label="Cadastrar ou editar unidade de saúde">
           <div class="field">
             <label for="unitName">Nome da unidade</label>
             <input class="input" id="unitName" name="name" required>
@@ -176,30 +184,34 @@
             <label for="unitNeighborhood">Bairro ou região</label>
             <input class="input" id="unitNeighborhood" name="neighborhood">
           </div>
-          <div class="row" style="align-items:end;margin-bottom:14px">
+          <div class="field-actions">
             <button class="btn btn-primary" type="submit" id="unitSubmit">Adicionar unidade</button>
             <button class="btn btn-outline" type="button" id="unitCancel" style="display:none"
               onclick="resetUnitForm()">Cancelar edição</button>
           </div>
         </form>
       </div>
-      <div class="card" style="margin-top:16px">
+      <div class="card mt-4">
         <div class="row between">
           <div>
             <h2>Unidades cadastradas</h2>
-            <p class="muted" style="margin-top:-8px">Unidades inativas não aparecem nos formulários de agendamento.</p>
+            <p class="muted card-sub">Unidades inativas não aparecem nos formulários de agendamento.</p>
           </div>
           <button class="btn btn-outline btn-sm" type="button" onclick="loadUnits()">Atualizar</button>
+        </div>
+        <div class="row mt-3">
+          <label for="unitFilter" class="sr-only">Filtrar unidades pelo nome, tipo ou bairro</label>
+          <input class="input grow" id="unitFilter" placeholder="Filtrar por nome, tipo ou bairro…" autocomplete="off" spellcheck="false">
         </div>
         <div id="unitList">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
-      <div class="card" style="margin-top:16px">
+      <div class="card mt-4">
         <h2>Serviços oferecidos pela unidade</h2>
-        <p class="muted" style="margin-top:-8px">Especialidades de consulta e tipos de exame que o paciente pode escolher
+        <p class="muted card-sub">Especialidades de consulta e tipos de exame que o paciente pode escolher
           para cada unidade. A fonte da verdade do agendamento.</p>
-        <form id="unitOfferForm" class="grid grid-2" style="margin-top:12px">
+        <form id="unitOfferForm" class="grid grid-2 mt-3" aria-label="Adicionar serviço ofertado por unidade">
           <div class="field">
             <label for="offerUnitSel">Unidade</label>
             <select class="select" id="offerUnitSel" required></select>
@@ -213,19 +225,23 @@
           </div>
           <div class="field">
             <label for="offerName">Especialidade ou exame</label>
-            <input class="input" id="offerName" placeholder="Ex.: Cardiologia / Hemograma" required>
+            <input class="input" id="offerName" placeholder="Ex.: Cardiologia / Hemograma…" required>
           </div>
-          <div class="row" style="align-items:end;margin-bottom:14px">
+          <div class="field-actions">
             <button class="btn btn-primary" type="submit">Adicionar serviço</button>
           </div>
         </form>
-        <div id="unitOfferList" style="margin-top:8px"></div>
+        <div class="row mt-3">
+          <label for="offerFilter" class="sr-only">Filtrar serviços pelo nome</label>
+          <input class="input grow" id="offerFilter" placeholder="Filtrar serviço pelo nome…" autocomplete="off" spellcheck="false">
+        </div>
+        <div id="unitOfferList" class="mt-2"></div>
       </div>
-      <div class="card" style="margin-top:16px">
+      <div class="card mt-4" id="profFormCard">
         <h2 id="profFormTitle">Cadastrar profissional</h2>
-        <p class="muted" style="margin-top:-8px">Profissional ativo só aparece no agendamento depois de vinculado a uma
+        <p class="muted card-sub">Profissional ativo só aparece no agendamento depois de vinculado a uma
           unidade e a um serviço.</p>
-        <form id="profForm" class="grid grid-4">
+        <form id="profForm" class="grid grid-4" aria-label="Cadastrar ou editar profissional">
           <div class="field">
             <label for="profName">Nome</label>
             <input class="input" id="profName" name="name" required>
@@ -236,23 +252,27 @@
           </div>
           <div class="field">
             <label for="profRegistry">Registro profissional</label>
-            <input class="input" id="profRegistry" name="registry" placeholder="CRM, CRP...">
+            <input class="input" id="profRegistry" name="registry" placeholder="CRM, CRP…">
           </div>
-          <div class="row" style="align-items:end;margin-bottom:14px">
+          <div class="field-actions">
             <button class="btn btn-primary" type="submit" id="profSubmit">Adicionar</button>
             <button class="btn btn-outline" type="button" id="profCancel" style="display:none"
               onclick="resetProfForm()">Cancelar edição</button>
           </div>
         </form>
       </div>
-      <div class="card" style="margin-top:16px">
+      <div class="card mt-4">
         <div class="row between">
           <div>
             <h2>Profissionais cadastrados</h2>
-            <p class="muted" style="margin-top:-8px">Em "Gerenciar" ficam vínculos com unidades, especialidades, horários
+            <p class="muted card-sub">Em "Gerenciar" ficam vínculos com unidades, especialidades, horários
               de atendimento e bloqueios de agenda.</p>
           </div>
           <button class="btn btn-outline btn-sm" type="button" onclick="loadProfessionals()">Atualizar</button>
+        </div>
+        <div class="row mt-3">
+          <label for="profFilter" class="sr-only">Filtrar profissionais pelo nome ou cargo</label>
+          <input class="input grow" id="profFilter" placeholder="Filtrar por nome ou cargo…" autocomplete="off" spellcheck="false">
         </div>
         <div id="profList">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
@@ -263,42 +283,49 @@
     </section>
 
     <!-- ===== AUDITORIA ===== -->
-    <section class="tabpanel" id="auditoria" role="tabpanel" aria-labelledby="tab-auditoria">
+    <section class="tabpanel" id="auditoria" role="tabpanel" aria-labelledby="tab-auditoria" tabindex="0">
       <div class="card">
         <h2>Ações administrativas recentes</h2>
-        <p class="muted" style="margin-top:-8px">Quem fez o quê e quando — confirmações, cancelamentos e gestão de
+        <p class="muted card-sub">Quem fez o quê e quando — confirmações, cancelamentos e gestão de
           alertas.</p>
-        <form id="auditFilterForm" class="row" aria-label="Filtrar auditoria" style="margin-top:12px">
+        <form id="auditFilterForm" class="row mt-3" aria-label="Filtrar auditoria">
           <label for="auditEntityType" class="sr-only">Tipo da entidade</label>
-          <input class="input" id="auditEntityType" name="entityType" placeholder="Tipo da entidade" style="min-width:180px">
+          <input class="input grow" id="auditEntityType" name="entityType" placeholder="Tipo da entidade…" autocomplete="off" spellcheck="false">
           <label for="auditAction" class="sr-only">Ação</label>
-          <input class="input" id="auditAction" name="action" placeholder="Ação" style="min-width:180px">
+          <input class="input grow" id="auditAction" name="action" placeholder="Ação…" autocomplete="off" spellcheck="false">
           <button class="btn btn-outline" type="submit">Filtrar</button>
           <button class="btn btn-outline" type="button" onclick="resetAuditFilters()">Limpar</button>
           <button class="btn btn-outline" type="button" onclick="verifyAuditChain()">Verificar integridade</button>
+          <label for="auditPageSize" class="sr-only">Quantas ações por página</label>
+          <select class="select filter-select" id="auditPageSize" name="pageSize" aria-label="Quantas ações por página">
+            <option value="25">25 por página</option>
+            <option value="50" selected>50 por página</option>
+            <option value="100">100 por página</option>
+            <option value="200">200 por página</option>
+          </select>
         </form>
-        <div id="chainResult" class="muted" style="margin-top:8px;font-size:.88rem"></div>
-        <div id="auditLog" style="margin-top:12px">
+        <div id="chainResult" class="muted mt-2 text-sm" role="status" aria-live="polite"></div>
+        <div id="auditLog" class="mt-3">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
         </div>
       </div>
     </section>
 
     <!-- ===== MINHA CONTA (perfil + LGPD + privacidade + DPO) ===== -->
-    <section class="tabpanel" id="minha-conta" role="tabpanel" aria-labelledby="tab-minha-conta">
-      <div class="grid grid-2" style="align-items:start">
+    <section class="tabpanel" id="minha-conta" role="tabpanel" aria-labelledby="tab-minha-conta" tabindex="0">
+      <div class="grid grid-2 items-start">
         <div class="card">
           <h2>Meus dados</h2>
           <p class="muted">Você também é um usuário do sistema: complete seus dados ou atualize-os quando mudar.</p>
-          <div style="display:flex;align-items:center;gap:12px;margin:14px 0">
-            <div style="flex:1;height:10px;border-radius:6px;background:var(--border);overflow:hidden">
-              <div id="acctBar" style="height:100%;width:0%;background:var(--primary)"></div>
+          <div class="meter">
+            <div class="meter-track">
+              <div class="meter-fill" id="acctBar"></div>
             </div>
-            <strong id="acctPct">0%</strong>
+            <strong class="meter-value" id="acctPct">—</strong>
           </div>
           <form id="acctForm" novalidate aria-label="Meus dados">
             <h3>Identificação</h3>
-            <div class="grid grid-2" style="gap:12px">
+            <div class="grid grid-2 gap-3">
               <div class="field">
                 <label for="a_full_name">Nome completo *</label>
                 <input class="input" id="a_full_name" name="full_name" autocomplete="name" required>
@@ -322,43 +349,43 @@
                 </select>
               </div>
             </div>
-            <h3 style="margin-top:16px">Documentos</h3>
-            <div class="grid grid-2" style="gap:12px">
+            <h3 class="mt-4">Documentos</h3>
+            <div class="grid grid-2 gap-3">
               <div class="field">
                 <label for="a_cpf">CPF</label>
-                <input class="input" id="a_cpf" name="cpf" inputmode="numeric" maxlength="14" oninput="maskCpf(this)">
+                <input class="input" id="a_cpf" name="cpf" inputmode="numeric" maxlength="14" autocomplete="off" spellcheck="false" oninput="maskCpf(this)">
               </div>
               <div class="field">
                 <label for="a_rg">RG <span class="opt">(opcional)</span></label>
-                <input class="input" id="a_rg" name="rg" maxlength="15" oninput="maskRg(this)">
+                <input class="input" id="a_rg" name="rg" maxlength="15" autocomplete="off" spellcheck="false" oninput="maskRg(this)">
               </div>
               <div class="field">
                 <label for="a_cns">Cartão SUS (CNS)</label>
-                <input class="input" id="a_cns" name="cns" inputmode="numeric" maxlength="15" oninput="maskCns(this)">
+                <input class="input" id="a_cns" name="cns" inputmode="numeric" maxlength="15" autocomplete="off" spellcheck="false" oninput="maskCns(this)">
               </div>
             </div>
-            <h3 style="margin-top:16px">Contato e endereço</h3>
-            <div class="grid grid-2" style="gap:12px">
+            <h3 class="mt-4">Contato e endereço</h3>
+            <div class="grid grid-2 gap-3">
               <div class="field">
                 <label for="a_mobile">Celular *</label>
-                <input class="input" id="a_mobile" name="mobile" inputmode="tel" maxlength="16" placeholder="(00) 90000-0000" required>
+                <input class="input" id="a_mobile" name="mobile" type="tel" inputmode="tel" maxlength="16" autocomplete="tel" placeholder="(00) 90000-0000" required>
               </div>
               <div class="field">
                 <label for="a_phone">Telefone fixo <span class="opt">(opcional)</span></label>
-                <input class="input" id="a_phone" name="phone" inputmode="tel" maxlength="15">
+                <input class="input" id="a_phone" name="phone" type="tel" inputmode="tel" maxlength="15" autocomplete="tel">
               </div>
               <div class="field">
                 <label for="a_cep">CEP</label>
-                <input class="input" id="a_cep" name="cep" maxlength="9" oninput="maskCep(this)"
+                <input class="input" id="a_cep" name="cep" inputmode="numeric" maxlength="9" autocomplete="postal-code" spellcheck="false" oninput="maskCep(this)"
                   onblur="lookupCep('a_cep',{street:'a_street',neighborhood:'a_neighborhood',city:'a_city',state:'a_state'})">
               </div>
               <div class="field">
                 <label for="a_number">Número</label>
-                <input class="input" id="a_number" name="address_number">
+                <input class="input" id="a_number" name="address_number" inputmode="numeric">
               </div>
-              <div class="field" style="grid-column:1/-1">
+              <div class="field col-full">
                 <label for="a_street">Rua / Logradouro</label>
-                <input class="input" id="a_street" name="street">
+                <input class="input" id="a_street" name="street" autocomplete="street-address">
               </div>
               <div class="field">
                 <label for="a_neighborhood">Bairro</label>
@@ -368,28 +395,28 @@
                 <label for="a_city">Cidade</label>
                 <input class="input" id="a_city" name="city">
               </div>
-              <div class="field" style="max-width:120px">
+              <div class="field field-narrow">
                 <label for="a_state">UF</label>
                 <input class="input" id="a_state" name="state" maxlength="2" placeholder="UF"
                   oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')">
               </div>
             </div>
-            <div class="row" style="margin-top:18px">
+            <div class="row mt-5">
               <button class="btn btn-primary" type="submit" id="acctSubmit">Salvar meus dados</button>
             </div>
           </form>
         </div>
 
-        <div class="grid" style="gap:16px">
+        <div class="grid gap-4">
           <div class="card">
             <h2>Meus dados (LGPD)</h2>
             <p class="muted">Veja o que o sistema registra sobre você, baixe uma cópia ou peça a exclusão da conta.</p>
-            <div id="acctConsent" class="muted" style="font-size:.9rem">
+            <div id="acctConsent" class="muted text-sm" role="status" aria-live="polite">
               <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
             </div>
-            <div class="row" style="margin-top:14px">
-              <button class="btn btn-outline btn-sm" type="button" onclick="downloadMyAccountData()">Baixar meus dados (JSON)</button>
-              <button class="btn btn-outline btn-sm" type="button" onclick="deleteMyAccount()" style="color:var(--danger)">Excluir minha conta…</button>
+            <div class="row mt-3">
+              <button class="btn btn-outline btn-sm" type="button" onclick="downloadMyAccountData(this)">Baixar meus dados (JSON)</button>
+              <button class="btn btn-outline btn-sm text-danger" type="button" onclick="deleteMyAccount()">Excluir minha conta…</button>
             </div>
           </div>
 
@@ -397,7 +424,7 @@
             <h2>Privacidade</h2>
             <p class="muted">Coletamos o mínimo necessário para o atendimento público. A base legal é o dever legal do
               SUS (art. 11, II, <em>f</em> da LGPD), não o consentimento — por isso não há caixa de aceite genérico.</p>
-            <ul class="muted" style="font-size:.9rem;padding-left:18px;margin:10px 0">
+            <ul class="muted list-plain text-sm">
               <li>Dados de saúde são sensíveis e ficam restritos à equipe que presta o atendimento.</li>
               <li>CPF, RG e CNS são gravados criptografados no banco.</li>
               <li>Cada acesso da equipe a documentos pessoais fica registrado na auditoria.</li>
@@ -409,7 +436,7 @@
           <div class="card">
             <h2>Encarregado (DPO)</h2>
             <p class="muted">Canal oficial para qualquer assunto sobre seus dados pessoais (LGPD, art. 41).</p>
-            <p id="acctDpo" style="font-weight:600;margin:10px 0 0"><span class="spinner"></span></p>
+            <p id="acctDpo" class="dpo-contact" role="status" aria-live="polite"><span class="spinner"></span></p>
           </div>
         </div>
       </div>
@@ -464,17 +491,44 @@
       document.getElementById('shortcutPessoas').style.display = can('users') ? '' : 'none';
       document.getElementById('shortcutCSV').style.display = can('reports') ? '' : 'none';
 
-      // Só abas principais (com data-tab) usam o switchTab genérico;
-      // sub-abas (Pessoas/Rede/Doenças) têm onclick próprio (setSubTab).
-      document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => { if (t.dataset.tab) switchTab(t.dataset.tab); }));
-      document.getElementById('diseaseForm').addEventListener('submit', addDisease);
-      document.getElementById('userSearchForm').addEventListener('submit', searchUsers);
+      // Só abas principais (com data-tab) usam o switchTab; as sub-abas
+      // (data-subtab) têm o próprio setSubTab. Um único listener para os dois
+      // tipos: as sub-abas usavam onclick inline, que não sobrevivia ao
+      // roving tabindex do teclado.
+      document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+        if (t.dataset.tab) switchTab(t.dataset.tab);
+        else if (t.dataset.subtab) setSubTab(t.dataset.subtab);
+      }));
+      document.getElementById('diseaseForm')?.addEventListener('submit', addDisease);
+      // Faixas que não cabem na tela (abas do rail e sub-abas de Cadastros)
+      // ganham esmaecimento no lado que ainda tem conteúdo.
+      document.querySelectorAll('.tabs').forEach(initScrollHint);
+      // Os filtros escrevem na URL com replaceState (não empilham histórico: cada
+      // tecla não pode virar um passo no Voltar). Trocar de ABA empilha
+      // (pushState), e é por isso que a escrita mora nos listeners, não dentro
+      // dos carregadores: um replaceState disparado durante a carga da própria
+      // aba substituiria a entrada anterior e o Voltar não voltaria.
+      document.getElementById('userSearchForm').addEventListener('submit', (e) => {
+        searchUsers(e).then(() => writeUrl(true));
+      });
       document.getElementById('unitForm').addEventListener('submit', saveUnit);
       document.getElementById('unitOfferForm').addEventListener('submit', addUnitOffer);
       document.getElementById('profForm').addEventListener('submit', saveProf);
-      document.getElementById('offerUnitSel').addEventListener('change', renderUnitOffers);
-      document.getElementById('auditFilterForm').addEventListener('submit', loadAuditLog);
+      document.getElementById('offerUnitSel').addEventListener('change', () => { renderUnitOffers.cache = null; renderUnitOffers(); });
+      document.getElementById('auditFilterForm').addEventListener('submit', (e) => {
+        loadAuditLog(e).then(() => writeUrl(true));
+      });
+      document.getElementById('auditPageSize').addEventListener('change', () => {
+        loadAuditLog().then(() => writeUrl(true));
+      });
       document.getElementById('acctForm').addEventListener('submit', saveAccount);
+
+      // Filtro das listas que a API entrega inteiras (sem paginação): digitar
+      // re-renderiza só com o que casa, sem nova ida ao servidor.
+      wireFilter('unitFilter', (termo) => renderUnits(termo));
+      wireFilter('profFilter', (termo) => renderProfessionals(termo));
+      wireFilter('diseaseFilter', (termo) => renderDiseases(termo));
+      wireFilter('offerFilter', (termo) => renderUnitOffers(termo));
 
       ensureReagendarModal();
       ensureDeleteDiseaseModal();
@@ -484,7 +538,108 @@
       if (can('units')) loadUnits();
       if (can('diseases')) loadDiseases();
       loadOverview();
+
+      // Só agora a URL passa a ser lida/escrita. O e2e afirma
+      // toHaveURL(/admin\.html$/) logo após o login, e applyLevelGating()
+      // chama setSubTab() — se qualquer um dos dois escrevesse no hash no
+      // boot, essa asserção quebraria.
+      initUrlState();
     });
+
+    /* ================= ESTADO NA URL (Fase 5) =================
+       Aba, sub-aba e filtros passam para o hash, para recarregar manter o
+       lugar e o botão Voltar do navegador navegar entre abas.
+       Regra dura: NADA é escrito no load. A leitura acontece uma vez, depois
+       que applyLevelGating() já decidiu quais abas existem. */
+    const URL_STATE = { tab: '', sub: '', q: '', role: '', status: '', entityType: '', action: '' };
+    let urlReady = false;
+    let usersSearched = false;
+
+    function currentTab() {
+      const ativa = document.querySelector('.tab[data-tab].active');
+      return ativa ? ativa.dataset.tab : '';
+    }
+    function currentSubTab() {
+      const ativa = document.querySelector('#cadastros [data-subtab].active');
+      return ativa ? ativa.dataset.subtab : '';
+    }
+    function writeUrl(replace) {
+      if (!urlReady) return;
+      const p = new URLSearchParams();
+      // O Início é o padrão: não suja a URL com #tab=overview.
+      if (currentTab() && currentTab() !== 'overview') p.set('tab', currentTab());
+      if (currentTab() === 'cadastros' && currentSubTab() && currentSubTab() !== 'pessoas') p.set('sub', currentSubTab());
+      if (URL_STATE.q) p.set('q', URL_STATE.q);
+      if (URL_STATE.role) p.set('role', URL_STATE.role);
+      if (URL_STATE.status) p.set('status', URL_STATE.status);
+      if (URL_STATE.entityType) p.set('entityType', URL_STATE.entityType);
+      if (URL_STATE.action) p.set('action', URL_STATE.action);
+      const hash = p.toString();
+      const alvo = hash ? '#' + hash : location.pathname + location.search;
+      // Nada a fazer (nem entrada nova no histórico) se a URL já é essa.
+      if (alvo === location.pathname + location.search + location.hash) return;
+      // Marca como "já aplicada": sem isso o popstate do Voltar encontraria o
+      // hash antigo já visto e sairia pela guarda de duplicidade, deixando a
+      // tela numa aba que a URL não representa.
+      ultimaHashAplicada = hash;
+      // Trocar de aba cria uma entrada nova (Voltar volta para a anterior);
+      // mexer num filtro substitui a atual, senão cada tecla poluiria o
+      // histórico do navegador.
+      if (replace) history.replaceState(null, '', alvo);
+      else history.pushState(null, '', alvo);
+    }
+
+    let ultimaHashAplicada = null;
+
+    async function applyUrlState() {
+      const hash = location.hash || '';
+      // popstate e hashchange disparam juntos na navegação por histórico:
+      // sem esta guarda a mesma busca rodaria duas vezes.
+      if (hash === ultimaHashAplicada) return;
+      ultimaHashAplicada = hash;
+
+      const p = new URLSearchParams(hash.replace(/^#/, ''));
+      const tab = p.get('tab');
+      const sub = p.get('sub');
+      URL_STATE.q = p.get('q') || '';
+      URL_STATE.role = p.get('role') || '';
+      URL_STATE.status = p.get('status') || '';
+      URL_STATE.entityType = p.get('entityType') || '';
+      URL_STATE.action = p.get('action') || '';
+
+      // Sem hash é o estado inicial (Início). Precisa ser aplicado também:
+      // voltar do histórico para `/admin.html` sem hash tem que mostrar o
+      // Início, senão a tela ficashowing uma aba que a URL não representa.
+      const alvo = (tab && document.querySelector(`.tab[data-tab="${tab}"]`)?.style.display !== 'none') ? tab : 'overview';
+      if (currentTab() !== alvo || !document.getElementById(alvo).classList.contains('active')) {
+        switchTab(alvo, { silentUrl: true });
+      }
+      if (alvo === 'cadastros') {
+        const subAlvo = sub && document.querySelector(`#cadastros [data-subtab="${sub}"]`)?.style.display !== 'none' ? sub : 'pessoas';
+        if (currentSubTab() !== subAlvo) setSubTab(subAlvo, { silentUrl: true });
+      }
+
+      const form = document.getElementById('userSearchForm');
+      form.q.value = URL_STATE.q;
+      form.role.value = URL_STATE.role;
+      form.status.value = URL_STATE.status;
+      if (alvo === 'cadastros' && document.getElementById('sub-pessoas').classList.contains('active')) {
+        searchUsers({ preventDefault() {}, target: form });
+      }
+      const auditForm = document.getElementById('auditFilterForm');
+      auditForm.entityType.value = URL_STATE.entityType;
+      auditForm.action.value = URL_STATE.action;
+    }
+
+    function initUrlState() {
+      urlReady = true;
+      // null força a primeira aplicação mesmo com hash vazio — senão o deep
+      // link da entrada seria ignorado por causa da guarda de duplicidade.
+      ultimaHashAplicada = null;
+      applyUrlState();
+      window.addEventListener('hashchange', applyUrlState);
+      window.addEventListener('popstate', applyUrlState);
+    }
 
     // P3: visões por nível administrativo (espelha requireCapability do back).
     // atendimento → só atendimentos; alertas → só doenças; gestor/superadmin → tudo.
@@ -533,7 +688,7 @@
       if (badge) badge.textContent = level;
     }
 
-    function switchTab(name) {
+    function switchTab(name, opts) {
       // Escopo: só abas principais — não apaga o destaque das sub-abas.
       // P3: barra navegação para seção oculta pelo nível (volta ao Início).
       const btn = document.querySelector(`.tab[data-tab="${name}"]`);
@@ -542,59 +697,103 @@
         const a = t.dataset.tab === name;
         t.classList.toggle('active', a);
         t.setAttribute('aria-selected', a ? 'true' : 'false');
+        // Roving tabindex (APG): só a aba ativa entra na ordem do Tab, senão
+        // o admin atravessa 5 paradas ociosas antes de chegar ao conteúdo.
+        t.tabIndex = a ? 0 : -1;
       });
       document.querySelectorAll('.tabpanel').forEach(p => p.classList.toggle('active', p.id === name));
       if (name === 'auditoria') loadAuditLog();
       if (name === 'cadastros' && can('units')) { loadProfessionals(); renderUnitOffers(); }
       if (name === 'minha-conta') initMyAccount();
+      if (!(opts && opts.silentUrl)) writeUrl(false);
+    }
+
+    /* Busca nas listas que a API entrega inteiras, sem paginação nem filtro
+       (GET /health-units/manage, /admin/diseases, /health-units/:id/offers e
+       /admin/professionals não leem NENHUM query param — verificado no
+       servidor). Filtrar no cliente é a única opção sem mudar a API.
+       input é filtrado por texto visível, case/acento-insensitivo. */
+    const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    function wireFilter(inputId, apply) {
+      const el = document.getElementById(inputId);
+      if (!el) return;
+      el.addEventListener('input', () => apply(norm(el.value.trim())));
+    }
+
+    /* Preenche o select de regiões. Extraído porque o addDisease precisa
+       recomeçar: as opções são injetadas por JS, então form.reset() as
+       apaga e devolve o placeholder "Carregando regiões…" do HTML original —
+       o dropdown ficava travado naquele texto até recarregar a página. */
+    function fillRegionSelect(sel, neighborhoods, placeholder) {
+      sel.innerHTML = neighborhoods.length
+        ? `<option value="">${esc(placeholder)}</option>`
+          + neighborhoods.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join('')
+        : `<option value="">Nenhum bairro encontrado</option>`;
     }
 
     async function loadHealthUnitsRegions() {
       const sel = document.getElementById('diseaseRegionSelect');
       if (!sel) return;
       try {
-        const units = await apiGet('/health-units');
-        const rows = Array.isArray(units) ? units : [];
-        const neighborhoods = Array.from(new Set(rows.map(u => u.neighborhood).filter(Boolean))).sort();
-
-        if (!neighborhoods.length) {
-          sel.innerHTML = '<option value="">Nenhum bairro encontrado</option>';
-          return;
-        }
-        sel.innerHTML = '<option value="">Selecione a região/bairro...</option>' +
-          neighborhoods.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join('');
+        const rows = await apiGet('/health-units');
+        const lista = Array.isArray(rows) ? rows : [];
+        const neighborhoods = Array.from(new Set(lista.map(u => u.neighborhood).filter(Boolean))).sort();
+        fillRegionSelect(sel, neighborhoods, 'Selecione a região/bairro…');
       } catch (err) {
         console.error(err);
         sel.innerHTML = '<option value="">Erro ao carregar regiões</option>';
       }
     }
 
+    /* Render separado da carga: o filtro re-renderiza a partir do array já
+       baixado, sem pedir nada ao servidor (a rota não aceita query param). */
+    function renderUnits(termo) {
+      const box = document.getElementById('unitList');
+      if (!box) return;
+      const t = termo || '';
+      const typeLabels = { ubs: 'UBS / PSF', hospital: 'Hospital', clinica: 'Clínica', caps: 'CAPS', outro: 'Outro' };
+      const casa = (u) => norm([u.name, typeLabels[u.type] || u.type, u.neighborhood].join(' ')).includes(t);
+      const visiveis = units.filter(casa);
+      box.innerHTML = units.length
+        ? (visiveis.length ? visiveis.map(unitRow).join('')
+          : `<div class="empty">Nenhuma unidade casa com "${esc(termo)}".</div>`)
+        : '<div class="empty">Nenhuma unidade cadastrada.</div>';
+    }
+
     async function loadUnits() {
       const box = document.getElementById('unitList');
       if (!box) return;
-      box.innerHTML = '<div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
+      box.innerHTML = skeleton();
       try {
         const data = await apiGet('/health-units/manage');
         units = Array.isArray(data) ? data : [];
-        box.innerHTML = units.length ? units.map(unitRow).join('') : '<div class="empty">Nenhuma unidade cadastrada.</div>';
+        renderUnits(norm(document.getElementById('unitFilter').value.trim()));
         refreshOfferUnitSelect();
         renderUnitOffers();
       } catch (err) {
-        box.innerHTML = `<div class="empty">${esc(err.message || 'Erro ao carregar unidades')}</div>`;
+        box.innerHTML = '';
+        box.appendChild(stateMessage('error', err.message || 'Erro ao carregar unidades', loadUnits));
       }
     }
 
     function unitRow(unit) {
       const typeLabels = { ubs: 'UBS / PSF', hospital: 'Hospital', clinica: 'Clínica', caps: 'CAPS', outro: 'Outro' };
       const active = Number(unit.active) === 1;
+      const nome = esc(unit.name);
+      // item-main/item-actions: abaixo de 620px o grupo de ações cai para uma
+      // faixa cheia em vez de espremer o nome contra os botões. E cada botão
+      // ganha nome acessível próprio — eram N botões "Editar" idênticos.
+      // O alvo do toggle NÃO vai no HTML: o handler lê o estado atual do
+      // array. Com o valor assado no botão, dois admins em telas antigas
+      // se desativavam por engano (cada um invertendo o que o outro fez).
       return `<div class="item">
-        <div>
-          <h3>${esc(unit.name)} <span class="badge ${active ? 'badge-success' : 'badge-danger'}">${active ? 'Ativa' : 'Inativa'}</span></h3>
+        <div class="item-main">
+          <h3>${nome} <span class="badge ${active ? 'badge-success' : 'badge-danger'}">${active ? 'Ativa' : 'Inativa'}</span></h3>
           <p>${esc(typeLabels[unit.type] || unit.type)}${unit.neighborhood ? ' · ' + esc(unit.neighborhood) : ''}</p>
         </div>
-        <div class="row" style="gap:6px">
-          <button class="btn btn-outline btn-sm" type="button" onclick="editUnit('${unit.id}')">Editar</button>
-          <button class="btn btn-outline btn-sm" type="button" onclick="toggleUnit('${unit.id}',${active ? 0 : 1})">${active ? 'Desativar' : 'Ativar'}</button>
+        <div class="item-actions">
+          <button class="btn btn-outline btn-sm" type="button" data-act="unit-edit" data-id="${esc(unit.id)}" aria-label="Editar ${nome}">Editar</button>
+          <button class="btn btn-outline btn-sm${active ? ' text-danger' : ''}" type="button" data-act="unit-toggle" data-id="${esc(unit.id)}" data-nome="${esc(unit.name)}" aria-label="${active ? 'Desativar' : 'Ativar'} ${nome}">${active ? 'Desativar' : 'Ativar'}</button>
         </div>
       </div>`;
     }
@@ -609,6 +808,9 @@
       document.getElementById('unitFormTitle').textContent = 'Editar unidade de saúde';
       document.getElementById('unitSubmit').textContent = 'Salvar alterações';
       document.getElementById('unitCancel').style.display = 'inline-flex';
+      // O modo de edição era só o texto do botão. Em lista longa, rolando
+      // até o formulário, não dava para saber o que estava sendo editado.
+      document.getElementById('unitFormCard').classList.add('form-editing');
       document.getElementById('unitForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
@@ -619,37 +821,61 @@
       document.getElementById('unitFormTitle').textContent = 'Cadastrar unidade de saúde';
       document.getElementById('unitSubmit').textContent = 'Adicionar unidade';
       document.getElementById('unitCancel').style.display = 'none';
+      document.getElementById('unitFormCard').classList.remove('form-editing');
     };
 
     async function saveUnit(e) {
       e.preventDefault();
       const payload = Object.fromEntries(new FormData(e.target));
-      const button = document.getElementById('unitSubmit');
-      button.disabled = true;
-      try {
-        const path = editingUnitId ? '/health-units/' + encodeURIComponent(editingUnitId) : '/health-units';
-        if (editingUnitId) await apiPatch(path, payload);
-        else await apiPost(path, payload);
-        toast(editingUnitId ? 'Unidade atualizada' : 'Unidade cadastrada', 'success');
-        resetUnitForm();
-        await loadUnits();
-        await loadHealthUnitsRegions();
-      } catch (err) {
-        toast(err.message || 'Erro ao salvar unidade', 'error');
-      } finally {
-        button.disabled = false;
+      const nomeEl = document.getElementById('unitName');
+      if (!String(payload.name || '').trim()) {
+        setFieldError(nomeEl, 'Informe o nome da unidade.');
+        showFirstError(nomeEl);
+        return;
       }
+      clearFieldError(nomeEl);
+      await loadingButton(document.getElementById('unitSubmit'), async () => {
+        try {
+          const path = editingUnitId ? '/health-units/' + encodeURIComponent(editingUnitId) : '/health-units';
+          if (editingUnitId) await apiPatch(path, payload);
+          else await apiPost(path, payload);
+          toast(editingUnitId ? 'Unidade atualizada' : 'Unidade cadastrada', 'success');
+          resetUnitForm();
+          await loadUnits();
+          await loadHealthUnitsRegions();
+        } catch (err) {
+          // Erro inline no campo, não só toast: o toast some em 3,5s e não
+          // fica associado ao campo para leitor de tela.
+          setFieldError(nomeEl, err.message || 'Não foi possível salvar a unidade.');
+        }
+      });
     }
 
-    window.toggleUnit = async function (id, active) {
-      try {
-        await apiPatch('/health-units/' + encodeURIComponent(id), { active });
-        toast(active ? 'Unidade ativada' : 'Unidade desativada', 'success');
-        await loadUnits();
-        await loadHealthUnitsRegions();
-      } catch (err) {
-        toast(err.message || 'Erro ao atualizar unidade', 'error');
+    window.toggleUnit = async function (id, nome, btn) {
+      // Lê o estado atual do servidor-side array em vez de confiar no que
+      // estava escrito no botão quando a linha foi desenhada.
+      const unit = units.find(u => String(u.id) === String(id));
+      if (!unit) return;
+      const ativo = Number(unit.active) === 1;
+      if (ativo) {
+        const ok = await confirmDialog({
+          title: 'Desativar ' + (nome || unit.name) + '?',
+          message: 'A unidade deixa de aparecer no agendamento para os pacientes até ser reativada. '
+            + 'Os atendimentos já marcados continuam como estão.',
+          confirmLabel: 'Desativar unidade',
+        });
+        if (!ok) return;
       }
+      await loadingButton(btn, async () => {
+        try {
+          await apiPatch('/health-units/' + encodeURIComponent(id), { active: ativo ? 0 : 1 });
+          toast(ativo ? 'Unidade desativada' : 'Unidade ativada', 'success');
+          await loadUnits();
+          await loadHealthUnitsRegions();
+        } catch (err) {
+          toast(err.message || 'Erro ao atualizar unidade', 'error');
+        }
+      });
     };
 
     /* ===== SERVIÇOS OFERTADOS PELA UNIDADE (4.4) ===== */
@@ -667,83 +893,131 @@
       const box = document.getElementById('unitOfferList');
       if (!box) return;
       const unitId = document.getElementById('offerUnitSel').value;
+      const filtro = document.getElementById('offerFilter');
+      const termo = norm(filtro ? filtro.value.trim() : '');
       if (!unitId) { box.innerHTML = '<div class="empty">Cadastre uma unidade para adicionar serviços.</div>'; return; }
-      box.innerHTML = '<div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
-      try {
-        const rows = await apiGet('/health-units/' + encodeURIComponent(unitId) + '/offers');
-        box.innerHTML = rows.length ? rows.map(o => `
+      if (!renderUnitOffers.cache || renderUnitOffers.cache.unit !== unitId) {
+        box.innerHTML = skeleton();
+        try {
+          renderUnitOffers.cache = { unit: unitId, rows: await apiGet('/health-units/' + encodeURIComponent(unitId) + '/offers') };
+        } catch (err) {
+          renderUnitOffers.cache = null;
+          box.innerHTML = '';
+          box.appendChild(stateMessage('error', err.message || 'Erro ao carregar serviços', renderUnitOffers));
+          return;
+        }
+      }
+      const rows = renderUnitOffers.cache.rows || [];
+      const visiveis = rows.filter(o => norm(o.name).includes(termo));
+      box.innerHTML = rows.length
+        ? (visiveis.length ? visiveis.map(o => `
           <div class="item">
-            <div>
+            <div class="item-main">
               <h3>${esc(o.name)} <span class="badge">${o.kind === 'exame' ? 'Exame' : 'Consulta'}</span>
                 <span class="badge ${Number(o.active) ? 'badge-success' : 'badge-danger'}">${Number(o.active) ? 'Ativo' : 'Inativo'}</span></h3>
             </div>
-            <button class="btn btn-outline btn-sm" type="button" onclick="delUnitOffer('${unitId}','${o.id}')">Remover</button>
+            <div class="item-actions">
+              <button class="btn btn-outline btn-sm text-danger" type="button" data-act="offer-del" data-unit="${esc(unitId)}" data-id="${esc(o.id)}" data-nome="${esc(o.name)}" data-kind="${esc(o.kind)}" aria-label="Remover ${o.kind === 'exame' ? 'exame' : 'serviço'} ${esc(o.name)}">Remover</button>
+            </div>
           </div>`).join('')
-          : '<div class="empty">Nenhum serviço cadastrado para esta unidade.</div>';
-      } catch (err) {
-        box.innerHTML = `<div class="empty">${esc(err.message || 'Erro ao carregar serviços')}</div>`;
-      }
+          : `<div class="empty">Nenhum serviço casa com "${esc(termo)}".</div>`)
+        : '<div class="empty">Nenhum serviço cadastrado para esta unidade.</div>';
     }
 
     async function addUnitOffer(e) {
       e.preventDefault();
       const unitId = document.getElementById('offerUnitSel').value;
-      if (!unitId) { toast('Cadastre uma unidade antes de adicionar serviços', 'error'); return; }
+      const nomeEl = document.getElementById('offerName');
+      clearFieldError(nomeEl);
+      if (!unitId) { setFieldError(nomeEl, 'Cadastre uma unidade antes de adicionar serviços.'); showFirstError(nomeEl); return; }
       const kind = document.getElementById('offerKind').value;
-      const name = document.getElementById('offerName').value.trim();
-      if (!name) { toast('Informe a especialidade ou o exame', 'error'); return; }
-      try {
-        await apiPost('/health-units/' + encodeURIComponent(unitId) + '/offers', { kind, name });
-        document.getElementById('offerName').value = '';
-        toast('Serviço adicionado', 'success');
-        renderUnitOffers();
-      } catch (err) { toast(err.message || 'Erro ao adicionar serviço', 'error'); }
+      const name = nomeEl.value.trim();
+      if (!name) { setFieldError(nomeEl, 'Informe a especialidade ou o exame.'); showFirstError(nomeEl); return; }
+      await loadingButton(e.target.querySelector('button[type=submit]'), async () => {
+        try {
+          await apiPost('/health-units/' + encodeURIComponent(unitId) + '/offers', { kind, name });
+          nomeEl.value = '';
+          toast('Serviço adicionado', 'success');
+          renderUnitOffers();
+        } catch (err) { setFieldError(nomeEl, err.message || 'Não foi possível adicionar o serviço.'); }
+      });
     }
 
-    window.delUnitOffer = async function (unitId, offerId) {
-      try {
-        await apiDelete('/health-units/' + encodeURIComponent(unitId) + '/offers/' + encodeURIComponent(offerId));
-        toast('Serviço removido', 'success');
-        renderUnitOffers();
-      } catch (err) { toast(err.message || 'Erro ao remover serviço', 'error'); }
+    window.delUnitOffer = async function (unitId, offerId, nome, kind, btn) {
+      const ok = await confirmDialog({
+        title: 'Remover ' + (kind === 'exame' ? 'o exame' : 'a especialidade') + '?',
+        message: '"' + nome + '" deixa de aparecer para os pacientes desta unidade. '
+          + 'Os agendamentos já marcados continuam válidos.',
+        confirmLabel: 'Remover serviço',
+      });
+      if (!ok) return;
+      await loadingButton(btn, async () => {
+        try {
+          await apiDelete('/health-units/' + encodeURIComponent(unitId) + '/offers/' + encodeURIComponent(offerId));
+          toast('Serviço removido', 'success');
+          renderUnitOffers();
+        } catch (err) { toast(err.message || 'Erro ao remover serviço', 'error'); }
+      });
     };
 
     /* ===== PROFISSIONAIS E AGENDA (4.4 / 4.6) ===== */
+    function renderProfessionals(termo) {
+      const t = termo || '';
+      const box = document.getElementById('profList');
+      if (!box) return;
+      const casa = (p) => norm([p.name, p.job_title, p.registry].join(' ')).includes(t);
+      const visiveis = professionals.filter(casa);
+      box.innerHTML = professionals.length
+        ? (visiveis.length ? visiveis.map(profRow).join('')
+          : `<div class="empty">Nenhum profissional casa com "${esc(termo)}".</div>`)
+        : '<div class="empty">Nenhum profissional cadastrado.</div>';
+    }
+
     async function loadProfessionals() {
       const box = document.getElementById('profList');
       if (!box) return;
-      box.innerHTML = '<div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
+      box.innerHTML = skeleton();
       try {
         const data = await apiGet('/admin/professionals');
         professionals = data.professionals || [];
         profOffers = data.offers || [];
         profSchedules = data.schedules || [];
         profBlocks = data.blocks || [];
-        box.innerHTML = professionals.length
-          ? professionals.map(profRow).join('')
-          : '<div class="empty">Nenhum profissional cadastrado.</div>';
-        if (activeProfId && professionals.some(p => p.id === activeProfId)) openProfDetail(activeProfId);
+        const filtro = document.getElementById('profFilter');
+        renderProfessionals(norm(filtro ? filtro.value.trim() : ''));
+        if (activeProfId && professionals.some(p => p.id === activeProfId)) {
+          // Re-renderizar apagaria o digitado nos formulários irmãos: guarda e
+          // devolve os valores ao abrir de novo.
+          openProfDetail(activeProfId, captureFormValues('#profDetail'));
+        }
         else { activeProfId = null; document.getElementById('profDetail').style.display = 'none'; }
+        document.querySelectorAll('[data-act="prof-open"]').forEach(b => {
+          b.setAttribute('aria-expanded', String(b.dataset.id === activeProfId));
+        });
       } catch (err) {
-        box.innerHTML = `<div class="empty">${esc(err.message || 'Erro ao carregar profissionais')}</div>`;
+        box.innerHTML = '';
+        box.appendChild(stateMessage('error', err.message || 'Erro ao carregar profissionais', loadProfessionals));
       }
     }
 
     function profRow(p) {
       const active = Number(p.active) === 1;
+      const nome = esc(p.name);
       const nOffers = profOffers.filter(o => o.professional_id === p.id).length;
       const nSched = profSchedules.filter(s => s.professional_id === p.id).length;
       const nBlocks = profBlocks.filter(b => b.professional_id === p.id).length;
+      // Três botões por linha era a maior pressão horizontal da página; em
+      // celular viram uma faixa empilhada de 44px.
       return `<div class="item">
-        <div>
-          <h3>${esc(p.name)} <span class="badge ${active ? 'badge-success' : 'badge-danger'}">${active ? 'Ativo' : 'Inativo'}</span>
+        <div class="item-main">
+          <h3>${nome} <span class="badge ${active ? 'badge-success' : 'badge-danger'}">${active ? 'Ativo' : 'Inativo'}</span>
             ${p.job_title ? `<span class="badge">${esc(p.job_title)}</span>` : ''}</h3>
           <p class="muted">${p.registry ? 'Registro: ' + esc(p.registry) + ' · ' : ''}${nOffers} vínculo(s) · ${nSched} horário(s) · ${nBlocks} bloqueio(s)</p>
         </div>
-        <div class="row" style="gap:6px">
-          <button class="btn btn-outline btn-sm" type="button" onclick="openProfDetail('${p.id}')">Gerenciar</button>
-          <button class="btn btn-outline btn-sm" type="button" onclick="editProf('${p.id}')">Editar</button>
-          <button class="btn btn-outline btn-sm" type="button" onclick="toggleProf('${p.id}',${active ? 0 : 1})">${active ? 'Desativar' : 'Ativar'}</button>
+        <div class="item-actions">
+          <button class="btn btn-outline btn-sm" type="button" data-act="prof-open" data-id="${esc(p.id)}" aria-label="Gerenciar vínculos e agenda de ${nome}" aria-expanded="false">Gerenciar</button>
+          <button class="btn btn-outline btn-sm" type="button" data-act="prof-edit" data-id="${esc(p.id)}" aria-label="Editar ${nome}">Editar</button>
+          <button class="btn btn-outline btn-sm${active ? ' text-danger' : ''}" type="button" data-act="prof-toggle" data-id="${esc(p.id)}" data-nome="${esc(p.name)}" aria-label="${active ? 'Desativar' : 'Ativar'} ${nome}">${active ? 'Desativar' : 'Ativar'}</button>
         </div>
       </div>`;
     }
@@ -753,72 +1027,99 @@
         units.map(u => `<option value="${u.id}" ${selected === u.id ? 'selected' : ''}>${esc(u.name)}</option>`).join('');
     }
 
-    window.openProfDetail = function (id) {
+    /* Re-renderizar #profDetail a cada ação apagava o que estava digitado nos
+       outros dois formulários do painel. O fluxo continua re-renderizando;
+       o que muda é que os valores são capturados antes e devolvidos depois. */
+    function captureFormValues(scope) {
+      const estado = {};
+      document.querySelectorAll(scope + ' form').forEach(f => {
+        const dados = {};
+        new FormData(f).forEach((v, k) => { dados[k] = v; });
+        estado[f.id] = dados;
+      });
+      return estado;
+    }
+    function applyFormValues(scope, estado) {
+      Object.keys(estado || {}).forEach(id => {
+        const f = document.getElementById(id);
+        if (!f) return;
+        Object.keys(estado[id]).forEach(k => {
+          const campo = f.elements[k];
+          if (campo && typeof campo.value === 'string') campo.value = estado[id][k];
+        });
+      });
+    }
+
+    window.openProfDetail = function (id, restaurar) {
       const p = professionals.find(x => x.id === id);
       const box = document.getElementById('profDetail');
       if (!p || !box) return;
       activeProfId = id;
+      const nome = esc(p.name);
       const offers = profOffers.filter(o => o.professional_id === id);
       const schedules = profSchedules.filter(s => s.professional_id === id);
       const blocks = profBlocks.filter(b => b.professional_id === id);
       box.style.display = 'block';
-      box.innerHTML = `<div class="card" style="margin-top:16px">
+      box.innerHTML = `<div class="card mt-4">
       <div class="row between">
-        <h2 style="margin:0">${esc(p.name)} — vínculos e agenda</h2>
-        <button class="btn btn-outline btn-sm" type="button" onclick="closeProfDetail()">Fechar</button>
+        <h2 class="m-0">${nome} — vínculos e agenda</h2>
+        <button class="btn btn-outline btn-sm" type="button" data-act="prof-close" aria-label="Fechar o painel de ${nome}">Fechar</button>
       </div>
 
-      <h3 style="margin-top:18px">Vínculos com unidades e serviços</h3>
-      <p class="muted" style="margin-top:-6px;font-size:.85rem">O profissional só aparece para o serviço vinculado naquela unidade.</p>
+      <h3 class="mt-4">Vínculos com unidades e serviços</h3>
+      <p class="muted card-sub text-sm">O profissional só aparece para o serviço vinculado naquela unidade.</p>
       <form id="profOfferForm" class="grid grid-3" aria-label="Vincular profissional a unidade e serviço">
         <div class="field"><label for="profOfferUnit">Unidade</label><select class="select" id="profOfferUnit" name="unit_id" required>${unitOptions('')}</select></div>
         <div class="field"><label for="profOfferKind">Tipo</label><select class="select" id="profOfferKind" name="kind"><option value="consulta">Consulta</option><option value="exame">Exame</option></select></div>
         <div class="field"><label for="profOfferName">Especialidade / exame</label><input class="input" id="profOfferName" name="name" required placeholder="Ex.: Cardiologia"></div>
-        <div class="field"><label for="profOfferReason">Motivo <span class="muted" style="font:inherit">(opcional)</span></label><input class="input" id="profOfferReason" name="reason" placeholder="Ex.: contratação nova"></div>
-        <div class="field"><span aria-hidden="true">&nbsp;</span><button class="btn btn-outline" type="submit">Vincular</button></div>
+        <div class="field"><label for="profOfferReason">Motivo <span class="opt">(opcional)</span></label><input class="input" id="profOfferReason" name="reason" placeholder="Ex.: contratação nova"></div>
+        <div class="field"><button class="btn btn-outline btn-block" type="submit">Vincular</button></div>
       </form>
       <div>${offers.length ? offers.map(o => `
-        <div class="item"><div><h3>${esc(o.name)} <span class="badge">${o.kind === 'exame' ? 'Exame' : 'Consulta'}</span></h3>
+        <div class="item"><div class="item-main"><h3>${esc(o.name)} <span class="badge">${o.kind === 'exame' ? 'Exame' : 'Consulta'}</span></h3>
         <p class="muted">${esc(o.unit_name)}</p></div>
-        <button class="btn btn-outline btn-sm" type="button" onclick="delProfOffer('${id}','${o.id}')">Remover</button></div>`).join('')
+        <div class="item-actions"><button class="btn btn-outline btn-sm text-danger" type="button" data-act="prof-offer-del" data-prof="${esc(id)}" data-id="${esc(o.id)}" data-nome="${esc(o.name)}" data-unidade="${esc(o.unit_name)}" aria-label="Remover vínculo com ${esc(o.name)} em ${esc(o.unit_name)}">Remover</button></div></div>`).join('')
           : '<div class="empty">Nenhum vínculo cadastrado.</div>'}</div>
 
-      <h3 style="margin-top:18px">Dias e horários de atendimento</h3>
+      <h3 class="mt-4">Dias e horários de atendimento</h3>
       <form id="profScheduleForm" class="grid grid-4" aria-label="Adicionar horário de atendimento">
         <div class="field"><label for="profSchedUnit">Unidade</label><select class="select" id="profSchedUnit" name="unit_id" required>${unitOptions('')}</select></div>
-        <div class="field"><label for="profSchedWeekday">Dia da semana</label><select class="select" id="profSchedWeekday" name="weekday"><option value="">Selecione o dia...</option>${WEEK.map((d, i) => `<option value="${i}">${d}</option>`).join('')}</select></div>
+        <div class="field"><label for="profSchedWeekday">Dia da semana</label><select class="select" id="profSchedWeekday" name="weekday"><option value="">Selecione o dia…</option>${WEEK.map((d, i) => `<option value="${i}">${d}</option>`).join('')}</select></div>
         <div class="field"><label for="profSchedStart">Início</label><input class="input" id="profSchedStart" type="time" name="start_time" required></div>
         <div class="field"><label for="profSchedEnd">Fim</label><input class="input" id="profSchedEnd" type="time" name="end_time" required></div>
         <div class="field"><label for="profSchedSlot">Duração (min)</label><input class="input" id="profSchedSlot" type="number" name="slot_minutes" value="30" min="5" max="240"></div>
-        <div class="field"><label for="profSchedReason">Motivo <span class="muted" style="font:inherit">(opcional)</span></label><input class="input" id="profSchedReason" name="reason"></div>
-        <div class="field"><span aria-hidden="true">&nbsp;</span><button class="btn btn-outline" type="submit">Adicionar horário</button></div>
+        <div class="field"><label for="profSchedReason">Motivo <span class="opt">(opcional)</span></label><input class="input" id="profSchedReason" name="reason"></div>
+        <div class="field"><button class="btn btn-outline btn-block" type="submit">Adicionar horário</button></div>
       </form>
       <div>${schedules.length ? schedules.map(s => `
-        <div class="item"><div><h3>${WEEK[Number(s.weekday)] || s.weekday}
+        <div class="item"><div class="item-main"><h3>${WEEK[Number(s.weekday)] || s.weekday}
         <span class="badge">${String(s.start_time).slice(0, 5)}–${String(s.end_time).slice(0, 5)}</span>
         <span class="badge">${Number(s.slot_minutes)} min</span></h3>
         <p class="muted">${esc(s.unit_name)}</p></div>
-        <button class="btn btn-outline btn-sm" type="button" onclick="delProfSchedule('${id}','${s.id}')">Remover</button></div>`).join('')
+        <div class="item-actions"><button class="btn btn-outline btn-sm text-danger" type="button" data-act="prof-schedule-del" data-prof="${esc(id)}" data-id="${esc(s.id)}" data-dia="${esc(WEEK[Number(s.weekday)] || 'o dia escolhido')}" data-unidade="${esc(s.unit_name)}" aria-label="Remover horário de ${WEEK[Number(s.weekday)] || 'atendimento'} em ${esc(s.unit_name)}">Remover</button></div></div>`).join('')
           : '<div class="empty">Nenhum horário cadastrado — o profissional não aparece na agenda.</div>'}</div>
 
-      <h3 style="margin-top:18px">Bloqueios, folgas e intervalos</h3>
+      <h3 class="mt-4">Bloqueios, folgas e intervalos</h3>
       <form id="profBlockForm" class="grid grid-4" aria-label="Bloquear agenda do profissional">
         <div class="field"><label for="profBlockUnit">Unidade</label><select class="select" id="profBlockUnit" name="unit_id" required>${unitOptions('')}</select></div>
         <div class="field"><label for="profBlockStart">Início</label><input class="input" id="profBlockStart" type="datetime-local" name="starts_at" required></div>
         <div class="field"><label for="profBlockEnd">Fim</label><input class="input" id="profBlockEnd" type="datetime-local" name="ends_at" required></div>
-        <div class="field"><label for="profBlockReason">Motivo <span class="muted" style="font:inherit">(obrigatório na prática)</span></label><input class="input" id="profBlockReason" name="reason" placeholder="Ex.: férias"></div>
-        <div class="field"><span aria-hidden="true">&nbsp;</span><button class="btn btn-outline" type="submit">Bloquear agenda</button></div>
+        <div class="field"><label for="profBlockReason">Motivo <span class="opt">(obrigatório na prática)</span></label><input class="input" id="profBlockReason" name="reason" placeholder="Ex.: férias"></div>
+        <div class="field"><button class="btn btn-outline btn-block" type="submit">Bloquear agenda</button></div>
       </form>
       <div>${blocks.length ? blocks.map(b => `
-        <div class="item"><div><h3>${fmtDate(b.starts_at)} → ${fmtDate(b.ends_at)}</h3>
+        <div class="item"><div class="item-main"><h3>${fmtDate(b.starts_at)} → ${fmtDate(b.ends_at)}</h3>
         <p class="muted">${esc(b.unit_name)}${b.reason ? ' · ' + esc(b.reason) : ''}</p></div>
-        <button class="btn btn-outline btn-sm" type="button" onclick="delProfBlock('${id}','${b.id}')">Remover</button></div>`).join('')
+        <div class="item-actions"><button class="btn btn-outline btn-sm text-danger" type="button" data-act="prof-block-del" data-prof="${esc(id)}" data-id="${esc(b.id)}" data-periodo="${esc(String(b.starts_at || '').replace('T', ' ') + ' a ' + String(b.ends_at || '').replace('T', ' '))}" aria-label="Remover bloqueio de ${fmtDate(b.starts_at)}">Remover</button></div></div>`).join('')
           : '<div class="empty">Nenhum bloqueio futuro.</div>'}</div>
     </div>`;
       document.getElementById('profOfferForm').addEventListener('submit', submitProfOffer);
       document.getElementById('profScheduleForm').addEventListener('submit', submitProfSchedule);
       document.getElementById('profBlockForm').addEventListener('submit', submitProfBlock);
-      setDateLimits();
+      // Só o reagendamento usa a janela de agora+1ano; o bloqueio de agenda
+      // fica livre (é justamente para_planejar folgas futuras).
+      setDateLimits('#profDetail input[type="datetime-local"]');
+      applyFormValues('#profDetail', restaurar);
       box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     };
 
@@ -831,11 +1132,20 @@
     async function submitProfOffer(e) {
       e.preventDefault();
       const f = Object.fromEntries(new FormData(e.target));
-      try {
-        await apiPost('/admin/professionals/' + encodeURIComponent(activeProfId) + '/offers', f);
-        toast('Vínculo criado', 'success');
-        await loadProfessionals();
-      } catch (err) { toast(err.message || 'Erro ao criar vínculo', 'error'); }
+      const nomeEl = document.getElementById('profOfferName');
+      if (!String(f.name || '').trim()) {
+        setFieldError(nomeEl, 'Informe a especialidade ou o exame.');
+        showFirstError(nomeEl);
+        return;
+      }
+      clearFieldError(nomeEl);
+      await loadingButton(e.target.querySelector('button[type=submit]'), async () => {
+        try {
+          await apiPost('/admin/professionals/' + encodeURIComponent(activeProfId) + '/offers', f);
+          toast('Vínculo criado', 'success');
+          await loadProfessionals();
+        } catch (err) { setFieldError(nomeEl, err.message || 'Não foi possível criar o vínculo.'); }
+      });
     }
 
     async function submitProfSchedule(e) {
@@ -858,11 +1168,15 @@
         return;
       }
       clearFieldError(endEl);
-      try {
-        await apiPost('/admin/professionals/' + encodeURIComponent(activeProfId) + '/schedules', f);
-        toast('Horário adicionado', 'success');
-        await loadProfessionals();
-      } catch (err) { toast(err.message || 'Erro ao adicionar horário', 'error'); }
+      await loadingButton(e.target.querySelector('button[type=submit]'), async () => {
+        try {
+          await apiPost('/admin/professionals/' + encodeURIComponent(activeProfId) + '/schedules', f);
+          toast('Horário adicionado', 'success');
+          await loadProfessionals();
+        } catch (err) {
+          setFieldError(endEl, err.message || 'Não foi possível adicionar o horário.');
+        }
+      });
     }
 
     async function submitProfBlock(e) {
@@ -878,35 +1192,64 @@
         return;
       }
       clearFieldError(endEl);
-      try {
-        await apiPost('/admin/professionals/' + encodeURIComponent(activeProfId) + '/blocks', f);
-        toast('Agenda bloqueada no período', 'success');
-        await loadProfessionals();
-      } catch (err) { toast(err.message || 'Erro ao bloquear agenda', 'error'); }
+      await loadingButton(e.target.querySelector('button[type=submit]'), async () => {
+        try {
+          await apiPost('/admin/professionals/' + encodeURIComponent(activeProfId) + '/blocks', f);
+          toast('Agenda bloqueada no período', 'success');
+          await loadProfessionals();
+        } catch (err) {
+          setFieldError(endEl, err.message || 'Não foi possível bloquear a agenda.');
+        }
+      });
     }
 
-    window.delProfOffer = async function (profId, offerId) {
-      try {
-        await apiDelete('/admin/professionals/' + encodeURIComponent(profId) + '/offers/' + encodeURIComponent(offerId));
-        toast('Vínculo removido', 'success');
-        await loadProfessionals();
-      } catch (err) { toast(err.message || 'Erro ao remover vínculo', 'error'); }
+    window.delProfOffer = async function (profId, offerId, nome, unidade, btn) {
+      const ok = await confirmDialog({
+        title: 'Remover o vínculo?',
+        message: nome + ' deixa de aparecer para este profissional em ' + unidade + '. '
+          + 'Os horários já publicados continuam, mas sem serviço vinculado.',
+        confirmLabel: 'Remover vínculo',
+      });
+      if (!ok) return;
+      await loadingButton(btn, async () => {
+        try {
+          await apiDelete('/admin/professionals/' + encodeURIComponent(profId) + '/offers/' + encodeURIComponent(offerId));
+          toast('Vínculo removido', 'success');
+          await loadProfessionals();
+        } catch (err) { toast(err.message || 'Erro ao remover vínculo', 'error'); }
+      });
     };
 
-    window.delProfSchedule = async function (profId, scheduleId) {
-      try {
-        await apiDelete('/admin/professionals/' + encodeURIComponent(profId) + '/schedules/' + encodeURIComponent(scheduleId));
-        toast('Horário removido', 'success');
-        await loadProfessionals();
-      } catch (err) { toast(err.message || 'Erro ao remover horário', 'error'); }
+    window.delProfSchedule = async function (profId, scheduleId, dia, unidade, btn) {
+      const ok = await confirmDialog({
+        title: 'Remover este horário?',
+        message: dia + ' em ' + unidade + ' deixa de ser uma janela de atendimento deste profissional.',
+        confirmLabel: 'Remover horário',
+      });
+      if (!ok) return;
+      await loadingButton(btn, async () => {
+        try {
+          await apiDelete('/admin/professionals/' + encodeURIComponent(profId) + '/schedules/' + encodeURIComponent(scheduleId));
+          toast('Horário removido', 'success');
+          await loadProfessionals();
+        } catch (err) { toast(err.message || 'Erro ao remover horário', 'error'); }
+      });
     };
 
-    window.delProfBlock = async function (profId, blockId) {
-      try {
-        await apiDelete('/admin/professionals/' + encodeURIComponent(profId) + '/blocks/' + encodeURIComponent(blockId));
-        toast('Bloqueio removido', 'success');
-        await loadProfessionals();
-      } catch (err) { toast(err.message || 'Erro ao remover bloqueio', 'error'); }
+    window.delProfBlock = async function (profId, blockId, periodo, btn) {
+      const ok = await confirmDialog({
+        title: 'Remover este bloqueio?',
+        message: 'A agenda volta a ficar aberta em ' + periodo + '. As vagas desse período podem ser oferecidas de novo.',
+        confirmLabel: 'Remover bloqueio',
+      });
+      if (!ok) return;
+      await loadingButton(btn, async () => {
+        try {
+          await apiDelete('/admin/professionals/' + encodeURIComponent(profId) + '/blocks/' + encodeURIComponent(blockId));
+          toast('Bloqueio removido', 'success');
+          await loadProfessionals();
+        } catch (err) { toast(err.message || 'Erro ao remover bloqueio', 'error'); }
+      });
     };
 
     window.editProf = function (id) {
@@ -919,6 +1262,7 @@
       document.getElementById('profFormTitle').textContent = 'Editar profissional';
       document.getElementById('profSubmit').textContent = 'Salvar alterações';
       document.getElementById('profCancel').style.display = 'inline-flex';
+      document.getElementById('profFormCard').classList.add('form-editing');
       document.getElementById('profForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
@@ -928,72 +1272,173 @@
       document.getElementById('profFormTitle').textContent = 'Cadastrar profissional';
       document.getElementById('profSubmit').textContent = 'Adicionar';
       document.getElementById('profCancel').style.display = 'none';
+      document.getElementById('profFormCard').classList.remove('form-editing');
     };
 
     async function saveProf(e) {
       e.preventDefault();
       const f = Object.fromEntries(new FormData(e.target));
-      const button = document.getElementById('profSubmit');
-      button.disabled = true;
-      try {
-        if (editingProfId) {
-          await apiPatch('/admin/professionals/' + encodeURIComponent(editingProfId), f);
-          toast('Profissional atualizado', 'success');
-        } else {
-          await apiPost('/admin/professionals', f);
-          toast('Profissional cadastrado', 'success');
+      const nomeEl = document.getElementById('profName');
+      if (!String(f.name || '').trim()) {
+        setFieldError(nomeEl, 'Informe o nome do profissional.');
+        showFirstError(nomeEl);
+        return;
+      }
+      clearFieldError(nomeEl);
+      await loadingButton(document.getElementById('profSubmit'), async () => {
+        try {
+          if (editingProfId) {
+            await apiPatch('/admin/professionals/' + encodeURIComponent(editingProfId), f);
+            toast('Profissional atualizado', 'success');
+          } else {
+            await apiPost('/admin/professionals', f);
+            toast('Profissional cadastrado', 'success');
+          }
+          resetProfForm();
+          await loadProfessionals();
+        } catch (err) {
+          setFieldError(nomeEl, err.message || 'Não foi possível salvar o profissional.');
         }
-        resetProfForm();
-        await loadProfessionals();
-      } catch (err) { toast(err.message || 'Erro ao salvar profissional', 'error'); }
-      finally { button.disabled = false; }
+      });
     }
 
-    window.toggleProf = async function (id, active) {
-      try {
-        await apiPatch('/admin/professionals/' + encodeURIComponent(id), { active });
-        toast(active ? 'Profissional ativado' : 'Profissional desativado', 'success');
-        await loadProfessionals();
-      } catch (err) { toast(err.message || 'Erro ao atualizar profissional', 'error'); }
+    window.toggleProf = async function (id, nome, btn) {
+      // Estado lido do array atualizado, não do HTML já desenhado.
+      const p = professionals.find(x => String(x.id) === String(id));
+      if (!p) return;
+      const ativo = Number(p.active) === 1;
+      if (ativo) {
+        const ok = await confirmDialog({
+          title: 'Desativar ' + (nome || p.name) + '?',
+          message: 'O profissional deixa de aparecer no agendamento até ser reativado. '
+            + 'Os horários e vínculos cadastrados continuam guardados.',
+          confirmLabel: 'Desativar profissional',
+        });
+        if (!ok) return;
+      }
+      await loadingButton(btn, async () => {
+        try {
+          await apiPatch('/admin/professionals/' + encodeURIComponent(id), { active: ativo ? 0 : 1 });
+          toast(ativo ? 'Profissional desativado' : 'Profissional ativado', 'success');
+          await loadProfessionals();
+        } catch (err) { toast(err.message || 'Erro ao atualizar profissional', 'error'); }
+      });
     };
 
-    // Atalhos da central de comando.
-    window.gotoAtendimentos = function () { if (can('appointments')) switchTab('atendimentos'); };
+    // Atalhos da central de comando. As três chamadas escrevem na URL com
+    // silentUrl e gravam uma entrada só no fim, senão trocar de aba viraria
+    // três passos no histórico do navegador.
+    window.gotoAtendimentos = function () {
+      if (!can('appointments')) return;
+      switchTab('atendimentos', { silentUrl: true });
+      writeUrl(false);
+    };
     window.gotoPessoas = function (status) {
       if (!can('users')) return;
-      switchTab('cadastros'); setSubTab('pessoas');
+      switchTab('cadastros', { silentUrl: true });
+      setSubTab('pessoas', { silentUrl: true });
       const form = document.getElementById('userSearchForm');
       if (form && status) form.status.value = status;
       if (form) searchUsers({ preventDefault() {}, target: form });
     };
-    window.setSubTab = function (name) {
+    window.setSubTab = function (name, opts) {
       // P3: ignora sub-aba oculta pelo nível.
       const btn = document.querySelector(`#cadastros [data-subtab="${name}"]`);
       if (btn && btn.style.display === 'none') return;
-      document.querySelectorAll('#cadastros [data-subtab]').forEach(t =>
-        t.classList.toggle('active', t.dataset.subtab === name));
+      document.querySelectorAll('#cadastros [data-subtab]').forEach(t => {
+        const a = t.dataset.subtab === name;
+        t.classList.toggle('active', a);
+        // Antes só a classe mudava: o tablist anunciava três filhos sem
+        // estado, e as sub-abas não eram tab de verdade para o leitor de tela.
+        t.setAttribute('aria-selected', a ? 'true' : 'false');
+        t.tabIndex = a ? 0 : -1;
+      });
       document.querySelectorAll('#cadastros .subpanel').forEach(p =>
         p.classList.toggle('active', p.id === 'sub-' + name));
       if (name === 'rede') { loadProfessionals(); renderUnitOffers(); }
+      // A lista de doenças só era carregada uma vez, no boot: quem abrisse
+      // Cadastros minutos depois via um cadastro desatualizado.
+      if (name === 'doencas' && can('diseases')) loadDiseases();
+      // A busca de usuários nascia totalmente vazia: só aparecia algo depois
+      // de apertar "Buscar". Na primeira vez que a sub-aba é aberta, roda sem
+      // filtro para já mostrar o estado real da base.
+      if (name === 'pessoas' && !usersSearched) {
+        usersSearched = true;
+        const form = document.getElementById('userSearchForm');
+        searchUsers({ preventDefault() {}, target: form });
+      }
+      if (!(opts && opts.silentUrl)) writeUrl(false);
     };
+
+    /* A rota vem paginada e ordenada por scheduled_at DESC. Para a "Agenda de
+       hoje" ser verdadeira, é preciso avançar até o primeiro registro que já
+       passou de hoje — senão um dia com mais de 100 registros aparece
+       pela metade. O teto de 5 páginas (500 registros) mantém a chamada
+       barata; ao estourar o teto, o painel avisa em vez de mostrar um
+       número silenciosamente errado. */
+    /* Guarda o que já foi baixado para a aba Atendimentos, para "Carregar mais"
+       revelar o resto sem nova ida ao servidor. */
+    const BOOKINGS = { appointments: { rows: [], shown: 20 }, exams: { rows: [], shown: 20 } };
+    const BOOKING_COLS = {
+      appointments: ['user_name', 'scheduled_at', 'specialty', 'doctor', 'location', 'status'],
+      exams: ['user_name', 'scheduled_at', 'exam_type', 'location', 'status'],
+    };
+    function renderBookingsList(kind, rows) {
+      const estado = BOOKINGS[kind];
+      estado.rows = rows;
+      if (!rows.length) return `<div class="empty">Sem ${kind === 'exams' ? 'exames' : 'consultas'}.</div>`;
+      const passo = 20;
+      const fatia = rows.slice(0, estado.shown);
+      const sobra = rows.length - fatia.length;
+      const rodape = sobra > 0
+        ? `<div class="load-more"><button class="btn btn-outline btn-sm" type="button" data-act="load-more-bookings" data-kind="${kind}" aria-label="Carregar mais ${Math.min(sobra, passo)} ${kind === 'exams' ? 'exames' : 'consultas'}">Carregar mais (${fatia.length} de ${rows.length})</button></div>`
+        : `<p class="load-more-end muted text-sm">${rows.length} registro(s) carregado(s).</p>`;
+      return renderActionableTable(fatia, BOOKING_COLS[kind], kind, kind === 'exams' ? 'Exames recentes' : 'Consultas recentes') + rodape;
+    }
+    window.loadMoreBookings = function (kind) {
+      BOOKINGS[kind].shown += 20;
+      const box = document.getElementById(kind === 'exams' ? 'recentExams' : 'recentAppts');
+      box.innerHTML = renderBookingsList(kind, BOOKINGS[kind].rows);
+    };
+
+    async function fetchBookingsUntil(kind, today) {
+      const todas = [];
+      const POR_PAGINA = 100;
+      const MAX_PAGINAS = 5;
+      let truncado = false;
+      for (let page = 1; page <= MAX_PAGINAS; page++) {
+        const res = await apiGet('/admin/' + kind + '?page=' + page + '&pageSize=' + POR_PAGINA);
+        const linhas = Array.isArray(res) ? res : (res.data || []);
+        if (!linhas.length) break;
+        todas.push(...linhas);
+        const ultima = linhas[linhas.length - 1];
+        // DESC: se o mais antigo da página já é anterior a hoje, parou.
+        if ((ultima.scheduled_at || '').slice(0, 10) < today) break;
+        const total = Array.isArray(res) ? linhas.length : Number(res.total || 0);
+        if (todas.length >= total) break;
+        if (page === MAX_PAGINAS) truncado = true;
+      }
+      return { linhas: todas, truncado };
+    }
 
     async function loadOverview() {
       try {
-        // P3: busca só o que o nível permite (o resto o back barraria com 403).
+        // Data LOCAL, não UTC: toISOString() converte para UTC e, em
+        // America/Sao_Paulo (UTC-3), o dia vira às 21h — "Agenda de hoje"
+        // mostrava AMANHÃ das 21h à meia-noite.
+        const agora = new Date();
+        const today = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
         const [A, E, D, S] = await Promise.all([
-          can('appointments') ? apiGet('/admin/appointments?limit=100').catch(() => []) : [],
-          can('appointments') ? apiGet('/admin/exams?limit=100').catch(() => []) : [],
+          can('appointments') ? fetchBookingsUntil('appointments', today).catch(() => ({ linhas: [], truncado: false })) : { linhas: [], truncado: false },
+          can('appointments') ? fetchBookingsUntil('exams', today).catch(() => ({ linhas: [], truncado: false })) : { linhas: [], truncado: false },
           can('diseases') ? apiGet('/diseases?active=true').catch(() => []) : [],
           apiGet('/admin/stats'),
         ]);
-        // Data LOCAL, não UTC: toISOString() converte para UTC e, em
-      // America/Sao_Paulo (UTC-3), o dia vira às 21h — "Agenda de hoje"
-      // mostrava AMANHÃ das 21h à meia-noite.
-      const agora = new Date();
-      const today = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
+        const agendamentos = A.linhas;
+        const exames = E.linhas;
         const isToday = r => (r.scheduled_at || '').slice(0, 10) === today;
-        const todayAppts = A.filter(isToday);
-        const todayExams = E.filter(isToday);
+        const todayAppts = agendamentos.filter(isToday);
+        const todayExams = exames.filter(isToday);
         const todayPending = [...todayAppts, ...todayExams].filter(r => r.status === 'pendente').length;
         const pendingUsers = Number(S.users.pending || 0);
         const inactiveUnits = Number(S.units.total || 0) - Number(S.units.active || 0);
@@ -1005,10 +1450,10 @@
           (can('diseases') ? stat('Alertas ativos', activeAlerts) : '') +
           (can('units') ? stat('Unidades ativas', Number(S.units.active || 0)) : '');
 
-        const notes = [];
-        if (can('users') && pendingUsers > 0) notes.push(`<div class="item"><div><h3>${pendingUsers} conta(s) aguardando ativação</h3><p>Atendentes não acessam o sistema até serem ativados.</p></div><button class="btn btn-primary btn-sm" onclick="gotoPessoas('pendente')">Ver contas</button></div>`);
-        if (can('appointments') && todayPending > 0) notes.push(`<div class="item"><div><h3>${todayPending} atendimento(s) pendente(s) hoje</h3><p>Confirme, cancele ou reagende na agenda do dia.</p></div><button class="btn btn-primary btn-sm" onclick="gotoAtendimentos()">Ver agenda</button></div>`);
-        if (can('units') && inactiveUnits > 0) notes.push(`<div class="item"><div><h3>${inactiveUnits} unidade(s) inativa(s)</h3><p>Unidades inativas não aparecem no agendamento do paciente.</p></div></div>`);
+const notes = [];
+        if (can('users') && pendingUsers > 0) notes.push(`<div class="item"><div class="item-main"><h3>${pendingUsers} conta(s) aguardando ativação</h3><p>Atendentes não acessam o sistema até serem ativados.</p></div><div class="item-actions"><button class="btn btn-primary btn-sm" type="button" onclick="gotoPessoas('pendente')">Ver contas</button></div></div>`);
+        if (can('appointments') && todayPending > 0) notes.push(`<div class="item"><div class="item-main"><h3>${todayPending} atendimento(s) pendente(s) hoje</h3><p>Confirme, cancele ou reagende na agenda do dia.</p></div><div class="item-actions"><button class="btn btn-primary btn-sm" type="button" onclick="gotoAtendimentos()">Ver agenda</button></div></div>`);
+        if (can('units') && inactiveUnits > 0) notes.push(`<div class="item"><div class="item-main"><h3>${inactiveUnits} unidade(s) inativa(s)</h3><p>Unidades inativas não aparecem no agendamento do paciente.</p></div></div>`);
         document.getElementById('attention').innerHTML = notes.length
           ? notes.join('')
           : '<div class="empty">Nenhuma pendência no momento.</div>';
@@ -1017,72 +1462,189 @@
           ? ['user_name', 'scheduled_at', 'specialty', 'doctor', 'location', 'status']
           : ['user_name', 'scheduled_at', 'exam_type', 'location', 'status'];
         document.getElementById('agendaToday').innerHTML = (todayAppts.length || todayExams.length)
-          ? (todayAppts.length ? `<h3>Consultas de hoje</h3>` + renderActionableTable(todayAppts, agendaCols('appointments'), 'appointments') : '')
-          + (todayExams.length ? `<h3 style="margin-top:16px">Exames de hoje</h3>` + renderActionableTable(todayExams, agendaCols('exams'), 'exams') : '')
+          ? (todayAppts.length ? `<h3 class="mt-3">Consultas de hoje</h3>` + renderActionableTable(todayAppts, agendaCols('appointments'), 'appointments', 'Consultas marcadas para hoje') : '')
+          + (todayExams.length ? `<h3 class="mt-4">Exames de hoje</h3>` + renderActionableTable(todayExams, agendaCols('exams'), 'exams', 'Exames marcados para hoje') : '')
           : '<div class="empty">Nada agendado para hoje.</div>';
+        // Honestidade numérica: se o teto de páginas estourou, diz. Antes o
+        // painel mostrava "0 pendentes" sem avisar que olhou só os 100 últimos.
+        if (A.truncado || E.truncado) {
+          document.getElementById('agendaToday').insertAdjacentHTML('beforeend',
+            `<div class="state-error"><p>Há mais de ${100 * 5} registros futuros no total. Este resumo pode estar incompleto — abra Atendimentos para ver a lista inteira.</p></div>`);
+        }
 
-        document.getElementById('recentAppts').innerHTML = A.length ? renderActionableTable(A.slice(0, 20), ['user_name', 'scheduled_at', 'specialty', 'doctor', 'location', 'status'], 'appointments') : '<div class="empty">Sem consultas.</div>';
-        document.getElementById('recentExams').innerHTML = E.length ? renderActionableTable(E.slice(0, 20), ['user_name', 'scheduled_at', 'exam_type', 'location', 'status'], 'exams') : '<div class="empty">Sem exames.</div>';
+        document.getElementById('recentAppts').innerHTML = renderBookingsList('appointments', agendamentos);
+        document.getElementById('recentExams').innerHTML = renderBookingsList('exams', exames);
 
         try {
           const rows = await apiGet('/admin/audit-log?limit=5');
-        document.getElementById('recentActivity').innerHTML = rows.length
-          ? rows.map(r => `<div class="item"><div><h3>${esc(ATOR_AUDITORIA(r))} <span class="badge">${esc(r.action)}</span></h3><p>${esc(r.entity_type)} · ${esc(r.details || '')}</p></div><span class="muted">${fmtDate(r.created_at)}</span></div>`).join('')
+          document.getElementById('recentActivity').innerHTML = (rows || []).length
+            ? rows.map(r => `<div class="item"><div class="item-main"><h3>${esc(ATOR_AUDITORIA(r))} <span class="badge">${esc(r.action)}</span></h3><p class="muted">${esc(r.entity_type)} · ${esc(r.details || '')}</p></div><span class="item-meta muted">${fmtDate(r.created_at)}</span></div>`).join('')
             : '<div class="empty">Nenhuma ação registrada ainda.</div>';
-        } catch (e) { document.getElementById('recentActivity').innerHTML = '<div class="empty">Não foi possível carregar a atividade.</div>'; }
-      } catch (err) { toast(err.message || 'Erro ao carregar dados', 'error'); }
+        } catch (e) { document.getElementById('recentActivity').innerHTML = '<div class="state-error"><p>Não foi possível carregar a atividade.</p></div>'; }
+      } catch (err) {
+        // Antes: só um toast. As cinco caixas ficavam com o skeleton pulsando
+        // para sempre depois que o toast sumia, parecendo "carregando".
+        ['stats', 'attention', 'agendaToday', 'recentAppts', 'recentExams'].forEach(id => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.innerHTML = '';
+          el.appendChild(stateMessage('error', err.message || 'Não foi possível carregar os dados', loadOverview));
+        });
+        document.getElementById('recentActivity').innerHTML = '';
+        document.getElementById('recentActivity').appendChild(stateMessage('error', 'Não foi possível carregar a atividade.', loadOverview));
+      }
     }
 
-    window.adminAction = async function (kind, id, status) {
-      try { await apiPatch('/admin/' + kind + '/' + encodeURIComponent(id), { status }); toast('Atualizado', 'success'); loadOverview(); }
-      catch (err) { toast(err.message || 'Erro', 'error'); }
-    };
-
-    window.downloadSummaryReport = async function () {
-      try {
-        const response = await fetch(window.API_BASE + '/admin/export/summary.csv', {
-          headers: { Authorization: 'Bearer ' + localStorage.getItem('saude_token') }
+    window.adminAction = async function (kind, id, status, btn, quem, quando) {
+      const rotulo = kind === 'exams' ? 'o exame' : 'a consulta';
+      // Cancelar é a ação pesada: o paciente perde a vaga e precisa remarcar.
+      if (status === 'cancelado') {
+        const ok = await confirmDialog({
+          title: 'Cancelar ' + rotulo + '?',
+          message: (quem || 'O atendimento') + (quando ? ' em ' + fmtDate(quando) : '')
+            + ' passa a constar como cancelado. O paciente vê a mudança e precisa remarcar — não dá para desfazer por aqui.',
+          confirmLabel: 'Cancelar ' + (kind === 'exams' ? 'o exame' : 'o atendimento'),
         });
-        if (!response.ok) throw new Error('Não foi possível gerar o relatório.');
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'saude-plus-resumo-administrativo.csv';
-        link.click();
-        URL.revokeObjectURL(url);
-      } catch (err) {
-        toast(err.message || 'Erro ao baixar relatório', 'error');
+        if (!ok) return;
       }
+      await loadingButton(btn, async () => {
+        try { await apiPatch('/admin/' + kind + '/' + encodeURIComponent(id), { status }); toast('Atualizado', 'success'); loadOverview(); }
+        catch (err) { toast(err.message || 'Erro', 'error'); }
+      });
     };
 
-    /* ===== MODAL DE REAGENDAMENTO (3.2) ===== */
+    window.downloadSummaryReport = async function (btn) {
+      await loadingButton(btn, async () => {
+        try {
+          const response = await fetch(window.API_BASE + '/admin/export/summary.csv', {
+            headers: { Authorization: 'Bearer ' + localStorage.getItem('saude_token') }
+          });
+          if (!response.ok) throw new Error('Não foi possível gerar o relatório.');
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = 'saude-plus-resumo-administrativo.csv';
+          link.click();
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          toast(err.message || 'Erro ao baixar relatório', 'error');
+        }
+      });
+    };
+
+    /* ===== MODAL DE REAGENDAMENTO (3.2) =====
+       Os quatro modais da página usavam cada um seu próprio bloco <style>
+       injetado no <head>, sem max-height (conteúdo mais alto que a viewport
+       era cortado nas duas pontas), sem foco preso e sem travar a rolagem do
+       fundo. Agora todos usam o mesmo componente .modal-overlay, e o
+       comportamento vem de openModal/closeModal no ui.js. O id e o nome do
+       closer continuam iguais porque closeTopModal os referencia. */
     function ensureReagendarModal() {
       if (document.getElementById('reagendarModal')) return;
-      const style = document.createElement('style');
-      style.textContent = `#reagendarModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}
-  #reagendarModal.show{display:flex}
-  #reagendarModal .reagendar-modal-card{width:min(400px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}
-  #reagendarModal h2{margin:0 0 10px}
-  #reagendarModal .reagendar-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}`;
-      document.head.appendChild(style);
-
       document.body.insertAdjacentHTML('beforeend', `
-    <div id="reagendarModal" role="dialog" aria-modal="true" aria-labelledby="reagendarModalTitle">
-      <div class="reagendar-modal-card">
-        <h2 id="reagendarModalTitle">Reagendar atendimento</h2>
-        <p class="muted" style="font-size:.9rem;margin-bottom:14px">Selecione a nova data e horário:</p>
-        <div class="field">
-          <label for="reagendarInputDate">Data/hora</label>
-          <input class="input" id="reagendarInputDate" type="datetime-local" required>
+    <!-- Modal: visualizar usuário -->
+    <div id="userViewModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="userViewTitle">
+      <div class="modal-card modal-card-wide">
+        <div class="row between mb-4">
+          <h2 id="userViewTitle" class="m-0">Detalhes do usuário</h2>
+          <button class="btn btn-outline btn-sm" type="button" onclick="closeModal('userViewModal')">Fechar</button>
         </div>
-        <div class="reagendar-modal-actions">
-          <button type="button" class="btn btn-outline" onclick="closeReagendarModal()">Cancelar</button>
-          <button type="button" class="btn btn-primary" id="reagendarConfirmBtn" onclick="confirmReagendar()">Salvar</button>
+        <div id="userViewContent"></div>
+      </div>
+    </div>
+
+    <!-- Modal: criar/editar usuário -->
+    <div id="userEditModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="userEditTitle">
+      <div class="modal-card modal-card-wide">
+        <div class="row between mb-4">
+          <h2 id="userEditTitle" class="m-0">Usuário</h2>
+          <button class="btn btn-outline btn-sm" type="button" onclick="closeModal('userEditModal')">Fechar</button>
+        </div>
+        <form id="userForm" class="grid grid-2" novalidate>
+          <input type="hidden" id="userFormId">
+          <div class="field"><label for="userFormName">Nome completo *</label><input class="input" id="userFormName" required></div>
+          <div class="field"><label for="userFormEmail">E-mail *</label><input class="input" id="userFormEmail" type="email" required></div>
+          <div class="field"><label for="userFormRole">Papel *</label>
+            <select class="select" id="userFormRole" required>
+              <option value="paciente">Paciente</option>
+              <option value="atendente">Atendente</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          <div class="field"><label for="userFormStatus">Status</label>
+            <select class="select" id="userFormStatus">
+              <option value="ativo">Ativo</option>
+              <option value="pendente">Pendente</option>
+              <option value="inativo">Inativo</option>
+            </select>
+          </div>
+          <div class="field"><label for="userFormJob">Cargo</label><input class="input" id="userFormJob"></div>
+          <div class="field"><label for="userFormPass">Senha <span class="opt">(deixe em branco para não alterar)</span></label><input class="input" id="userFormPass" type="password" autocomplete="new-password"></div>
+          <div class="field" id="userFormAdminWrap" style="display:none"><label for="userFormAdminLevel">Nível administrativo</label>
+            <select class="select" id="userFormAdminLevel">
+              <option value="superadmin">Superadmin</option>
+              <option value="gestor">Gestor</option>
+              <option value="atendimento">Atendimento</option>
+              <option value="alertas">Alertas</option>
+            </select>
+          </div>
+          <div class="field" id="userFormProfWrap" style="display:none"><label for="userFormProf">Vincular a profissional</label>
+            <select class="select" id="userFormProf"><option value="">Não vinculado</option></select>
+          </div>
+          <div class="modal-actions grid-span-full">
+            <button type="button" class="btn btn-outline" onclick="closeModal('userEditModal')">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: excluir usuário -->
+    <div id="userDeleteModal" class="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="userDeleteTitle">
+      <div class="modal-card">
+        <h2 id="userDeleteTitle">Excluir usuário?</h2>
+        <p>O usuário será ocultado (soft-delete). Ele não poderá mais acessar o sistema.</p>
+        <p class="muted" id="userDeleteName"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="closeModal('userDeleteModal')">Voltar</button>
+          <button type="button" class="btn btn-danger" id="userDeleteConfirm">Excluir</button>
         </div>
       </div>
     </div>
+
+    <!-- Modal: agenda/vínculos do atendente -->
+    <div id="userAgendaModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="userAgendaTitle">
+      <div class="modal-card modal-card-wide" style="max-width:1400px; max-height:90vh; overflow:auto;">
+        <div class="row between mb-4">
+          <div>
+            <h2 id="userAgendaTitle" class="m-0">Agenda, horários e vínculos</h2>
+            <p class="muted mt-0 text-sm" id="userAgendaSubtitle"></p>
+          </div>
+          <button class="btn btn-outline btn-sm" type="button" onclick="closeModal('userAgendaModal')">Fechar</button>
+        </div>
+        <div id="userAgendaContent" class="agenda-modal"></div>
+      </div>
+    </div>
+
+    <div id="reagendarModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reagendarModalTitle">
+      <div class="modal-card">
+        <h2 id="reagendarModalTitle">Reagendar atendimento</h2>
+        <p class="muted">Selecione a nova data e horário:</p>
+        <form id="reagendarForm">
+          <div class="field">
+            <label for="reagendarInputDate">Data/hora</label>
+            <input class="input" id="reagendarInputDate" type="datetime-local" required>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" onclick="closeReagendarModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="reagendarConfirmBtn">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
   `);
+      document.getElementById('reagendarForm').addEventListener('submit', (e) => { e.preventDefault(); confirmReagendar(); });
     }
 
     function nowLocalForInput() {
@@ -1097,124 +1659,198 @@
       setDateLimits();
       input.min = nowLocalForInput();
       input.value = '';
-      document.getElementById('reagendarModal').classList.add('show');
+      // O foco precisa ir para o campo: sem isso o Tab continuava no botão da
+      // tabela, por trás do scrim.
+      openModal('reagendarModal');
     };
 
-    function closeReagendarModal() {
-      const m = document.getElementById('reagendarModal');
-      if (m) m.classList.remove('show');
+    window.closeReagendarModal = function () {
+      closeModal('reagendarModal');
       pendingReagendar = null;
-    }
+    };
 
     async function confirmReagendar() {
       if (!pendingReagendar) return;
-      const inputVal = document.getElementById('reagendarInputDate').value;
+      const inputEl = document.getElementById('reagendarInputDate');
+      const inputVal = inputEl.value;
       if (!inputVal) {
-        toast('Selecione uma data e hora válidas', 'error');
+        setFieldError(inputEl, 'Escolha a nova data e hora.');
+        showFirstError(inputEl);
         return;
       }
+      clearFieldError(inputEl);
 
       const formattedDate = inputVal.replace('T', ' ');
-      const btn = document.getElementById('reagendarConfirmBtn');
-      btn.disabled = true;
-      btn.textContent = 'Salvando...';
-
-      try {
-        await apiPatch('/admin/' + pendingReagendar.kind + '/' + encodeURIComponent(pendingReagendar.id), { scheduled_at: formattedDate });
-        toast('Reagendado com sucesso', 'success');
-        closeReagendarModal();
-        loadOverview();
-      } catch (err) {
-        toast(err.message || 'Erro ao reagendar', 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Salvar';
-      }
+      await loadingButton(document.getElementById('reagendarConfirmBtn'), async () => {
+        try {
+          await apiPatch('/admin/' + pendingReagendar.kind + '/' + encodeURIComponent(pendingReagendar.id), { scheduled_at: formattedDate });
+          toast('Reagendado com sucesso', 'success');
+          closeReagendarModal();
+          loadOverview();
+        } catch (err) {
+          // O toast fica atrás do scrim (z-index 100 contra 9999): o erro
+          // precisa aparecer dentro do próprio modal.
+          toast(err.message || 'Erro ao reagendar', 'error');
+          setFieldError(inputEl, err.message || 'Não foi possível reagendar. Tente de novo.');
+        }
+      });
     }
 
     /* ===== BUSCA DE USUÁRIOS E HISTÓRICO UNIFICADOS (3.4) ===== */
-    async function searchUsers(e) {
+    async function searchUsers(e, opts) {
       e.preventDefault();
-      const f = new FormData(e.target);
-      const q = f.get('q').trim(); const role = f.get('role'); const status = f.get('status');
+      usersSearched = true;
+      const form = e.target;
+      const f = new FormData(form);
+      const q = f.get('q').trim();
+      const role = f.get('role');
+      const status = f.get('status');
+      URL_STATE.q = q; URL_STATE.role = role; URL_STATE.status = status;
+      // A URL NÃO é escrita aqui: este carregador também roda em caminho
+      // automático (deep link, primeira abertura da sub-aba) e um replaceState
+      // dentro dele apagaria o filtro que acabou de ser restaurado da URL.
+      // Quem escreve é o listener do formulário, via writeUrl(true).
+      // "Carregar mais" continua de onde parou; um filtro novo volta ao 1.
+      const page = (opts && opts.page) || 1;
+      const accumulando = Boolean(opts && opts.append);
       const box = document.getElementById('userList');
       const summary = document.getElementById('userSummary');
       document.getElementById('userEditBox').style.display = 'none';
       document.getElementById('userHistoryBox').style.display = 'none';
-      box.innerHTML = '<div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
-      summary.textContent = 'Buscando usuários...';
+      if (!accumulando) box.innerHTML = skeleton();
+      box.setAttribute('aria-busy', 'true');
+      summary.textContent = 'Buscando usuários…';
       try {
-        let path = '/admin/users?';
-        const params = [];
-        if (q) params.push('q=' + encodeURIComponent(q));
-        if (role) params.push('role=' + encodeURIComponent(role));
-        if (status) params.push('status=' + encodeURIComponent(status));
-        path += params.join('&');
-        const result = await apiGet(path);
+        // A API pagina por page/pageSize (não offset) e devolve
+        // {data,page,pageSize,total}. pageSize máximo: 100.
+        const params = new URLSearchParams({ page: String(page), pageSize: '25' });
+        if (q) params.set('q', q);
+        if (role) params.set('role', role);
+        if (status) params.set('status', status);
+        const result = await apiGet('/admin/users?' + params.toString());
         const users = Array.isArray(result) ? result : (result.data || []);
         const total = Array.isArray(result) ? users.length : Number(result.total || users.length);
         summary.textContent = total === 1 ? '1 usuário encontrado.' : `${total} usuários encontrados.`;
-        if (!users.length) { box.innerHTML = '<div class="empty">Nenhum usuário encontrado com esses filtros.</div>'; return; }
+        if (!users.length) {
+          if (!accumulando) box.innerHTML = '<div class="empty">Nenhum usuário encontrado com esses filtros.</div>';
+          return;
+        }
         const ROLE_LABEL = { paciente: 'Paciente', atendente: 'Atendente', admin: 'Administrador' };
         const STATUS_CLASS = { ativo: 'badge-success', inativo: 'badge-danger', pendente: 'badge-warning' };
-        box.innerHTML = users.map(u => `
+        const myId = (window.SESSION && SESSION.user && SESSION.user.id) || '';
+        const myRole = (window.SESSION && SESSION.user && SESSION.user.role) || '';
+        const myLevel = (window.SESSION && SESSION.user && SESSION.user.admin_level) || '';
+        const LEVEL_RANK = { superadmin: 4, gestor: 3, atendimento: 2, alertas: 1 };
+        const myRank = LEVEL_RANK[myLevel] || 0;
+        const targetRank = (u) => LEVEL_RANK[u.admin_level] || 0;
+        const canManage = (u) => {
+          if (u.id === myId) return false;
+          if (u.role === 'admin') {
+            if (myRole !== 'admin') return false;
+            if (myRank <= targetRank(u)) return false;
+          }
+          return true;
+        };
+        const linhas = users.map(u => {
+          const nome = esc(u.full_name || '(Sem nome)');
+          const quem = `${nome} (${esc(u.email || 'sem e-mail')})`;
+          const prof = u.professional_name ? ` · Prof.: ${esc(u.professional_name)}` : '';
+          return `
       <div class="item">
-        <div>
-          <h3>${esc(u.full_name || '(Sem nome)')} <span class="badge">${ROLE_LABEL[u.role] || u.role}</span>
+        <div class="item-main">
+          <h3>${nome} <span class="badge">${ROLE_LABEL[u.role] || esc(u.role)}</span>
             <span class="badge ${STATUS_CLASS[u.account_status] || ''}">${esc(u.account_status)}</span>
           </h3>
-          <p class="muted">${esc(u.email)} ${u.mobile ? '· ' + esc(u.mobile) : ''} ${u.job_role ? '· ' + esc(u.job_role) : ''} ${u.last_login_at ? '· Último acesso: ' + fmtDate(u.last_login_at) : '· Nunca acessou'}</p>
+          <p class="muted">${esc(u.email)} ${u.mobile ? ' · ' + esc(u.mobile) : ''} ${u.job_role ? ' · ' + esc(u.job_role) : ''}${prof} ${u.last_login_at ? ' · Último acesso: ' + fmtDate(u.last_login_at) : ' · Nunca acessou'}</p>
         </div>
-        <div class="row" style="gap:6px">
-          <button class="btn btn-outline btn-sm" data-act="view-user" data-id="${esc(u.id)}">Abrir perfil</button>
-          <button class="btn btn-outline btn-sm" data-act="show-history" data-id="${esc(u.id)}" data-name="${esc(u.full_name || '')}">Abrir histórico</button>
+        <div class="item-actions">
+          <button class="btn btn-outline btn-sm" type="button" data-act="user-view" data-id="${esc(u.id)}">Visualizar</button>
+          <button class="btn btn-outline btn-sm" type="button" data-act="user-edit" data-id="${esc(u.id)}">Editar</button>
+          ${u.role === 'atendente' ? `<button class="btn btn-outline btn-sm" type="button" data-act="user-agenda" data-id="${esc(u.id)}" data-nome="${esc(u.full_name||'')}">Agenda/Vínculos</button>` : ''}
+          <button class="btn btn-outline btn-sm" type="button" data-act="show-history" data-id="${esc(u.id)}" data-name="${esc(u.full_name || '')}">Histórico</button>
+          ${canManage(u) ? `<button class="btn btn-outline btn-sm text-danger" type="button" data-act="user-delete" data-id="${esc(u.id)}" data-nome="${esc(u.full_name || u.email)}">Excluir</button>` : ''}
         </div>
-      </div>`).join('');
-      } catch (err) { summary.textContent = ''; box.innerHTML = `<div class="empty">${esc(err.message || 'Erro')}</div>`; }
+      </div>`;
+        }).join('');
+        if (accumulando) box.insertAdjacentHTML('beforeend', linhas + loadMoreHtml('users', page, total));
+        else box.innerHTML = linhas + loadMoreHtml('users', page, total);
+      } catch (err) {
+        summary.textContent = '';
+        if (!accumulando) {
+          box.innerHTML = '';
+          box.appendChild(stateMessage('error', err.message || 'Não foi possível buscar os usuários.', () => searchUsers({ preventDefault() {}, target: form })));
+        }
+      } finally {
+        box.removeAttribute('aria-busy');
+      }
     }
+
+    /* "Carregar mais" só aparece quando ainda há registro depois do que já
+       foi listado. Sem isso a lista truncava em 50 sem nenhum aviso — o
+       total da API era lido e jogado fora. */
+    function loadMoreHtml(rota, page, total) {
+      const porPagina = 25;
+      const carregados = page * porPagina;
+      if (carregados >= total) return `<p class="load-more-end muted text-sm">Fim da lista — ${total} registro(s).</p>`;
+      return `<div class="load-more"><button class="btn btn-outline btn-sm" type="button" data-act="load-more" data-kind="${rota}" data-page="${page + 1}" aria-label="Carregar mais ${total - carregados} registro(s) de ${rota}">Carregar mais (${carregados} de ${total})</button></div>`;
+    }
+
+    window.loadMore = async function (btn) {
+      const kind = btn.dataset.kind;
+      const next = Number(btn.dataset.page);
+      if (kind === 'users') {
+        const form = document.getElementById('userSearchForm');
+        await searchUsers({ preventDefault() {}, target: form }, { page: next, append: true });
+      } else if (kind === 'audit') {
+        await loadAuditLog({ append: true, page: next });
+      }
+    };
 
     window.showHistory = async function (userId, name) {
       const box = document.getElementById('userHistoryBox');
       document.getElementById('userEditBox').style.display = 'none';
       box.style.display = 'block';
-      box.innerHTML = '<div class="card"><div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div></div>';
+      box.innerHTML = '<div class="card">' + skeleton() + '</div>';
       box.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       try {
         const data = await apiGet('/admin/history?userId=' + encodeURIComponent(userId));
         const user = data.user || { id: userId, full_name: name };
         box.innerHTML = `<div class="card">
-      <div class="row between" style="margin-bottom:12px">
-        <h2 style="margin:0">Histórico de ${esc(user.full_name || 'Usuário')}</h2>
-        <button class="btn btn-outline btn-sm" onclick="document.getElementById('userHistoryBox').style.display='none'">Fechar</button>
+      <div class="row between mb-3">
+        <h2 class="m-0">Histórico de ${esc(user.full_name || 'Usuário')}</h2>
+        <button class="btn btn-outline btn-sm" type="button" data-act="close-box" data-target="userHistoryBox" aria-label="Fechar o histórico">Fechar</button>
       </div>
-      <p class="muted" style="margin-top:0">${(data.appointments || []).length} consultas · ${(data.exams || []).length} exames</p>
-      
-      <h3 style="margin-top:18px">Consultas</h3>
-      ${(data.appointments || []).length ? renderTable(data.appointments, ['scheduled_at', 'specialty', 'doctor', 'location', 'status']) : '<div class="empty">Sem consultas.</div>'}
-      <h3 style="margin-top:18px">Exames</h3>
-      ${(data.exams || []).length ? renderTable(data.exams, ['scheduled_at', 'exam_type', 'location', 'status']) : '<div class="empty">Sem exames.</div>'}
+      <p class="muted mt-0">${(data.appointments || []).length} consultas · ${(data.exams || []).length} exames</p>
+
+      <h3 class="mt-4">Consultas</h3>
+      ${(data.appointments || []).length ? renderTable(data.appointments, ['scheduled_at', 'specialty', 'doctor', 'location', 'status'], 'Consultas de ' + (user.full_name || 'usuário')) : '<div class="empty">Sem consultas.</div>'}
+      <h3 class="mt-4">Exames</h3>
+      ${(data.exams || []).length ? renderTable(data.exams, ['scheduled_at', 'exam_type', 'location', 'status'], 'Exames de ' + (user.full_name || 'usuário')) : '<div class="empty">Sem exames.</div>'}
     </div>`;
-      } catch (err) { box.innerHTML = `<div class="card"><div class="empty">${esc(err.message || 'Erro ao carregar histórico')}</div></div>`; }
+      } catch (err) {
+        box.innerHTML = '<div class="card"></div>';
+        box.firstElementChild.appendChild(stateMessage('error', err.message || 'Erro ao carregar histórico'));
+      }
     };
 
     /* ===== PERFIL E MUDANÇA DE STATUS COM MOTIVO (3.3) ===== */
     window.viewUser = async function (id) {
       const box = document.getElementById('userEditBox');
       document.getElementById('userHistoryBox').style.display = 'none';
-      box.style.display = 'block'; box.innerHTML = '<div class="card"><div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div></div>';
+      box.style.display = 'block'; box.innerHTML = '<div class="card">' + skeleton() + '</div>';
       box.scrollIntoView({ behavior: 'smooth', block: 'start' });
       try {
         const u = await apiGet('/admin/users/' + encodeURIComponent(id));
         const STATUSES = ['ativo', 'pendente', 'inativo'];
         const STATUS_LABEL = { ativo: 'Ativo', pendente: 'Pendente (aguardando ativação)', inativo: 'Inativo' };
         box.innerHTML = `<div class="card">
-      <div class="row between" style="margin-bottom:16px">
-        <h2 style="margin:0">${esc(u.full_name)}</h2>
-        <button class="btn btn-outline btn-sm" onclick="document.getElementById('userEditBox').style.display='none'">Fechar</button>
+      <div class="row between mb-4">
+        <h2 class="m-0">${esc(u.full_name)}</h2>
+        <button class="btn btn-outline btn-sm" type="button" data-act="close-box" data-target="userEditBox" aria-label="Fechar o perfil de ${esc(u.full_name || 'usuário')}">Fechar</button>
       </div>
       <h3>Identificação e contato</h3>
-      <div class="grid grid-2" style="gap:10px;margin-bottom:16px;font-size:.9rem">
+      <dl class="dl mb-4">
         ${row2('E-mail', u.email)} ${row2('Celular', u.mobile || '—')}
         ${row2('Nascimento', u.birth_date ? new Date(u.birth_date).toLocaleDateString('pt-BR') : '—')} ${row2('Gênero', u.gender || '—')}
         ${row2('Tipo sanguíneo', u.blood_type || '—')} ${row2('Cargo', u.job_role || '—')}
@@ -1222,21 +1858,21 @@
         ${row2('Nome social', u.social_name || '—')} ${row2('CNS (Cartão SUS)', u.cns || '—')}
         ${row2('Prioridade legal', u.priority || '—')} ${row2('Responsável (menor)', u.guardian_name || '—')}
         ${row2('Cor / raça', u.race || '—')}
-      </div>
+      </dl>
       <h3>Documentos protegidos</h3>
-      <div class="grid grid-2" style="gap:10px;margin-bottom:16px;font-size:.9rem">
+      <dl class="dl mb-4">
         ${row2('CPF', u.cpf || '—')} ${row2('RG', u.rg || '—')}
-      </div>
+      </dl>
       <h3>Endereço</h3>
-      <div class="grid grid-2" style="gap:10px;margin-bottom:16px;font-size:.9rem">
+      <dl class="dl mb-4">
         ${row2('CEP', u.cep || '—')} ${row2('Endereço', u.street ? (u.street + (u.address_number ? ', ' + u.address_number : '')) : '—')}
         ${row2('Bairro', u.neighborhood || '—')} ${row2('Cidade/UF', u.city ? (u.city + (u.state ? ' / ' + u.state : '')) : '—')}
         ${row2('Zona', u.zone || '—')} ${row2('Ponto de referência', u.reference_point || '—')}
-      </div>
-      <p class="muted" style="font-size:.8rem;margin-bottom:8px">
-        <strong>Papel:</strong> ${u.role}
+      </dl>
+      <p class="muted text-sm mb-2">
+        <strong>Papel:</strong> ${esc(u.role)}
       </p>
-      <div class="grid grid-2" style="gap:10px">
+      <div class="grid grid-2 gap-3">
         <div class="field">
           <label for="edit_status_${u.id}">Status da conta</label>
           <select class="select" id="edit_status_${u.id}" data-current-status="${u.account_status || ''}">
@@ -1244,21 +1880,318 @@
           </select>
         </div>
         <div class="field">
-          <label for="edit_reason_${u.id}">Motivo da alteração <span class="muted" style="font-weight:400">(obrigatório ao mudar status)</span></label>
+          <label for="edit_reason_${u.id}">Motivo da alteração <span class="opt">(obrigatório ao mudar status)</span></label>
           <input class="input" id="edit_reason_${u.id}" placeholder="Ex.: solicitação do paciente, cadastro duplicado">
         </div>
         ${u.role === 'admin' && can('admins') ? `<div class="field"><label for="edit_admin_level_${u.id}">Nível administrativo</label><select class="select" id="edit_admin_level_${u.id}"><option value="superadmin" ${u.admin_level === 'superadmin' ? 'selected' : ''}>Superadmin</option><option value="gestor" ${(!u.admin_level || u.admin_level === 'gestor') ? 'selected' : ''}>Gestor</option><option value="atendimento" ${u.admin_level === 'atendimento' ? 'selected' : ''}>Atendimento</option><option value="alertas" ${u.admin_level === 'alertas' ? 'selected' : ''}>Alertas</option></select></div>` : ''}
       </div>
-      <button class="btn btn-primary" style="margin-top:12px" onclick="adminUpdateUser('${u.id}')">Salvar status</button>
+      <button class="btn btn-primary mt-3" type="button" data-act="user-save" data-id="${esc(u.id)}">Salvar status</button>
     </div>`;
-      } catch (err) { box.innerHTML = `<div class="card"><div class="empty">${esc(err.message || 'Erro')}</div></div>`; }
-    };
+      } catch (err) {
+        box.innerHTML = '<div class="card"></div>';
+        box.firstElementChild.appendChild(stateMessage('error', err.message || 'Erro ao carregar o perfil'));
+      }
+      };
 
+      let professionalsListCache = [];
+      async function loadProfessionalsForSelect(currentProfId = '') {
+        try {
+          const data = await apiGet('/admin/professionals');
+          const list = Array.isArray(data) ? data : (Array.isArray(data.professionals) ? data.professionals : []);
+          professionalsListCache = list.filter(p => Number(p.active) === 1);
+          const sel = document.getElementById('userFormProf');
+          if (!sel) return;
+          const opts = professionalsListCache.filter(p => {
+            if (currentProfId && p.id === currentProfId) return true;
+            if (!p.user_id) return true;
+            return false;
+          });
+          sel.innerHTML = '<option value="">Não vinculado</option>' + opts.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+          if (currentProfId) sel.value = currentProfId;
+        } catch (e) { /* ignore */ }
+      }
+
+      function toggleUserFormRole() {
+        const role = document.getElementById('userFormRole').value;
+        const adminWrap = document.getElementById('userFormAdminWrap');
+        const profWrap = document.getElementById('userFormProfWrap');
+        if (adminWrap) adminWrap.style.display = role === 'admin' ? '' : 'none';
+        if (profWrap) {
+          profWrap.style.display = role === 'atendente' ? '' : 'none';
+          loadProfessionalsForSelect(document.getElementById('userFormProf').value || '');
+        }
+      }
+
+      document.getElementById('userFormRole')?.addEventListener('change', toggleUserFormRole);
+
+      window.openUserCreate = function () {
+        document.getElementById('userEditTitle').textContent = 'Novo usuário';
+        document.getElementById('userFormId').value = '';
+        document.getElementById('userFormName').value = '';
+        document.getElementById('userFormEmail').value = '';
+        document.getElementById('userFormRole').value = 'paciente';
+        document.getElementById('userFormStatus').value = 'ativo';
+        document.getElementById('userFormJob').value = '';
+        document.getElementById('userFormPass').value = '';
+        document.getElementById('userFormAdminLevel').value = 'gestor';
+        document.getElementById('userFormProf').value = '';
+        toggleUserFormRole();
+        loadProfessionalsForSelect('');
+        openModal('userEditModal');
+        setTimeout(() => document.getElementById('userFormName').focus(), 50);
+      };
+
+      window.openUserView = async function (id) {
+        const box = document.getElementById('userViewContent');
+        box.innerHTML = '<div class="state state-loading">Carregando...</div>';
+        openModal('userViewModal');
+        try {
+          const u = await apiGet('/admin/users/' + encodeURIComponent(id));
+          box.innerHTML = `
+            <dl class="dl">
+              <div><dt>Nome</dt><dd>${esc(u.full_name||'')}</dd></div>
+              <div><dt>E-mail</dt><dd>${esc(u.email||'')}</dd></div>
+              <div><dt>Papel</dt><dd>${esc(u.role||'')}</dd></div>
+              <div><dt>Status</dt><dd>${esc(u.account_status||'')}</dd></div>
+              <div><dt>Profissional vinculado</dt><dd>${esc(u.professional_name || '-')}</dd></div>
+              <div><dt>Celular</dt><dd>${esc(u.mobile||'-')}</dd></div>
+              <div><dt>CPF</dt><dd>${esc(u.cpf||'-')}</dd></div>
+              <div><dt>RG</dt><dd>${esc(u.rg||'-')}</dd></div>
+              <div><dt>CNS</dt><dd>${esc(u.cns||'-')}</dd></div>
+              <div><dt>Endereço</dt><dd>${[u.street,u.address_number,u.neighborhood,u.city,u.state,u.cep].filter(Boolean).join(', ')||'-'}</dd></div>
+            </dl>`;
+        } catch (e) {
+          box.innerHTML = '<div class="state state-error">' + esc(e.message||'Erro') + '</div>';
+        }
+      };
+
+      window.openUserEdit = async function (id) {
+        document.getElementById('userEditTitle').textContent = 'Editar usuário';
+        document.getElementById('userFormId').value = id;
+        document.getElementById('userFormPass').value = '';
+        try {
+          const u = await apiGet('/admin/users/' + encodeURIComponent(id));
+          await loadProfessionalsForSelect(u.professional_id || '');
+          document.getElementById('userFormName').value = u.full_name || '';
+          document.getElementById('userFormEmail').value = u.email || '';
+          document.getElementById('userFormRole').value = u.role || 'paciente';
+          document.getElementById('userFormStatus').value = u.account_status || 'ativo';
+          document.getElementById('userFormJob').value = u.job_role || '';
+          document.getElementById('userFormAdminLevel').value = u.admin_level || 'gestor';
+          document.getElementById('userFormProf').value = u.professional_id || '';
+          toggleUserFormRole();
+          if (u.role === 'atendente' && !document.getElementById('userFormProf').value) {
+            const profWrap = document.getElementById('userFormProfWrap');
+            if (profWrap) {
+              profWrap.querySelector('label').textContent = 'Profissional (será criado automaticamente se não vinculado)';
+            }
+          }
+          openModal('userEditModal');
+        } catch (e) {
+          toast(e.message || 'Erro ao carregar usuário', 'error');
+        }
+      };
+
+      let deleteUserId = null;
+      window.openUserDelete = function (id, nome) {
+        deleteUserId = id;
+        document.getElementById('userDeleteName').textContent = nome || '';
+        openModal('userDeleteModal');
+      };
+
+      window.openUserAgenda = async function (id, nome) {
+        document.getElementById('userAgendaTitle').textContent = 'Agenda e vínculos';
+        document.getElementById('userAgendaSubtitle').textContent = nome || '';
+        const box = document.getElementById('userAgendaContent');
+        box.innerHTML = '<div class="state state-loading">Carregando...</div>';
+        openModal('userAgendaModal');
+        try {
+          const u = await apiGet('/admin/users/' + encodeURIComponent(id));
+          let pid = u.professional_id;
+          if (!pid) {
+            const pData = await apiGet('/admin/professionals');
+            const list = Array.isArray(pData) ? pData : (pData.professionals || []);
+            const found = list.find(x => x.user_id === id);
+            pid = found ? found.id : null;
+          }
+          if (!pid && u.role === 'atendente') {
+            await apiPut('/admin/users/' + encodeURIComponent(id), { role: 'atendente' });
+            const u2 = await apiGet('/admin/users/' + encodeURIComponent(id));
+            pid = u2.professional_id;
+            if (!pid) {
+              const pData = await apiGet('/admin/professionals');
+              const list = Array.isArray(pData) ? pData : (pData.professionals || []);
+              const found = list.find(x => x.user_id === id);
+              pid = found ? found.id : null;
+            }
+          }
+          if (!pid) {
+            box.innerHTML = '<div class="empty">Não há profissional vinculado a este usuário. Edite o usuário e defina como Atendente.</div>';
+            return;
+          }
+          const [allUnits, pdata] = await Promise.all([
+            apiGet('/admin/units').catch(()=>[]),
+            apiGet('/admin/professionals').catch(()=>({professionals:[],offers:[],schedules:[],blocks:[]}))
+          ]);
+          const profs = Array.isArray(pdata)?pdata:(pdata.professionals||[]);
+          const prof = profs.find(x=>x.id===pid);
+          const poffers = (pdata.offers||[]).filter(x=>x.professional_id===pid);
+          const pscheds = (pdata.schedules||[]).filter(x=>x.professional_id===pid);
+          const pblocks = (pdata.blocks||[]).filter(x=>x.professional_id===pid);
+          const units = Array.isArray(allUnits)?allUnits:(allUnits.units||allUnits.data||[]);
+          const unitOpts = '<option value="">Selecione a unidade</option>' + units.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+          const WEEK = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+          box.innerHTML = `
+            <div class="grid grid-2 agenda-grid">
+              <section class="card">
+                <div class="row between mb-2">
+                  <h3 class="m-0">Vínculos com unidades e serviços</h3>
+                </div>
+                <p class="muted mt-0 text-sm">Define onde e para quais serviços o atendente atende.</p>
+                <form id="uaOfferForm" class="form-grid">
+                  <div class="field"><label>Unidade</label><select class="select" name="unit_id" required>${unitOpts}</select></div>
+                  <div class="field"><label>Tipo</label><select class="select" name="kind"><option value="consulta">Consulta</option><option value="exame">Exame</option></select></div>
+                  <div class="field field-wide"><label>Especialidade / Tipo de exame</label><input class="input" name="name" placeholder="Ex.: Cardiologia, Hemograma" required></div>
+                  <div class="form-actions"><button class="btn btn-primary" type="submit">Vincular serviço</button></div>
+                </form>
+                <div class="list mt-3">${poffers.length? poffers.map(o=>`<div class="item"><div class="item-main"><h3>${esc(o.name)} <span class="badge">${o.kind==='exame'?'Exame':'Consulta'}</span></h3><p class="muted">${esc(o.unit_name||'')}</p></div><div class="item-actions"><button class="btn btn-outline btn-sm text-danger" type="button" data-act="ua-offer-del" data-id="${esc(o.id)}">Remover</button></div></div>`).join(''):'<div class="empty">Nenhum vínculo cadastrado.</div>'}</div>
+              </section>
+              <section class="card">
+                <div class="row between mb-2">
+                  <h3 class="m-0">Horários de atendimento</h3>
+                </div>
+                <p class="muted mt-0 text-sm">Selecione os dias da semana e a faixa horária.</p>
+                <form id="uaSchedForm" class="form-grid">
+                  <div class="field field-wide"><label>Unidade</label><select class="select" name="unit_id" required>${unitOpts}</select></div>
+                  <div class="field field-wide">
+                    <label>Dias da semana</label>
+                    <div class="weekdays">
+                      ${WEEK.map((d,i)=>`<label class="weekday-chip"><input type="checkbox" name="weekdays" value="${i}"> <span>${d}</span></label>`).join('')}
+                    </div>
+                  </div>
+                  <div class="field"><label>Início</label><input class="input" type="time" name="start_time" required></div>
+                  <div class="field"><label>Fim</label><input class="input" type="time" name="end_time" required></div>
+                  <div class="form-actions"><button class="btn btn-primary" type="submit">Adicionar horários</button></div>
+                </form>
+                <div class="list mt-3">${pscheds.length? pscheds.map(s=>`<div class="item"><div class="item-main"><h3>${WEEK[Number(s.weekday)]} · ${String(s.start_time).substr(0,5)} às ${String(s.end_time).substr(0,5)} <span class="badge">${s.slot_minutes||30} min</span></h3><p class="muted">${esc(s.unit_name||'')}</p></div><div class="item-actions"><button class="btn btn-outline btn-sm text-danger" type="button" data-act="ua-sched-del" data-id="${esc(s.id)}">Remover</button></div></div>`).join(''):'<div class="empty">Nenhum horário cadastrado.</div>'}</div>
+              </section>
+            </div>
+            <section class="card mt-4">
+              <div class="row between mb-2">
+                <h3 class="m-0">Bloqueios, folgas e intervalos</h3>
+              </div>
+              <p class="muted mt-0 text-sm">Bloqueios impedem agendamentos no período informado.</p>
+              <form id="uaBlockForm" class="form-grid form-grid-4">
+                <div class="field"><label>Unidade</label><select class="select" name="unit_id" required>${unitOpts}</select></div>
+                <div class="field"><label>Início</label><input class="input" type="datetime-local" name="starts_at" required></div>
+                <div class="field"><label>Fim</label><input class="input" type="datetime-local" name="ends_at" required></div>
+                <div class="form-actions"><button class="btn btn-primary" type="submit">Bloquear agenda</button></div>
+              </form>
+              <div class="list mt-3">${pblocks.length? pblocks.map(b=>`<div class="item"><div class="item-main"><h3>${String(b.starts_at).replace('T',' ')} até ${String(b.ends_at).replace('T',' ')}</h3><p class="muted">${esc(b.unit_name||'')}${b.reason?' · '+esc(b.reason):''}</p></div><div class="item-actions"><button class="btn btn-outline btn-sm text-danger" type="button" data-act="ua-block-del" data-id="${esc(b.id)}">Remover</button></div></div>`).join(''):'<div class="empty">Nenhum bloqueio futuro.</div>'}</div>
+            </section>
+          `;
+            document.getElementById('uaOfferForm').onsubmit = async (e)=>{
+              e.preventDefault();
+              const btn=e.target.querySelector('button[type=submit]');
+              const f=new FormData(e.target); const body={unit_id:f.get('unit_id'),kind:f.get('kind'),name:String(f.get('name')||'').trim()};
+              if(!body.unit_id||!body.name)return toast('Preencha unidade e serviço','error');
+              if(btn){btn.disabled=true;btn.textContent='Vinculando...';}
+              try{ await apiPost('/admin/professionals/'+pid+'/offers', body); toast('Vínculo criado','success'); openUserAgenda(id,nome);}catch(ex){toast(ex.message||'Erro','error');}finally{if(btn){btn.disabled=false;btn.textContent='Vincular serviço';}}
+            };
+            document.getElementById('uaSchedForm').onsubmit = async (e)=>{
+              e.preventDefault();
+              const btn=e.target.querySelector('button[type=submit]');
+              const f=new FormData(e.target);
+              const unit_id=f.get('unit_id');
+              const start_time=f.get('start_time');
+              const end_time=f.get('end_time');
+              const days = Array.from(e.target.querySelectorAll('input[name="weekdays"]:checked')).map(x=>x.value);
+              if(!unit_id||!start_time||!end_time||days.length===0)return toast('Selecione unidade, dias e horários','error');
+              if(btn){btn.disabled=true;btn.textContent='Adicionando...';}
+              try{
+                for(const d of days){
+                  await apiPost('/admin/professionals/'+pid+'/schedules', {unit_id,weekday:d,start_time,end_time,slot_minutes:30});
+                }
+                toast(days.length===1?'Horário adicionado':'Horários adicionados','success');
+                openUserAgenda(id,nome);
+              }catch(ex){toast(ex.message||'Erro','error');}finally{if(btn){btn.disabled=false;btn.textContent='Adicionar horários';}}
+            };
+            document.getElementById('uaBlockForm').onsubmit = async (e)=>{
+              e.preventDefault();
+              const btn=e.target.querySelector('button[type=submit]');
+              const f=new FormData(e.target); const body={unit_id:f.get('unit_id'),starts_at:f.get('starts_at'),ends_at:f.get('ends_at')};
+              if(!body.unit_id||!body.starts_at||!body.ends_at)return toast('Preencha todos os campos','error');
+              if(btn){btn.disabled=true;btn.textContent='Bloqueando...';}
+              try{ await apiPost('/admin/professionals/'+pid+'/blocks', body); toast('Bloqueio adicionado','success'); openUserAgenda(id,nome);}catch(ex){toast(ex.message||'Erro','error');}finally{if(btn){btn.disabled=false;btn.textContent='Bloquear agenda';}}
+            };
+          box.onclick = async (ev)=>{
+            const b=ev.target.closest('[data-act]');
+            if(!b)return;
+            try{
+              if(b.dataset.act==='ua-offer-del'){ await apiDelete('/admin/professionals/'+pid+'/offers/'+b.dataset.id); toast('Removido','success'); openUserAgenda(id,nome);}
+              if(b.dataset.act==='ua-sched-del'){ await apiDelete('/admin/professionals/'+pid+'/schedules/'+b.dataset.id); toast('Removido','success'); openUserAgenda(id,nome);}
+              if(b.dataset.act==='ua-block-del'){ await apiDelete('/admin/professionals/'+pid+'/blocks/'+b.dataset.id); toast('Removido','success'); openUserAgenda(id,nome);}
+            }catch(ex){toast(ex.message||'Erro','error');}
+          };
+        } catch(e){ box.innerHTML='<div class="state state-error">'+esc(e.message||'Erro')+'</div>'; }
+      };
+      document.getElementById('userDeleteConfirm')?.addEventListener('click', async function () {
+        if (!deleteUserId) return;
+        this.disabled = true;
+        try {
+          await apiDelete('/admin/users/' + encodeURIComponent(deleteUserId));
+          toast('Usuário excluído', 'success');
+          closeModal('userDeleteModal');
+          searchUsers({ preventDefault(){}, target: document.getElementById('userSearchForm') });
+        } catch (e) {
+          toast(e.message || 'Erro ao excluir', 'error');
+        } finally {
+          this.disabled = false;
+        }
+      });
+
+      document.getElementById('userForm')?.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const id = document.getElementById('userFormId').value;
+        const payload = {
+          full_name: document.getElementById('userFormName').value.trim(),
+          email: document.getElementById('userFormEmail').value.trim(),
+          role: document.getElementById('userFormRole').value,
+          account_status: document.getElementById('userFormStatus').value,
+          job_role: document.getElementById('userFormJob').value.trim() || null,
+          admin_level: document.getElementById('userFormAdminLevel').value,
+          professional_id: document.getElementById('userFormProf').value || null
+        };
+        const pass = document.getElementById('userFormPass').value;
+        if (pass) payload.password = pass;
+        const btn = this.querySelector('button[type=submit]');
+        if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
+        try {
+          if (id) {
+            await apiPut('/admin/users/' + encodeURIComponent(id), payload);
+            toast('Usuário atualizado', 'success');
+          } else {
+            if (!pass) return toast('Senha obrigatória para novo usuário', 'error');
+            await apiPost('/admin/users', payload);
+            toast('Usuário criado', 'success');
+          }
+          closeModal('userEditModal');
+          searchUsers({ preventDefault(){}, target: document.getElementById('userSearchForm') });
+        } catch (err) {
+          toast(err.message || 'Erro ao salvar', 'error');
+        } finally {
+          if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
+        }
+      });
+
+      // <dl> em vez de <div><span>rótulo</span><p>valor</p></div> dentro de uma
+    // grade: o leitor de tela anunciava "E-mail, Wrap long, a@b.com" como um
+    // bloco solto. Com dt/dd o par é anunciado como definição.
     function row2(label, value) {
-      return `<div><span class="muted" style="font-size:.75rem;text-transform:uppercase">${label}</span><p style="margin:2px 0 0;font-weight:500">${esc(value)}</p></div>`;
+      return `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`;
     }
 
-    window.adminUpdateUser = async function (id) {
+    window.adminUpdateUser = async function (id, btn) {
       const statusEl = document.getElementById('edit_status_' + id);
       const account_status = statusEl?.value;
       const reasonEl = document.getElementById('edit_reason_' + id);
@@ -1266,69 +2199,113 @@
       const adminLevel = document.getElementById('edit_admin_level_' + id)?.value;
       // P2a.6: o label diz "(obrigatório ao mudar status)" — agora o front
       // valida antes do PATCH em vez de tomar 400 genérico do back.
-      try {
-        const currentStatus = statusEl?.dataset.currentStatus || '';
-        if (account_status !== currentStatus && !reason) {
-          setFieldError(reasonEl, 'Informe o motivo da alteração de status.');
-          showFirstError(reasonEl);
-          return;
-        }
-        clearFieldError(reasonEl);
-        const payload = { account_status, reason, status_notes: reason };
-        if (adminLevel) payload.admin_level = adminLevel;
-        await apiPatch('/admin/users/' + encodeURIComponent(id), payload);
-        toast('Status atualizado', 'success');
-        viewUser(id);
+      const currentStatus = statusEl?.dataset.currentStatus || '';
+      if (account_status !== currentStatus && !reason) {
+        setFieldError(reasonEl, 'Informe o motivo da alteração de status.');
+        showFirstError(reasonEl);
+        return;
       }
-      catch (err) { toast(err.message || 'Erro', 'error'); }
+      clearFieldError(reasonEl);
+      const payload = { account_status, reason, status_notes: reason };
+      if (adminLevel) payload.admin_level = adminLevel;
+      await loadingButton(btn, async () => {
+        try {
+          await apiPatch('/admin/users/' + encodeURIComponent(id), payload);
+          toast('Status atualizado', 'success');
+          viewUser(id);
+        } catch (err) {
+          setFieldError(reasonEl, err.message || 'Não foi possível atualizar o status.');
+        }
+      });
     };
+
+    function renderDiseases(termo) {
+      const t = termo || '';
+      const box = document.getElementById('diseaseList');
+      if (!box) return;
+      const casa = (d) => norm([d.name, d.description, d.region].join(' ')).includes(t);
+      const visiveis = diseases.filter(casa);
+      box.innerHTML = diseases.length
+        ? (visiveis.length ? visiveis.map(diseaseRow).join('')
+          : `<div class="empty">Nenhum alerta casa com "${esc(termo)}".</div>`)
+        : '<div class="empty">Sem registros.</div>';
+    }
+
+    function diseaseRow(d) {
+      const nome = esc(d.name);
+      const ativo = Number(d.active) === 1;
+      return `<div class="item"><div class="item-main"><h3>${nome} <span class="badge ${levelClass(d.alert_level)}">${esc(d.alert_level)}</span> <span class="badge ${ativo ? 'badge-success' : 'badge-danger'}">${ativo ? 'Ativo' : 'Inativo'}</span></h3>
+        <p>${esc(d.description || '')} ${d.region ? '· ' + esc(d.region) : ''}</p></div>
+        <div class="item-actions">
+          <button class="btn btn-outline btn-sm" type="button" data-act="dis-edit" data-id="${esc(d.id)}" aria-label="Editar alerta ${nome}">Editar</button>
+          <button class="btn btn-outline btn-sm${ativo ? ' text-danger' : ''}" type="button" data-act="dis-toggle" data-id="${esc(d.id)}" data-nome="${esc(d.name)}" aria-label="${ativo ? 'Desativar' : 'Ativar'} alerta ${nome}">${ativo ? 'Desativar' : 'Ativar'}</button>
+          <button class="btn btn-outline btn-sm text-danger" type="button" data-act="dis-delete" data-id="${esc(d.id)}" aria-label="Excluir alerta ${nome}">Excluir</button>
+        </div></div>`;
+    }
 
     async function loadDiseases() {
       try {
         const data = await apiGet('/admin/diseases');
         diseases = Array.isArray(data) ? data : [];
-        document.getElementById('diseaseList').innerHTML = (data || []).length
-          ? data.map(d => `<div class="item"><div><h3>${esc(d.name)} <span class="badge ${levelClass(d.alert_level)}">${esc(d.alert_level)}</span> <span class="badge ${Number(d.active) ? 'badge-success' : 'badge-danger'}">${Number(d.active) ? 'Ativo' : 'Inativo'}</span></h3>
-          <p>${esc(d.description || '')} ${d.region ? '· ' + esc(d.region) : ''}</p></div>
-          <div class="row"><button class="btn btn-outline btn-sm" onclick="editDisease('${d.id}')">Editar</button><button class="btn btn-outline btn-sm" onclick="toggleDisease('${d.id}',${Number(d.active) ? 0 : 1})">${Number(d.active) ? 'Desativar' : 'Ativar'}</button><button class="btn btn-outline btn-sm" onclick="delDisease('${d.id}')">Excluir</button></div></div>`).join('')
-          : '<div class="empty">Sem registros.</div>';
-      } catch (err) { toast(err.message || 'Erro', 'error'); }
+        const filtro = document.getElementById('diseaseFilter');
+        renderDiseases(norm(filtro ? filtro.value.trim() : ''));
+      } catch (err) {
+        const box = document.getElementById('diseaseList');
+        box.innerHTML = '';
+        box.appendChild(stateMessage('error', err.message || 'Não foi possível carregar os alertas', loadDiseases));
+      }
     }
 
     async function addDisease(e) {
       e.preventDefault();
-      const f = Object.fromEntries(new FormData(e.target));
-      try { await apiPost('/admin/diseases', { ...f }); e.target.reset(); toast('Doença cadastrada', 'success'); loadDiseases(); }
-      catch (err) { toast(err.message || 'Erro', 'error'); }
+      const form = e.target;
+      const f = Object.fromEntries(new FormData(form));
+      const nomeEl = document.getElementById('diseaseName');
+      const regiaoEl = document.getElementById('diseaseRegionSelect');
+      clearFieldError(nomeEl); clearFieldError(regiaoEl);
+      await loadingButton(form.querySelector('button[type=submit]'), async () => {
+        try {
+          await apiPost('/admin/diseases', { ...f });
+          // form.reset() apagaria as opções do select (injetadas por JS) e
+          // devolveria o placeholder do HTML original. Recria a lista.
+          const bairros = Array.from(regiaoEl.options).map(o => o.value).filter(Boolean);
+          form.reset();
+          fillRegionSelect(regiaoEl, bairros, 'Selecione a região/bairro…');
+          document.getElementById('diseaseLevel').value = 'baixo';
+          toast('Doença cadastrada', 'success');
+          loadDiseases();
+        } catch (err) {
+          setFieldError(nomeEl, err.message || 'Não foi possível cadastrar o alerta.');
+        }
+      });
     }
 
     window.delDisease = async (id) => {
       deletingDiseaseId = id;
       ensureDeleteDiseaseModal();
-      document.getElementById('deleteDiseaseModal').classList.add('show');
+      openModal('deleteDiseaseModal');
     };
 
     function ensureDeleteDiseaseModal() {
       if (document.getElementById('deleteDiseaseModal')) return;
-      const style = document.createElement('style');
-      style.textContent = `#deleteDiseaseModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}#deleteDiseaseModal.show{display:flex}#deleteDiseaseModal .modal-card{width:min(440px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}`;
-      document.head.appendChild(style);
-      document.body.insertAdjacentHTML('beforeend', `<div id="deleteDiseaseModal" role="dialog" aria-modal="true" aria-labelledby="deleteDiseaseTitle"><div class="modal-card"><h2 id="deleteDiseaseTitle">Excluir alerta?</h2><p>O alerta deixará de aparecer para os usuários. Essa ação não pode ser desfeita.</p><div class="row" style="justify-content:flex-end;margin-top:20px"><button type="button" class="btn btn-outline" onclick="closeDeleteDiseaseModal()">Voltar</button><button type="button" class="btn btn-primary" style="background:var(--danger);border-color:var(--danger)" onclick="confirmDeleteDisease()">Excluir alerta</button></div></div></div>`);
+      document.body.insertAdjacentHTML('beforeend', `<div id="deleteDiseaseModal" class="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="deleteDiseaseTitle" aria-describedby="deleteDiseaseText"><div class="modal-card"><h2 id="deleteDiseaseTitle">Excluir alerta?</h2><p id="deleteDiseaseText">O alerta deixará de aparecer para os usuários. Essa ação não pode ser desfeita.</p><div class="modal-actions"><button type="button" class="btn btn-outline" onclick="closeDeleteDiseaseModal()">Voltar</button><button type="button" class="btn btn-danger" id="deleteDiseaseConfirm" onclick="confirmDeleteDisease(this)">Excluir alerta</button></div></div></div>`);
     }
 
     window.closeDeleteDiseaseModal = function () {
-      document.getElementById('deleteDiseaseModal')?.classList.remove('show');
+      closeModal('deleteDiseaseModal');
       deletingDiseaseId = null;
     };
 
-    window.confirmDeleteDisease = async function () {
+    window.confirmDeleteDisease = async function (btn) {
       if (!deletingDiseaseId) return;
-      try {
-        await apiDelete('/admin/diseases/' + encodeURIComponent(deletingDiseaseId));
-        closeDeleteDiseaseModal();
-        toast('Alerta excluído', 'success');
-        loadDiseases();
-      } catch (err) { toast(err.message || 'Erro ao excluir alerta', 'error'); }
+      await loadingButton(btn, async () => {
+        try {
+          await apiDelete('/admin/diseases/' + encodeURIComponent(deletingDiseaseId));
+          closeDeleteDiseaseModal();
+          toast('Alerta excluído', 'success');
+          loadDiseases();
+        } catch (err) { toast(err.message || 'Erro ao excluir alerta', 'error'); }
+      });
     };
 
     window.editDisease = async function (id) {
@@ -1340,70 +2317,108 @@
       document.getElementById('diseaseEditRegion').value = disease.region || '';
       document.getElementById('diseaseEditLevel').value = disease.alert_level || 'baixo';
       document.getElementById('diseaseEditDescription').value = disease.description || '';
-      document.getElementById('diseaseEditModal').classList.add('show');
+      openModal('diseaseEditModal');
     };
 
     function ensureDiseaseModal() {
       if (document.getElementById('diseaseEditModal')) return;
-      const style = document.createElement('style');
-      style.textContent = `#diseaseEditModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}#diseaseEditModal.show{display:flex}#diseaseEditModal .modal-card{width:min(560px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}`;
-      document.head.appendChild(style);
-      document.body.insertAdjacentHTML('beforeend', `<div id="diseaseEditModal" role="dialog" aria-modal="true" aria-labelledby="diseaseEditTitle"><div class="modal-card"><h2 id="diseaseEditTitle">Editar alerta</h2><form id="diseaseEditForm"><div class="field"><label for="diseaseEditName">Nome</label><input class="input" id="diseaseEditName" required></div><div class="grid grid-2"><div class="field"><label for="diseaseEditRegion">Região</label><input class="input" id="diseaseEditRegion"></div><div class="field"><label for="diseaseEditLevel">Nível</label><select class="select" id="diseaseEditLevel"><option value="baixo">Baixo</option><option value="medio">Médio</option><option value="alto">Alto</option></select></div></div><div class="field"><label for="diseaseEditDescription">Descrição</label><textarea class="textarea" id="diseaseEditDescription"></textarea></div><div class="row" style="justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="closeDiseaseModal()">Cancelar</button><button type="submit" class="btn btn-primary" id="diseaseEditSubmit">Salvar alterações</button></div></form></div></div>`);
+      document.body.insertAdjacentHTML('beforeend', `<div id="diseaseEditModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="diseaseEditTitle"><div class="modal-card modal-card-wide"><h2 id="diseaseEditTitle">Editar alerta</h2><form id="diseaseEditForm"><div class="field"><label for="diseaseEditName">Nome</label><input class="input" id="diseaseEditName" required></div><div class="grid grid-2"><div class="field"><label for="diseaseEditRegion">Região</label><input class="input" id="diseaseEditRegion"></div><div class="field"><label for="diseaseEditLevel">Nível</label><select class="select" id="diseaseEditLevel"><option value="baixo">Baixo</option><option value="medio">Médio</option><option value="alto">Alto</option></select></div></div><div class="field"><label for="diseaseEditDescription">Descrição</label><textarea class="textarea" id="diseaseEditDescription"></textarea></div><div class="modal-actions"><button type="button" class="btn btn-outline" onclick="closeDiseaseModal()">Cancelar</button><button type="submit" class="btn btn-primary" id="diseaseEditSubmit">Salvar alterações</button></div></form></div></div>`);
       document.getElementById('diseaseEditForm').addEventListener('submit', saveDiseaseEdit);
     }
 
     window.closeDiseaseModal = function () {
-      document.getElementById('diseaseEditModal')?.classList.remove('show');
+      closeModal('diseaseEditModal');
       editingDiseaseId = null;
     };
 
     async function saveDiseaseEdit(e) {
       e.preventDefault();
       if (!editingDiseaseId) return;
-      const button = document.getElementById('diseaseEditSubmit');
-      button.disabled = true;
-      try {
-        await apiPatch('/admin/diseases/' + encodeURIComponent(editingDiseaseId), {
-          name: document.getElementById('diseaseEditName').value.trim(),
-          region: document.getElementById('diseaseEditRegion').value.trim(),
-          alert_level: document.getElementById('diseaseEditLevel').value,
-          description: document.getElementById('diseaseEditDescription').value.trim()
-        });
-        closeDiseaseModal();
-        toast('Alerta atualizado', 'success');
-        loadDiseases();
-      } catch (err) { toast(err.message || 'Erro ao editar alerta', 'error'); }
-      finally { button.disabled = false; }
+      await loadingButton(document.getElementById('diseaseEditSubmit'), async () => {
+        try {
+          await apiPatch('/admin/diseases/' + encodeURIComponent(editingDiseaseId), {
+            name: document.getElementById('diseaseEditName').value.trim(),
+            region: document.getElementById('diseaseEditRegion').value.trim(),
+            alert_level: document.getElementById('diseaseEditLevel').value,
+            description: document.getElementById('diseaseEditDescription').value.trim()
+          });
+          closeDiseaseModal();
+          toast('Alerta atualizado', 'success');
+          loadDiseases();
+        } catch (err) { toast(err.message || 'Erro ao editar alerta', 'error'); }
+      });
     }
 
-    window.toggleDisease = async function (id, active) {
-      try { await apiPatch('/admin/diseases/' + encodeURIComponent(id), { active }); toast(active ? 'Alerta ativado' : 'Alerta desativado', 'success'); loadDiseases(); }
-      catch (err) { toast(err.message || 'Erro ao atualizar alerta', 'error'); }
+    window.toggleDisease = async function (id, nome, btn) {
+      const d = diseases.find(x => String(x.id) === String(id));
+      if (!d) return;
+      const ativo = Number(d.active) === 1;
+      if (ativo) {
+        const ok = await confirmDialog({
+          title: 'Desativar o alerta?',
+          message: '"' + (nome || d.name) + '" deixa de aparecer para os pacientes da região. '
+            + 'O cadastro continua guardado e dá para reativar depois.',
+          confirmLabel: 'Desativar alerta',
+        });
+        if (!ok) return;
+      }
+      await loadingButton(btn, async () => {
+        try { await apiPatch('/admin/diseases/' + encodeURIComponent(id), { active: ativo ? 0 : 1 }); toast(ativo ? 'Alerta desativado' : 'Alerta ativado', 'success'); loadDiseases(); }
+        catch (err) { toast(err.message || 'Erro ao atualizar alerta', 'error'); }
+      });
     };
 
-    async function loadAuditLog(e) {
-      if (e) e.preventDefault();
+    async function loadAuditLog(e, opts) {
+      if (e && e.preventDefault) e.preventDefault();
+      const box = document.getElementById('auditLog');
+      const accumulando = Boolean(opts && opts.append);
+      const page = (opts && opts.page) || 1;
+      const form = document.getElementById('auditFilterForm');
+      const pageSize = Number(form.pageSize.value) || 50;
+      const entityType = form.entityType.value.trim();
+      const action = form.action.value.trim();
+      URL_STATE.entityType = entityType; URL_STATE.action = action;
+      if (!accumulando) box.innerHTML = skeleton();
+      box.setAttribute('aria-busy', 'true');
       try {
-        const params = new URLSearchParams({ limit: '50' });
-        const form = document.getElementById('auditFilterForm');
-        if (form) {
-          const data = new FormData(form);
-          if (data.get('entityType')) params.set('entityType', data.get('entityType'));
-          if (data.get('action')) params.set('action', data.get('action'));
-        }
-        const rows = await apiGet('/admin/audit-log?' + params.toString());
-        document.getElementById('auditLog').innerHTML = rows.length
-          ? rows.map(r => `<div class="item"><div>
+        // page/pageSize ativam o modo paginado (que devolve {data,total}).
+        // Sem nenhum dos dois a rota cai no modo legado e devolve só os
+        // primeiros 50, sem nenhuma forma de pedir o resto.
+        const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+        if (entityType) params.set('entityType', entityType);
+        if (action) params.set('action', action);
+        const res = await apiGet('/admin/audit-log?' + params.toString());
+        const rows = Array.isArray(res) ? res : (res.data || []);
+        const total = Array.isArray(res) ? rows.length : Number(res.total || rows.length);
+        // O texto mais longo da linha (ator, ação, detalhes) é o que não tinha
+        // onde quebrar — foi o que mediu 8099px de documento num viewport de 360.
+        const linhas = rows.map(r => `<div class="item"><div class="item-main">
           <h3>${esc(ATOR_AUDITORIA(r))} <span class="badge">${esc(r.action)}</span></h3>
           <p>${esc(r.entity_type)} · ${esc(r.details || '')}</p>
-        </div><span class="muted">${fmtDate(r.created_at)}</span></div>`).join('')
-          : '<div class="empty">Nenhuma ação registrada ainda.</div>';
-      } catch (err) { toast(err.message || 'Erro', 'error'); }
+        </div><span class="item-meta muted">${fmtDate(r.created_at)}</span></div>`).join('');
+        if (!linhas && !accumulando) { box.innerHTML = '<div class="empty">Nenhuma ação registrada ainda.</div>'; return; }
+        const rodape = loadMoreAuditHtml(page, pageSize, total);
+        if (accumulando) box.insertAdjacentHTML('beforeend', linhas + rodape);
+        else box.innerHTML = linhas + rodape;
+      } catch (err) {
+        if (!accumulando) {
+          box.innerHTML = '';
+          box.appendChild(stateMessage('error', err.message || 'Não foi possível carregar a auditoria.', () => loadAuditLog()));
+        }
+      } finally {
+        box.removeAttribute('aria-busy');
+      }
+    }
+
+    function loadMoreAuditHtml(page, pageSize, total) {
+      const carregados = page * pageSize;
+      if (carregados >= total) return `<p class="load-more-end muted text-sm">${total} ação(ões) no total.</p>`;
+      return `<div class="load-more"><button class="btn btn-outline btn-sm" type="button" data-act="load-more" data-kind="audit" data-page="${page + 1}" aria-label="Carregar mais ${total - carregados} ações de auditoria">Carregar mais (${carregados} de ${total})</button></div>`;
     }
 
     window.resetAuditFilters = function () {
       document.getElementById('auditFilterForm').reset();
-      loadAuditLog();
+      loadAuditLog().then(() => writeUrl(true));
     };
 
     // Aulas 1/6: verifica a cadeia de hashes da trilha (integridade).
@@ -1419,6 +2434,9 @@
     };
 
     const COL_LABELS = { scheduled_at: 'Data/hora', specialty: 'Especialidade', doctor: 'Médico', location: 'Local', status: 'Status', user_name: 'Paciente', exam_type: 'Tipo de exame' };
+    // Rótulo legível para qualquer coluna, mesmo as que não estão no mapa
+    // acima: antes caía o nome cru do campo (scheduled_at, entity_type).
+    function colLabel(col) { return COL_LABELS[col] || String(col).replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()); }
     function statusClass(s) { return s === 'cancelado' ? 'badge-danger' : s === 'concluido' ? 'badge-success' : s === 'pendente' ? 'badge-warning' : ''; }
     function renderCell(col, row) {
       const v = row[col];
@@ -1426,25 +2444,58 @@
       if (col === 'status') return `<span class="badge ${statusClass(v)}">${esc(v)}</span>`;
       return esc(v ?? '—');
     }
-    function renderTable(rows, cols) {
-      return `<table><thead><tr>${cols.map(c => `<th>${COL_LABELS[c] || c}</th>`).join('')}</tr></thead><tbody>
-    ${rows.map(r => `<tr>${cols.map(c => `<td>${renderCell(c, r)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    /* Tabela no desktop, card no celular.
+       A tabela de 7 colunas da agenda estourava a página em qualquer viewport
+       abaixo de ~1150px porque nada a envolvia num contêiner com
+       overflow-x. Agora: .table-wrap rola no ponteiro (min-width 34rem) e,
+       abaixo de 760px, cada linha vira um card com o rótulo da coluna vindo
+       de data-label. data-label também serve ao leitor de tela, que antes
+       lia uma sequência de <td> sem contexto. */
+    function renderTable(rows, cols, caption) {
+      const head = cols.map(c => `<th scope="col">${esc(colLabel(c))}</th>`).join('');
+      const body = rows.map(r =>
+        `<tr>${cols.map(c => `<td data-label="${esc(colLabel(c))}">${renderCell(c, r)}</td>`).join('')}</tr>`).join('');
+      return `<div class="table-wrap"><table data-card>`
+        + `<caption class="sr-only">${esc(caption || '')}</caption>`
+        + `<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
     }
-    function renderActionableTable(rows, cols, kind) {
-      const header = cols.map(c => `<th>${COL_LABELS[c] || c}</th>`).join('') + '<th>Ações</th>';
+    function renderActionableTable(rows, cols, kind, caption) {
+      const rotulo = kind === 'exams' ? 'exame' : 'consulta';
+      const head = cols.map(c => `<th scope="col">${esc(colLabel(c))}</th>`).join('') + '<th scope="col">Ações</th>';
       const body = rows.map(r => {
-        const cells = cols.map(c => `<td>${renderCell(c, r)}</td>`).join('');
-        const canAct = r.status === 'pendente' || r.status === 'confirmado';
-        const actions = canAct ? `<div class="row">
-      <button class="btn btn-outline btn-sm" onclick="adminAction('${kind}','${r.id}','confirmado')">Confirmar</button>
-      <button class="btn btn-outline btn-sm" onclick="adminAction('${kind}','${r.id}','cancelado')">Cancelar</button>
-      <button class="btn btn-outline btn-sm" onclick="adminReagendar('${kind}','${r.id}')">Reagendar</button>
-    </div>`: '<span class="muted">—</span>';
-        return `<tr>${cells}<td>${actions}</td></tr>`;
+        const quem = esc(r.user_name || 'Paciente');
+        const quando = fmtDate(r.scheduled_at);
+        // O nome acessível é montado por linha: uma tabela de 20 linhas gerava
+        // 20 botões "Confirmar" idênticos, e o leitor de tela só anunciava
+        // "Confirmar, botão" sem dizer o que estava sendo confirmado.
+        const quemRotulo = `${rotulo} de ${quem} em ${quando}`;
+        // Dados crus para a confirmação de cancelamento: o texto do diálogo
+        // precisa dizer de quem é e quando, senão vira "tem certeza?".
+        const quemBruto = String(r.user_name || 'Paciente');
+        const quandoBruto = String(r.scheduled_at || '');
+        const cells = cols.map(c => `<td data-label="${esc(colLabel(c))}">${renderCell(c, r)}</td>`).join('');
+        const podeAgir = r.status === 'pendente' || r.status === 'confirmado';
+        // data-* em vez de onclick com id interpolado: o id ia cru para dentro
+        // do HTML e a delegação evita reabrir o problema de aspas/apóstrofo.
+        const acoes = podeAgir
+          ? `<div class="item-actions">`
+            + `<button class="btn btn-outline btn-sm" type="button" data-act="appt-status" data-kind="${esc(kind)}" data-id="${esc(r.id)}" data-status="confirmado" data-quem="${esc(quemBruto)}" data-quando="${esc(quandoBruto)}" aria-label="Confirmar ${esc(quemRotulo)}">Confirmar</button>`
+            + `<button class="btn btn-outline btn-sm text-danger" type="button" data-act="appt-status" data-kind="${esc(kind)}" data-id="${esc(r.id)}" data-status="cancelado" data-quem="${esc(quemBruto)}" data-quando="${esc(quandoBruto)}" aria-label="Cancelar ${esc(quemRotulo)}">Cancelar</button>`
+            + `<button class="btn btn-outline btn-sm" type="button" data-act="appt-reschedule" data-kind="${esc(kind)}" data-id="${esc(r.id)}" aria-label="Reagendar ${esc(quemRotulo)}">Reagendar</button>`
+            + `</div>`
+          : '<span class="muted">—</span>';
+        return `<tr>${cells}<td data-label="Ações">${acoes}</td></tr>`;
       }).join('');
-      return `<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
+      return `<div class="table-wrap"><table data-card>`
+        + `<caption class="sr-only">${esc(caption || '')}</caption>`
+        + `<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
     }
-    function stat(label, value) { return `<div class="card"><p class="muted" style="margin:0;font-size:.8rem;text-transform:uppercase">${label}</p><h2 style="margin:.2em 0 0;font-size:1.8rem">${value}</h2></div>`; }
+    function stat(label, value) {
+      // .stat-card em vez de um <h2> estilizado inline: era um número, não um
+      // título de seção — <h2> aqui poluía a hierarquia do painel.
+      return `<div class="card stat-card"><p class="stat-label">${esc(label)}</p>`
+        + `<p class="stat-value">${esc(value)}</p></div>`;
+    }
     function levelClass(l) { return l === 'alto' ? 'badge-danger' : l === 'medio' ? 'badge-warning' : 'badge-success'; }
     // O apóstrofo também é escapado: com um nome como "Maria d'Ávila" o
     // onclick interpolado virava SyntaxError e o botão morria em silêncio.
@@ -1459,32 +2510,44 @@
 
     // Ações dos botões renderizados por innerHTML: delegadas no document, com
     // os dados em data-*. Sem isso o nome do usuário era interpolado dentro de
-    // onclick="..." e um apóstrofo quebrava o script da página inteira.
-    document.addEventListener('click', (ev) => {
+    // onclick="..." e um apóstrofo quebrava o script da página inteira. Também
+    // centraliza o nome acessível e evita interpolar id cru no HTML.
+      document.addEventListener('click', (ev) => {
       const btn = ev.target.closest('[data-act]');
-      if (!btn) return;
-      if (btn.dataset.act === 'show-history') return showHistory(btn.dataset.id, btn.dataset.name);
-      if (btn.dataset.act === 'view-user') return viewUser(btn.dataset.id);
+        if (!btn) return;
+        if (btn.dataset.act === 'show-history') return showHistory(btn.dataset.id, btn.dataset.name);
+        const d = btn.dataset;
+        if (d.act === 'view-user' || d.act === 'user-view') return openUserView(d.id);
+        if (d.act === 'user-edit') return openUserEdit(d.id);
+        if (d.act === 'user-delete') return openUserDelete(d.id, d.nome);
+        if (d.act === 'user-agenda') return openUserAgenda(d.id, d.nome);
+        if (btn.id === 'userCreateBtn') { openUserCreate(); return; }
+      if (d.act === 'appt-status') return adminAction(d.kind, d.id, d.status, btn, d.quem, d.quando);
+      if (d.act === 'appt-reschedule') return adminReagendar(d.kind, d.id);
+      if (d.act === 'unit-edit') return editUnit(d.id);
+      if (d.act === 'unit-toggle') return toggleUnit(d.id, d.nome, btn);
+      if (d.act === 'offer-del') return delUnitOffer(d.unit, d.id, d.nome, d.kind, btn);
+      if (d.act === 'prof-open') return openProfDetail(d.id);
+      if (d.act === 'prof-edit') return editProf(d.id);
+      if (d.act === 'prof-toggle') return toggleProf(d.id, d.nome, btn);
+      if (d.act === 'prof-close') return closeProfDetail();
+      if (d.act === 'prof-offer-del') return delProfOffer(d.prof, d.id, d.nome, d.unidade, btn);
+      if (d.act === 'prof-schedule-del') return delProfSchedule(d.prof, d.id, d.dia, d.unidade, btn);
+      if (d.act === 'prof-block-del') return delProfBlock(d.prof, d.id, d.periodo, btn);
+      if (d.act === 'dis-edit') return editDisease(d.id);
+      if (d.act === 'dis-toggle') return toggleDisease(d.id, d.nome, btn);
+      if (d.act === 'dis-delete') return delDisease(d.id);
+      if (d.act === 'close-box') { const b = document.getElementById(d.target); if (b) b.style.display = 'none'; }
+      if (d.act === 'user-save') return adminUpdateUser(d.id, btn);
+      if (d.act === 'load-more') return loadMore(btn);
+      if (d.act === 'load-more-bookings') return loadMoreBookings(d.kind);
     });
 
-    document.querySelectorAll('.tabs').forEach(tabContainer => {
-      const tabs = Array.from(tabContainer.querySelectorAll('.tab'));
-
-      tabs.forEach((tab, index) => {
-        tab.addEventListener('keydown', (e) => {
-          if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-            e.preventDefault();
-            let newIndex = e.key === 'ArrowRight' ? index + 1 : index - 1;
-
-            if (newIndex >= tabs.length) newIndex = 0;
-            if (newIndex < 0) newIndex = tabs.length - 1;
-
-            tabs[newIndex].focus();
-            tabs[newIndex].click();
-          }
-        });
-      });
-    });
+    // A navegação por ←/→/Home/End dentro de [role=tablist] já é feita pelo
+// assets/ui.js (tablistKeys), que também filtra abas ocultas por nível.
+// Este handler local duplicava o comportamento: as setas disparavam
+// switchTab() DUAS vezes (duas chamadas de loadAuditLog por tecla) e o
+// clique ia para o painel errado ao cair numa aba com display:none.
 
     /* ================= MINHA CONTA (perfil + LGPD + privacidade + DPO) ================= */
     // O admin é um usuário do sistema: os mesmos endpoints /auth/me atendem qualquer role.
@@ -1535,17 +2598,18 @@
     async function loadAccountConsent() {
       const box = document.getElementById('acctConsent');
       if (!box) return;
-      box.innerHTML = '<div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>';
+box.innerHTML = skeleton();
       try {
         // /auth/me/export é a única leitura que traz privacy_version/consent_at do titular.
         const data = await apiGet('/auth/me/export');
         const p = data.profile || {};
         const quando = p.consent_at ? fmtDate(p.consent_at) : 'não registrado';
         box.innerHTML =
-          `<p style="margin:0">Política de privacidade na versão <strong>${esc(data.privacy_version || p.privacy_version || '—')}</strong></p>` +
-          `<p style="margin:4px 0 0">Consentimento registrado em: <strong>${esc(quando)}</strong></p>`;
+          `<p class="m-0">Política de privacidade na versão <strong>${esc(data.privacy_version || p.privacy_version || '—')}</strong></p>`
+          + `<p class="mt-1">Consentimento registrado em: <strong>${esc(quando)}</strong></p>`;
       } catch (err) {
-        box.textContent = err.message || 'Não foi possível ler os registros de consentimento.';
+        box.innerHTML = '';
+box.appendChild(stateMessage('error', err.message || 'Não foi possível ler os registros de consentimento.', loadAccountConsent));
       }
     }
 
@@ -1564,17 +2628,27 @@
 
     async function saveAccount(e) {
       e.preventDefault();
-      const btn = document.getElementById('acctSubmit');
+      // PUT /auth/me é atualização parcial: '' = o usuário apagou, limpar;
+      // undefined = o campo não existe nesta página, manter. Este formulário
+      // não tem job_role/blood_type/priority/race — e antes de Task 6, salvá-lo
+      // apagava todos esses campos do usuário.
+      const campo = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : undefined; };
       const get = (id) => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
-    // PUT /auth/me é atualização parcial: '' = o usuário apagou, limpar;
-    // undefined = o campo não existe nesta página, manter. Este formulário
-    // não tem job_role/blood_type/priority/race — e antes de Task 6, salvá-lo
-    // apagava todos esses campos do usuário.
-    const campo = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : undefined; };
+      // O form tem novalidate e required nos campos abaixo, mas nenhuma
+      // validação: um envio vazio ia ao back e voltava só como toast. Agora
+      // nome e celular são checados antes, com mensagem no próprio campo.
+      ['a_full_name', 'a_mobile', 'a_cpf', 'a_cns', 'a_cep'].forEach(id => clearFieldError(document.getElementById(id)));
+      if (!get('a_full_name')) {
+        setFieldError(document.getElementById('a_full_name'), 'Informe seu nome completo.');
+        showFirstError(document.getElementById('a_full_name'));
+        return;
+      }
+      if (get('a_mobile').replace(/\D/g, '').length < 10) {
+        setFieldError(document.getElementById('a_mobile'), 'Informe o celular com DDD.');
+        showFirstError(document.getElementById('a_mobile'));
+        return;
+      }
       // Validação local dos documentos (mesmas regras do back).
-      ['a_cpf', 'a_cns', 'a_cep'].forEach(id => {
-        if (get(id)) clearFieldError(document.getElementById(id));
-      });
       if (get('a_cpf') && !isValidCPF(get('a_cpf'))) {
         setFieldError(document.getElementById('a_cpf'), 'CPF inválido. Confira os números digitados.');
         showFirstError(document.getElementById('a_cpf'));
@@ -1590,91 +2664,98 @@
         showFirstError(document.getElementById('a_cep'));
         return;
       }
-      btn.disabled = true;
-      try {
-await apiPut('/auth/me', {
-    full_name: campo('a_full_name'),
-    social_name: campo('a_social_name'), birth_date: campo('a_birth_date'),
-    gender: campo('a_gender'),
-    // cpf/rg/cns são a EXCEÇÃO: os inputs não vêm preenchidos (placeholder, por
-    //Privacy — o back devolve a máscara, não o número). Campo vazio nesses três
-    // quer dizer "não me mexa", não "apague": mandar '' limparia o documento
-    // salvo a cada gravação do perfil.
-    cpf: campo('a_cpf') || undefined, rg: campo('a_rg') || undefined, cns: campo('a_cns') || undefined,
-    mobile: campo('a_mobile'), phone: campo('a_phone'),
-    cep: campo('a_cep'), street: campo('a_street'), address_number: campo('a_number'),
-    neighborhood: campo('a_neighborhood'), city: campo('a_city'), state: campo('a_state'),
+await loadingButton(document.getElementById('acctSubmit'), async () => {
+        try {
+    await apiPut('/auth/me', {
+      full_name: campo('a_full_name'),
+      social_name: campo('a_social_name'), birth_date: campo('a_birth_date'),
+      gender: campo('a_gender'),
+      // cpf/rg/cns são a EXCEÇÃO: os inputs não vêm preenchidos (placeholder, por
+      // Privacy — o back devolve a máscara, não o número). Campo vazio nesses três
+      // quer dizer "não me mexa", não "apague": mandar '' limparia o documento
+      // salvo a cada gravação do perfil.
+      cpf: campo('a_cpf') || undefined, rg: campo('a_rg') || undefined, cns: campo('a_cns') || undefined,
+      mobile: campo('a_mobile'), phone: campo('a_phone'),
+      cep: campo('a_cep'), street: campo('a_street'), address_number: campo('a_number'),
+      neighborhood: campo('a_neighborhood'), city: campo('a_city'), state: campo('a_state'),
     });
-        toast('Dados atualizados', 'success');
-        acctLoaded = false;
-        await initMyAccount(true);
-      } catch (err) {
-        toast(err.message || 'Erro ao salvar', 'error');
-      } finally { btn.disabled = false; }
+          toast('Dados atualizados', 'success');
+          acctLoaded = false;
+          await initMyAccount(true);
+        } catch (err) {
+          setFieldError(document.getElementById('a_full_name'), err.message || 'Não foi possível salvar. Revise os dados e tente de novo.');
+        }
+      });
     }
 
-    async function downloadMyAccountData() {
-      try {
-        const data = await apiGet('/auth/me/export');
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'meus-dados-saude-mais.json';
-        a.click();
-        URL.revokeObjectURL(url);
-        toast('Arquivo gerado', 'success');
-      } catch (err) { toast(err.message || 'Erro ao exportar', 'error'); }
+    async function downloadMyAccountData(btn) {
+      await loadingButton(btn, async () => {
+        try {
+          const data = await apiGet('/auth/me/export');
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'meus-dados-saude-mais.json';
+          a.click();
+          URL.revokeObjectURL(url);
+          toast('Arquivo gerado', 'success');
+        } catch (err) { toast(err.message || 'Erro ao exportar', 'error'); }
+      });
     }
 
     function ensureDeleteAccountModal() {
       if (document.getElementById('deleteAccountModal')) return;
-      const style = document.createElement('style');
-      style.textContent = `#deleteAccountModal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.45)}#deleteAccountModal.show{display:flex}#deleteAccountModal .modal-card{width:min(440px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}`;
-      document.head.appendChild(style);
-      document.body.insertAdjacentHTML('beforeend', `<div id="deleteAccountModal" role="dialog" aria-modal="true" aria-labelledby="delAcctTitle"><div class="modal-card"><h2 id="delAcctTitle">Excluir sua conta?</h2><p>Seus dados pessoais serão anonimizados e você perderá o acesso administrativo. Confirme com sua senha.</p><div class="field" style="margin-top:14px"><label for="delAcctPass">Senha</label><input class="input" type="password" id="delAcctPass" autocomplete="current-password"></div><p id="delAcctError" style="color:var(--danger);font-size:.9rem;margin:0"></p><div class="row" style="justify-content:flex-end;margin-top:20px"><button type="button" class="btn btn-outline" onclick="closeDeleteAccountModal()">Voltar</button><button type="button" class="btn btn-primary" style="background:var(--danger);border-color:var(--danger)" onclick="confirmDeleteAccount()">Excluir conta</button></div></div></div>`);
+      document.body.insertAdjacentHTML('beforeend', `<div id="deleteAccountModal" class="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="delAcctTitle"><div class="modal-card"><h2 id="delAcctTitle">Excluir sua conta?</h2><p>Seus dados pessoais serão anonimizados e você perderá o acesso administrativo. Confirme com sua senha.</p><div class="field mt-3"><label for="delAcctPass">Senha</label><input class="input" type="password" id="delAcctPass" autocomplete="current-password" data-modal-autofocus></div><p id="delAcctError" class="field-msg" role="alert" aria-live="assertive"></p><div class="modal-actions"><button type="button" class="btn btn-outline" onclick="closeDeleteAccountModal()">Voltar</button><button type="button" class="btn btn-danger" id="delAcctConfirm" onclick="confirmDeleteAccount(this)">Excluir conta</button></div></div></div>`);
     }
     window.closeDeleteAccountModal = function () {
-      document.getElementById('deleteAccountModal')?.classList.remove('show');
+      closeModal('deleteAccountModal');
       const p = document.getElementById('delAcctPass');
       if (p) p.value = '';
     };
     window.deleteMyAccount = function () {
       ensureDeleteAccountModal();
       document.getElementById('delAcctError').textContent = '';
-      document.getElementById('deleteAccountModal').classList.add('show');
-      document.getElementById('delAcctPass').focus();
+      // O foco vai para o campo de senha (data-modal-autofocus), não para o
+      // primeiro botão — quem vai ler precisa digitar, não confirmar.
+      openModal('deleteAccountModal');
     };
-    window.confirmDeleteAccount = async function () {
-      const pass = document.getElementById('delAcctPass').value;
-      if (!pass) { document.getElementById('delAcctError').textContent = 'Informe sua senha.'; return; }
-      try {
-        // apiDelete não envia corpo; usa fetch direto com a senha de confirmação.
-        const token = localStorage.getItem('saude_token');
-        const res = await fetch(window.API_BASE + '/auth/me', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ password: pass }),
-        });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) { document.getElementById('delAcctError').textContent = body.error || 'Não foi possível excluir.'; return; }
-        toast('Conta excluída', 'success');
-        closeDeleteAccountModal();
-        setTimeout(() => location.replace('index.html'), 900);
-      } catch (err) {
-        document.getElementById('delAcctError').textContent = err.message || 'Falha de rede.';
-      }
+    window.confirmDeleteAccount = async function (btn) {
+      const campo = document.getElementById('delAcctPass');
+      const erro = document.getElementById('delAcctError');
+      if (!campo.value) { erro.textContent = 'Informe sua senha.'; return; }
+      erro.textContent = '';
+      await loadingButton(btn, async () => {
+        try {
+          // apiDelete não envia corpo; usa fetch direto com a senha de confirmação.
+          const token = localStorage.getItem('saude_token');
+          const res = await fetch(window.API_BASE + '/auth/me', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ password: campo.value }),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) { erro.textContent = body.error || 'Não foi possível excluir.'; return; }
+          toast('Conta excluída', 'success');
+          closeDeleteAccountModal();
+          setTimeout(() => location.replace('index.html'), 900);
+        } catch (err) {
+          erro.textContent = err.message || 'Falha de rede.';
+        }
+      });
     };
 
-    function setDateLimits() {
-      const now = new Date();
+    /* Aplica a janela de agendamento aos campos datetime-local do escopo informado.
+       Antes varria o documento inteiro e também atingia o formulário de
+       bloqueio de agenda do profissional — cujo campo existe para datas
+       futuras, mas herdava min=agora sem querer. */
+    function setDateLimits(selector) {
+      const agora = new Date();
       const minDateTime = nowLocalForInput();
-
       const maxDateObj = new Date();
-      maxDateObj.setFullYear(now.getFullYear() + 1);
+      maxDateObj.setFullYear(agora.getFullYear() + 1);
       const maxDateTime = new Date(maxDateObj - maxDateObj.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-
-      document.querySelectorAll('input[type="datetime-local"]').forEach(el => {
+      document.querySelectorAll(selector || 'input[type="datetime-local"]').forEach(el => {
         el.min = minDateTime;
         el.max = maxDateTime;
       });

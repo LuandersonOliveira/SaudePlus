@@ -32,6 +32,21 @@ const SAFE_ROLES = ['paciente', 'atendente', 'admin'];
 const SAFE_STATUSES = ['ativo', 'inativo', 'pendente'];
 const SAFE_ADMIN_LEVELS = ['superadmin', 'gestor', 'atendimento', 'alertas'];
 
+/**
+ * Derruba as sessões e os links de redefinição pendentes do usuário.
+ *
+ * Sem isto, desativar, rebaixar ou trocar a senha pelo admin deixava o
+ * refresh token anterior valendo por até 30 dias — a pessoa continuava
+ * entrando mesmo depois da medida administrativa.
+ */
+async function revokeAccess(userId) {
+  await pool.query('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND revoked = 0', [userId]);
+  await pool.query(
+    'UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL',
+    [userId]
+  );
+}
+
 // GET /admin/users — lista todos os usuários (SEM cpf/rg — só no endpoint individual)
 router.get('/', async (req, res, next) => {
   try {
@@ -43,7 +58,8 @@ router.get('/', async (req, res, next) => {
     const query = req.query.q !== undefined ? req.query.q : req.query.email;
     const search = query ? String(query).toLowerCase().trim() : null;
 
-    const filters = [];
+    // Soft delete: contas excluídas não voltam na listagem, nem na contagem.
+    const filters = ['deleted_at IS NULL'];
     let sql = `SELECT id, full_name, social_name, email, role, account_status,
                       phone, mobile, birth_date, gender, priority, race, job_role, admin_level, created_at, last_login_at
            FROM users`;
@@ -55,13 +71,13 @@ router.get('/', async (req, res, next) => {
       const pattern = '%' + search + '%';
       params.push(pattern, pattern, pattern, pattern);
     }
-    const whereClause = filters.length ? ' WHERE ' + filters.join(' AND ') : '';
+    const whereClause = ' WHERE ' + filters.join(' AND ');
     sql += whereClause;
     sql += ' ORDER BY full_name LIMIT ? OFFSET ?';
     params.push(pageSize, offset);
 
     const [rows] = await pool.query(sql, params);
-    const [[countRow]] = await pool.query('SELECT COUNT(*) AS total FROM users' + whereClause, params.slice(0, -2));
+    const [[countRow]] = await pool.query('SELECT COUNT(*) AS total FROM users u' + whereClause, params.slice(0, -2));
     res.json({ data: rows, page, pageSize, total: Number(countRow.total) });
   } catch (err) {
     next(err);
@@ -75,14 +91,17 @@ router.get('/:id',
   async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, full_name, social_name, email, role, account_status,
-              phone, mobile, birth_date, gender, blood_type, admin_level,
-              priority, race, guardian_name,
-              mother_name, father_name,
-              cpf, rg, cns,
-              cep, street, address_number, neighborhood, city, state,
-              job_role, created_at
-       FROM users WHERE id = ?`,
+      `SELECT u.id, u.full_name, u.social_name, u.email, u.role, u.account_status,
+              u.phone, u.mobile, u.birth_date, u.gender, u.blood_type, u.admin_level,
+              u.priority, u.race, u.guardian_name,
+              u.mother_name, u.father_name,
+              u.cpf, u.rg, u.cns,
+              u.cep, u.street, u.address_number, u.neighborhood, u.city, u.state,
+              u.job_role, u.created_at,
+              p.id AS professional_id, p.name AS professional_name
+       FROM users u
+       LEFT JOIN professionals p ON p.user_id = u.id
+       WHERE u.id = ? AND u.deleted_at IS NULL`,
       [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -107,13 +126,14 @@ router.get('/:id',
 // sim ativar uma conta e ajustar um cargo.
 router.patch('/:id', async (req, res, next) => {
   try {
-    const { account_status, job_role, admin_level, reason, status_notes } = req.body || {};
+    const { account_status, job_role, admin_level, role, password, professional_id, unlink_professional } = req.body || {};
+    // O motivo vai para a auditoria; o teto é o mesmo do sanitizeDetails.
+    const reason = req.body && req.body.reason ? String(req.body.reason).slice(0, 1000) : '';
     const updates = [];
     const params = [];
-    const logParts = [];
 
     const [[currentUser]] = await pool.query(
-      'SELECT account_status, job_role, admin_level, role FROM users WHERE id = ?',
+      'SELECT account_status, job_role, admin_level, role, email, full_name FROM users WHERE id = ? AND deleted_at IS NULL',
       [req.params.id]
     );
     if (!currentUser) return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -137,48 +157,179 @@ router.patch('/:id', async (req, res, next) => {
       if (req.params.id === req.user.id) {
         return res.status(400).json({ error: 'Você não pode alterar o status da própria conta.' });
       }
-      // O motivo vai para o details da auditoria. Teto de 1000 = o mesmo do
-      // sanitizeDetails; sem ele o campo aceitaria payload ilimitado.
-      const statusReason = String(reason || status_notes || '').trim().slice(0, 1000);
-      if (account_status !== currentUser.account_status && !statusReason) {
-        return res.status(400).json({ error: 'Informe o motivo da alteração de status.' });
-      }
-      updates.push('account_status=?'); params.push(account_status); logParts.push(`status -> ${account_status}`);
-      if (statusReason) logParts.push(`motivo: ${statusReason}`);
+      updates.push('account_status=?'); params.push(account_status);
     }
     if (job_role !== undefined) {
-      updates.push('job_role=?'); params.push(job_role || null); logParts.push(`cargo -> ${job_role}`);
+      updates.push('job_role=?'); params.push(job_role || null);
+    }
+    if (role !== undefined) {
+      if (!SAFE_ROLES.includes(role)) return res.status(400).json({ error: 'Papel inválido.' });
+      if (req.params.id === req.user.id) return res.status(400).json({ error: 'Você não pode alterar o próprio papel.' });
+      // Promover a admin é criar um par de privilégio: exige a capability
+      // 'admins'. Sem isto, um gestor (que tem 'users') promovia qualquer
+      // conta a administrador.
+      if (role === 'admin' && currentUser.role !== 'admin' && !pode('admins', req.user)) {
+        return res.status(403).json({ error: 'Seu nível administrativo não permite criar administradores.' });
+      }
+      if (currentUser.role === 'admin' && role !== 'admin') {
+        const targetRank = rankDe(currentUser.admin_level);
+        if (actorRank(req.user) <= targetRank) {
+          return res.status(403).json({ error: 'Você não pode rebaixar um administrador igual ou superior.' });
+        }
+      }
+      updates.push('role=?'); params.push(role);
     }
     if (admin_level !== undefined) {
       if (!pode('admins', req.user)) return res.status(403).json({ error: 'Seu nível administrativo não permite alterar níveis de outros administradores.' });
       if (!SAFE_ADMIN_LEVELS.includes(admin_level)) return res.status(400).json({ error: 'Nível administrativo inválido.' });
-      // Não pode rebaixar para baixo do próprio nível.
       if ((LEVEL_RANK[admin_level] ?? 0) < actorRank(req.user)) {
         return res.status(403).json({ error: 'Você não pode definir um nível abaixo do seu.' });
       }
-      updates.push('admin_level=?'); params.push(admin_level); logParts.push(`nível admin -> ${admin_level}`);
+      updates.push('admin_level=?'); params.push(admin_level);
+    }
+    if (password !== undefined && password !== '') {
+      if (String(password).length < 6) return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres.' });
+      const bcrypt = require('bcryptjs');
+      updates.push('password_hash=?'); params.push(await bcrypt.hash(String(password), 10));
     }
 
-    if (!updates.length) return res.status(400).json({ error: 'Nada para atualizar.' });
+    if (updates.length) {
+      params.push(req.params.id);
+      const [result] = await pool.query(
+        `UPDATE users SET ${updates.join(', ')} WHERE id=? AND deleted_at IS NULL`, params
+      );
+      if (result.affectedRows === 0) return res.status(400).json({ error: 'Nenhuma alteração foi realizada.' });
+    }
 
-    params.push(req.params.id);
-    const [result] = await pool.query(
-      `UPDATE users SET ${updates.join(', ')} WHERE id=?`, params
+    // Medidas administrativas que tiram poder do titular precisam encerrar a
+    // sessão: senha trocada, papel rebaixado/trocado ou conta desativada.
+    const desativa = account_status !== undefined && account_status !== 'ativo';
+    const mudaPapel = role !== undefined && role !== currentUser.role;
+    const mudaSenha = password !== undefined && password !== '';
+    if (desativa || mudaPapel || mudaSenha) {
+      await revokeAccess(req.params.id);
+    }
+
+    // Vincular/desvincular profissional / auto-sincronizar
+    const targetRole = role !== undefined ? role : currentUser.role;
+    if (role !== undefined && role !== currentUser.role && currentUser.role === 'atendente' && targetRole !== 'atendente') {
+      await pool.query('UPDATE professionals SET user_id = NULL WHERE user_id = ?', [req.params.id]);
+    }
+    if (unlink_professional) {
+      await pool.query('UPDATE professionals SET user_id = NULL WHERE user_id = ?', [req.params.id]);
+    } else if (targetRole === 'atendente') {
+      if (professional_id) {
+        const [[p]] = await pool.query('SELECT id, user_id FROM professionals WHERE id = ? AND active = 1', [professional_id]);
+        if (!p) return res.status(400).json({ error: 'Profissional não encontrado ou inativo.' });
+        if (p.user_id && p.user_id !== req.params.id) return res.status(400).json({ error: 'Profissional já vinculado a outro atendente.' });
+        await pool.query('UPDATE professionals SET user_id = NULL WHERE user_id = ?', [req.params.id]);
+        await pool.query('UPDATE professionals SET user_id = ? WHERE id = ?', [req.params.id, professional_id]);
+      }
+      const [[existing]] = await pool.query('SELECT id FROM professionals WHERE user_id = ?', [req.params.id]);
+      if (!existing) {
+        const crypto = require('crypto');
+        const [[u]] = await pool.query('SELECT full_name, job_role FROM users WHERE id = ?', [req.params.id]);
+        const pid = crypto.randomUUID();
+        await pool.query(
+          'INSERT INTO professionals (id, name, job_title, registry, active, user_id) VALUES (?,?,?,?,1,?)',
+          [pid, u.full_name || u.job_role || 'Atendente', u.job_role || 'Atendente', null, req.params.id]
+        );
+      } else if (job_role) {
+        await pool.query('UPDATE professionals SET name = COALESCE(name, ?), job_title = ? WHERE user_id = ?', [job_role, job_role, req.params.id]);
+      }
+    } else if (targetRole !== 'atendente') {
+      await pool.query('UPDATE professionals SET user_id = NULL WHERE user_id = ?', [req.params.id]);
+    }
+
+    const changes = [];
+    if (account_status !== undefined && account_status !== currentUser.account_status) changes.push(`status: ${currentUser.account_status}->${account_status}`);
+    if (role !== undefined && role !== currentUser.role) changes.push(`role: ${currentUser.role}->${role}`);
+    if (job_role !== undefined && job_role !== currentUser.job_role) changes.push(`cargo: ${currentUser.job_role||'-'}->${job_role||'-'}`);
+    if (admin_level !== undefined && admin_level !== currentUser.admin_level) changes.push(`admin_level: ${currentUser.admin_level||'-'}->${admin_level}`);
+    if (password !== undefined && password !== '') changes.push('senha alterada');
+    if (professional_id && targetRole === 'atendente') changes.push(`profissional vinculado: ${professional_id}`);
+    if (unlink_professional) changes.push('profissional desvinculado');
+    if (reason) changes.push(`motivo: ${reason}`);
+    await req.audit('admin_update_user', 'user', req.params.id, changes.join('; ') || 'atualização');
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /admin/users - criar novo usuário
+router.post('/', async (req, res, next) => {
+  try {
+    const { full_name, email, password, role, account_status, job_role, admin_level, professional_id } = req.body || {};
+    if (!full_name || !email || !password) return res.status(400).json({ error: 'Nome, e-mail e senha são obrigatórios.' });
+    if (String(password).length < 6) return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres.' });
+    const r = role && SAFE_ROLES.includes(role) ? role : 'paciente';
+    if (r === 'admin' && !pode('admins', req.user)) return res.status(403).json({ error: 'Sem permissão para criar administradores.' });
+    const s = account_status && SAFE_STATUSES.includes(account_status) ? account_status : (r === 'atendente' ? 'pendente' : 'ativo');
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const [[ex]] = await pool.query('SELECT id FROM users WHERE LOWER(email)=? AND deleted_at IS NULL', [normalizedEmail]);
+    if (ex) return res.status(409).json({ error: 'E-mail já cadastrado.' });
+
+    // Valida o vínculo ANTES de criar a conta: recusar depois deixaria um
+    // usuário órfão no banco a cada tentativa inválida.
+    if (r === 'atendente' && professional_id) {
+      const [[p]] = await pool.query('SELECT id, user_id FROM professionals WHERE id = ? AND active = 1', [professional_id]);
+      if (!p) return res.status(400).json({ error: 'Profissional não encontrado ou inativo.' });
+      if (p.user_id) return res.status(400).json({ error: 'Profissional já vinculado a outro atendente.' });
+    }
+
+    const bcrypt = require('bcryptjs');
+    const crypto = require('crypto');
+    const id = crypto.randomUUID();
+    const hash = await bcrypt.hash(String(password), 10);
+    await pool.query(
+      `INSERT INTO users (id, full_name, email, password_hash, role, account_status, job_role, admin_level)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [id, full_name.trim(), normalizedEmail, hash, r, s, job_role || null, r === 'admin' ? (admin_level || 'gestor') : null]
     );
-    if (result.affectedRows === 0) return res.status(400).json({ error: 'Nenhuma alteração foi realizada.' });
 
-    const previous = [];
-    if (account_status !== undefined && account_status !== currentUser.account_status) {
-      previous.push(`status: ${currentUser.account_status} -> ${account_status}`);
+    if (r === 'atendente') {
+      if (professional_id) {
+        await pool.query('UPDATE professionals SET user_id = ? WHERE id = ?', [id, professional_id]);
+      } else {
+        // Auto-criar profissional para o atendente
+        const [[existing]] = await pool.query('SELECT id FROM professionals WHERE user_id = ?', [id]);
+        if (!existing) {
+          const pid = crypto.randomUUID();
+          await pool.query(
+            'INSERT INTO professionals (id, name, job_title, registry, active, user_id) VALUES (?,?,?,?,1,?)',
+            [pid, full_name.trim(), job_role || 'Atendente', null, id]
+          );
+        }
+      }
     }
-    if (job_role !== undefined && job_role !== currentUser.job_role) {
-      previous.push(`cargo: ${currentUser.job_role || 'não informado'} -> ${job_role || 'não informado'}`);
+
+    await req.audit('admin_create_user', 'user', id, `criado: ${normalizedEmail} role=${r} status=${s}`);
+    res.status(201).json({ ok: true, id });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /admin/users/:id - soft delete
+router.delete('/:id', async (req, res, next) => {
+  try {
+    if (req.params.id === req.user.id) return res.status(400).json({ error: 'Você não pode excluir a própria conta.' });
+    const [[currentUser]] = await pool.query(
+      'SELECT full_name, email, role, admin_level FROM users WHERE id = ? AND deleted_at IS NULL',
+      [req.params.id]
+    );
+    if (!currentUser) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    if (currentUser.role === 'admin') {
+      const targetRank = rankDe(currentUser.admin_level);
+      if (actorRank(req.user) <= targetRank) {
+        return res.status(403).json({ error: 'Você não pode excluir um administrador igual ou superior.' });
+      }
     }
-    if (admin_level !== undefined && admin_level !== currentUser.admin_level) {
-      previous.push(`nível admin: ${currentUser.admin_level || 'gestor'} -> ${admin_level}`);
-    }
-    await req.audit('admin_update_user', 'user', req.params.id,
-      `${previous.join('; ')}${logParts.length ? `; ${logParts.join('; ')}` : ''}`);
+    await pool.query('UPDATE professionals SET user_id = NULL WHERE user_id = ?', [req.params.id]);
+    await pool.query('UPDATE users SET deleted_at = NOW() WHERE id = ?', [req.params.id]);
+    await revokeAccess(req.params.id);
+    await req.audit('admin_delete_user', 'user', req.params.id, `excluído: ${currentUser.email} (${currentUser.full_name})`);
     res.json({ ok: true });
   } catch (err) {
     next(err);

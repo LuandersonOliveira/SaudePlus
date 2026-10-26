@@ -29,18 +29,28 @@ const SERVER_DIR = path.join(ROOT, 'server');
 // "Pronto." em uma base sem as colunas novas, e todo agendamento passava a
 // devolver 500.
 //
-// Quem decide a ordem é o package.json; aqui só traduz `migrate:audit:details`
-// para o nome do arquivo `migrate-audit-details.js`.
+// Quem decide a ordem é o package.json, e o NOME DO ARQUIVO vem do comando de
+// cada script — não de uma tradução de `migrate:a:b` para `migrate-a-b.js`.
+// A tradução quebrava em `migrate:professional-user`, que aponta para
+// `migrate-professional-user-link.js`.
 function migrationScripts() {
   const pkg = JSON.parse(fs.readFileSync(path.join(SERVER_DIR, 'package.json'), 'utf8'));
   const linha = (pkg.scripts && pkg.scripts['migrate:all']) || '';
-  const nomes = linha.match(/npm run migrate:[\w:]+/g) || [];
+  const nomes = linha.match(/npm run migrate:[\w:-]+/g) || [];
   if (!nomes.length) {
     throw new Error(
       'server/package.json não define o script migrate:all — a ordem das migrations ficou indeterminada'
     );
   }
-  return nomes.map((n) => n.replace(/^npm run /, '').replace(/:/g, '-') + '.js');
+  return nomes.map((n) => {
+    const script = n.replace(/^npm run /, '');
+    const comando = (pkg.scripts && pkg.scripts[script]) || '';
+    const m = /node\s+(?:\.\/)?scripts\/([\w.-]+\.js)/.exec(comando);
+    if (!m) {
+      throw new Error(`server/package.json: ${script} não aponta para um arquivo em scripts/`);
+    }
+    return m[1];
+  });
 }
 
 const BOLD = '\x1b[1m';

@@ -134,7 +134,7 @@
 
   ## Banco de dados
 
-  Banco `saude` (`utf8mb4_unicode_ci`), 13 tabelas:
+  Banco `saude` (`utf8mb4_unicode_ci`), 14 tabelas:
 
   | Tabela                | Guarda o quê                                                                                                                                                                                                                                                                                                                                                                                                                             |
   | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -144,13 +144,15 @@
   | `reminders`           | Lembretes: `user_id`, `title`, `message`, `remind_at`, `read`, gerados na véspera pelo job                                                                                                                                                                                                                                                                                                                                               |
   | `diseases`            | Alertas epidemiológicos: `name`, `region`, `alert_level` (`baixo`/`medio`/`alto`), `description`, `active`                                                                                                                                                                                                                                                                                                                               |
   | `health_units`        | Catálogo real de unidades (fonte CNES via ubs.med.br, 10 seeds): UBSs, hospital, clínica, CAPS + `type`, `neighborhood`, `active`                                                                                                                                                                                                                                                                                                        |
-  | `professionals`       | Profissionais de saúde: `name`, `job_title`, `registry`, `active`                                                                                                                                                                                                                                                                                                                                                                        |
+  | `professionals`       | Profissionais de saúde: `name`, `job_title`, `registry`, `active`, `user_id` (vínculo opcional com a conta de atendente)                                                                                                                                                                                                                                                                                                                  |
   | `unit_offers`         | O que cada unidade oferece: `unit_id`, `kind` (`consulta`/`exame`), `name`                                                                                                                                                                                                                                                                                                                                                               |
   | `professional_offers` | O que cada profissional atende por unidade/tipo                                                                                                                                                                                                                                                                                                                                                                                          |
   | `work_schedules`      | Horários: `professional_id`, `unit_id`, `weekday` (0=dom…6=sáb), `start_time`, `end_time`, `slot_minutes` (padrão 30)                                                                                                                                                                                                                                                                                                                    |
   | `schedule_blocks`     | Folgas/bloqueios pontuais: `starts_at`, `ends_at`, `reason`                                                                                                                                                                                                                                                                                                                                                                              |
-  | `audit_log`           | Rastreabilidade admin: `actor_id`, `action`, `entity_type`, `entity_id`, `details`                                                                                                                                                                                                                                                                                                                                                       |
-  | (views/índices)       | FKs com `ON DELETE CASCADE` + índices em `user_id`, `scheduled_at`, `(entity_type, entity_id)`                                                                                                                                                                                                                                                                                                                                           |
+  | `audit_log`           | Rastreabilidade admin: `actor_id`, `action`, `entity_type`, `entity_id`, `details`, `prev_hash`/`entry_hash` (cadeia à prova de adulteração)                                                                                                                                                                                                                                                                                              |
+  | `refresh_tokens`      | Sessões rotativas: hash do token, família, expiração e `revoked` (reuso revoga a família)                                                                                                                                                                                                                                                                                                                                                 |
+  | `password_reset_tokens` | Recuperação de senha: SHA-256 do token, `expires_at` e `used_at` (uso único; `ON DELETE CASCADE`)                                                                                                                                                                                                                                                                                                                                        |
+  | (views/índices)       | FKs com `ON DELETE CASCADE`/`RESTRICT` + índices em `user_id`, `scheduled_at`, `(entity_type, entity_id)`                                                                                                                                                                                                                                                                                                                                 |
 
   Telefones/horários das unidades na seed **não foram confirmados na fonte pública** — valide antes de divulgar oficialmente.
 
@@ -164,6 +166,7 @@
   | Auth                | `POST /auth/signup`                                                                                           | P    | Cadastro (paciente livre; atendente nasce `pendente`); registra consentimento e cifra CPF/RG/CNS |
   |                     | `POST /auth/login`                                                                                            | P    | Login (bloqueia `inativo`/`pendente`), retorna `{token, refreshToken, user}` |
   |                     | `POST /auth/refresh` · `POST /auth/logout`                                                                   | P    | Rotaciona sessão (detecta reuso) · revoga refresh                    |
+  |                     | `POST /auth/password/forgot` · `POST /auth/password/reset`                                                    | P    | Envia link de recuperação (SMTP ou pendência registrada) · consome token de uso único |
   |                     | `GET /auth/me` · `PUT /auth/me`                                                                               | J    | Lê/atualiza perfil próprio                                           |
   |  | `GET /auth/me/export`                                                                                         | J    | Portabilidade LGPD (JSON + docs decifrados)                          |
   |  | `DELETE /auth/me`                                                                                             | J    | Eliminação LGPD (exige senha; anonimiza)                             |
@@ -193,8 +196,10 @@
   |                     | `GET /admin/diseases` · `POST /admin/diseases` · `PATCH /admin/diseases/:id` · `DELETE /admin/diseases/:id`   | A    | CRUD de alertas                                                      |
   |                     | `GET /admin/audit-log`                                                                                        | A    | Trilha de auditoria com filtros                                      |
   |                     | `GET /admin/audit-log/verify`                                                                                 | A    | Verifica a cadeia de hashes (detecta adulteração/remoção)             |
-  | Admin usuários      | `GET /admin/users/` (`?q=&role=&status=`) · `GET /admin/users/:id`                                            | A    | Busca e detalhe                                                      |
-  |                     | `PATCH /admin/users/:id`                                                                                      | A    | Só `account_status` / `job_role` / `admin_level`                     |
+  | Admin usuários      | `GET /admin/users/` (`?q=&role=&status=`) · `GET /admin/users/:id`                                            | A    | Busca e detalhe (lista ignora contas com soft delete)                |
+  |                     | `POST /admin/users/`                                                                                          | A    | Cria usuário (valida vínculo profissional antes do insert)          |
+  |                     | `PATCH /admin/users/:id`                                                                                      | A    | Status, cargo, papel, nível, senha e vínculo; revoga sessões         |
+  |                     | `DELETE /admin/users/:id`                                                                                     | A    | Soft delete + revogação de refresh/resets; bloqueia autoexclusão     |
   | Admin profissionais | `GET /admin/professionals` · `POST /admin/professionals` · `PATCH /admin/professionals/:id`                   | A    | CRUD profissionais                                                   |
   |                     | `POST /admin/professionals/:id/offers` · `DELETE /admin/professionals/:id/offers/:offerId`                    | A    | Vínculos unidade/serviço                                             |
   |                     | `POST /admin/professionals/:id/schedules` · `DELETE /admin/professionals/:id/schedules/:scheduleId`           | A    | Horários semanais                                                    |
@@ -235,7 +240,7 @@
   mysql --default-character-set=utf8mb4 -u root -p < server/schema.sql
   ```
 
-  > Isso cria o banco `saude` com as 13 tabelas + 10 unidades de saúde de seed.
+  > Isso cria o banco `saude` com as 14 tabelas + 10 unidades de saúde de seed.
   O `schema.sql` já é a **união de todas as migrations** — ele sozinho produz um
   banco completo, sem precisar rodar nenhuma migration depois.
 
@@ -263,9 +268,9 @@
   npm start
   ```
 
-> **Ordem importa:** `migrate:all` roda `v3` → `security` → `privacy`
-> → `interop` → `audit` → `audit:details` → `mfa:replay` → `booking:duration`
-> → `reminder:delivery` → `password:reset`,
+> **Ordem importa:** `migrate:all` roda `v3` → `professional-user` → `security`
+> → `privacy` → `interop` → `audit` → `audit:details` → `mfa:replay`
+> → `booking:duration` → `reminder:delivery` → `password:reset`,
 > nessa ordem. Pular o
 > `migrate:privacy` causa `Unknown column 'privacy_version'` no signup.
   >
@@ -419,10 +424,11 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   | `dev`              | `nodemon src/server.js`                             | Dev com auto-reload                                                                                                                                                        |
   | `seed:admin`       | `node scripts/seed-admin.js`                        | Cria (ou promove a `superadmin`) o admin do `.env` com `bcryptjs`                                                                                                          |
   | `seed:demo` | `node scripts/seed-v3-demo.js [--reset]` | Popula agenda demo em 4 unidades (serviços, 6 profissionais, horários + 3 vagas ocupadas p/ testar conflito; idempotente) |
-| `migrate:all` | roda todas em ordem | `v3` → `security` → `privacy` → `interop` → `audit` → `audit:details` → `mfa:replay` → `booking:duration` → `reminder:delivery` → `password:reset`. Idempotente. **É o que o `setup` usa.** |
+| `migrate:all` | roda todas em ordem | `v3` → `professional-user` → `security` → `privacy` → `interop` → `audit` → `audit:details` → `mfa:replay` → `booking:duration` → `reminder:delivery` → `password:reset`. Idempotente. **É o que o `setup` usa.** |
 | `migrate` | importa `migration_001.sql` | Só para bancos muito antigos (perfil estendido). O `schema.sql` já é a união de tudo, então banco novo não precisa. |
   | `migrate:v3` | `node scripts/migrate-v3.js` | Cria `social_name/cns/priority/guardian`, `unit_id/professional_id` e tabelas `professionals/unit_offers/professional_offers/work_schedules/schedule_blocks` (idempotente) |
-  | `migrate:security` | `node scripts/migrate-security.js` | **Fase 0:** cria `refresh_tokens` + triggers append-only em `audit_log` (idempotente; rode após `migrate:v3`) |
+  | `migrate:professional-user` | `node scripts/migrate-professional-user-link.js` | Adiciona `professionals.user_id` e o índice único que vincula a agenda ao atendente (idempotente; deve rodar antes de `migrate:security`) |
+  | `migrate:security` | `node scripts/migrate-security.js` | **Fase 0:** cria `refresh_tokens` + triggers append-only em `audit_log` (idempotente; rode após `migrate:professional-user`) |
   | `migrate:privacy` | `node scripts/migrate-privacy.js` | **Fase 1:** consentimento (`privacy_version`, `consent_at/ip`, `deleted_at`) + `cpf/rg/cns` → TEXT + normaliza CPF + cifra legado (exige `DATA_ENCRYPTION_KEY`) |
   | `migrate:interop` | `node scripts/migrate-interop.js` | **Fase 2:** `health_units.cnes_code/phone/address`, `users.govbr_sub`, `diseases.source/external_ref` |
   | `migrate:audit` | `node scripts/migrate-audit.js` | **Aulas 1/6:** hash encadeado (`prev_hash`/`entry_hash`/`seq`) + MFA (`totp_*`) + FK do log `CASCADE→RESTRICT` |
@@ -447,8 +453,10 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   - **Headers + abuso:** `helmet()` (sem `X-Powered-By`), CORS por allowlist explícita (sem `*`; múltiplas origens via vírgula em `CORS_ORIGIN`), `express.json({limit:'100kb'})`, rate-limit global (300 req/15 min) + estrito em `/auth` (somado ao bloqueio por IP já existente no login: 5 erros/5 min → 429).
   - **`bcryptjs` em vez de `bcrypt`:** mesma API, JS puro, sem toolchain de compilação nem binário pré-compilado — evita falha silenciosa de `npm install` em máquina Windows de aluno ou rede restrita.
   - **Isolamento por usuário no servidor** (não só no front): toda rota `/me/*` filtra por `WHERE user_id = ?`; `password_hash` nunca é serializado; rota de atendente omite `cpf/rg`; `verifyToken` em tudo que é privado, `requireStaff`/`requireAdmin` onde cabe.
-  - **Papéis:** `paciente` (só o próprio), `atendente` (`pendente` até ativação; busca só paciente `ativo`; confirma/cancela/reagendar com auditoria; **sem** acesso a RNDS/CPF/CNS), `admin` (só via seed/banco; `admin_level` com efeito real: `superadmin`/`gestor` tudo, `atendimento` só agendamentos, `alertas` só doenças — via `requireCapability`; escalonamento lateral bloqueado — painel ainda unificado).
-  - **Conta:** `account_status` (`ativo`/`inativo`/`pendente`); login bloqueia `inativo` e `pendente`.
+  - **Papéis:** `paciente` (só o próprio), `atendente` (`pendente` até ativação; busca só paciente `ativo`; confirma/cancela/reagendar com auditoria; agenda/exames fail-closed sem vínculo profissional; **sem** acesso a RNDS/CPF/CNS), `admin` (via seed ou criado por quem tem a capability `admins`; `admin_level` com efeito real: `superadmin`/`gestor` tudo, `atendimento` só agendamentos, `alertas` só doenças — via `requireCapability`; escalonamento lateral bloqueado — painel ainda unificado).
+  - **Conta:** `account_status` (`ativo`/`inativo`/`pendente`); login bloqueia `inativo` e `pendente`; exclusão é soft delete e não retorna em listagens, stats, histórico nem CSV.
+  - **Recuperação de senha:** `POST /auth/password/forgot` responde sempre igual (não revela e-mail), grava apenas o SHA-256 do token de uso único; sem SMTP a pendência fica registrada em vez de fingir envio. `POST /auth/password/reset` consome o token e revoga sessões antigas.
+  - **Medidas administrativas:** desativar, excluir, trocar papel/senha ou rebaixar um admin revoga refresh tokens e resets pendentes; promover a `admin` exige capability `admins`.
   - **LGPD — Fase 1:** CPF/RG/CNS cifrados no banco (AES-256-GCM, `utils/crypto.js`; chave em `DATA_ENCRYPTION_KEY`, futuro KMS/Vault); consentimento registrado no signup (`privacy_version`, `consent_at`, `consent_ip`); direitos exercíveis pelo titular — portabilidade (`GET /auth/me/export` + botão no dashboard), eliminação via anonimização (`DELETE /auth/me` com senha + botão no dashboard); visualização de documentos pelo admin auditada (`admin_view_user_docs`); expurgo automático de inativas +5 anos (`purge:retention`); DPO público (`GET /public/dpo` + `privacy.html` com bases legais art. 11). Governança em `docs/ROPA.md`, `docs/RIPD.md`, `docs/RESPOSTA_INCIDENTES.md`. Antes de uso com população ainda faltam: HTTPS/HSTS, DPO nomeado de verdade (`DPO_NAME/DPO_EMAIL` ainda vazios), revisão jurídica da `privacy.html` pela Procuradoria e KMS/Vault.
 
   ## Segurança da informação (Aulas 1–8 de auditoria)
@@ -477,7 +485,7 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
 
   Guia passo a passo com dados fictícios em **`ROTEIRO_TESTE_ALUNOS.md`**:
 
-  0. Checklist (MySQL + schema, `.env`, `npm install`, `seed:admin`, `npm start`, `npx serve`, `CORS_ORIGIN`).
+  0. Checklist (MySQL, `.env`, `npm run setup`, `npm run doctor`, `npm run dev`, `CORS_ORIGIN`).
   1. Papel aluno (conta → login → `dashboard.html` → consulta + exame → Próximos eventos → Sair).
   2. Papel admin (login seed → `admin.html` → Visão geral com dados de todos → Histórico por e-mail → cadastrar alerta → aluno vê em Alertas).
   3. Teste de segurança (A não vê B; aluno digitando `admin.html` cai em `dashboard.html` com aviso; DevTools mostra `Authorization: Bearer`; deslogado digitando `dashboard.html` cai em `auth.html`).
@@ -488,7 +496,7 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
 
   | Doc                                                       | Conteúdo                                                                                            |
   | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-  | `docs/PROJETO_COMPLETO.md`                                | Documentação técnica consolidada (camadas, papéis, 13 tabelas, endpoints, fluxos, scripts, lacunas) |
+  | `docs/PROJETO_COMPLETO.md`                                | Documentação técnica consolidada (camadas, papéis, 14 tabelas, endpoints, fluxos, scripts, lacunas) |
   | `docs/PLANO_MELHORIAS.md`                                 | Diagnóstico 2026-07-20 + plano em fases (segurança, dados, qualidade, produto)                      |
   | `docs/PLANO_UIUX.md`                                      | Plano visual/UX                                                                                     |
   | `docs/PROJETO_DO_ZERO.md`                                 | Guia de reconstrução do zero                                                                        |
@@ -501,7 +509,7 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
 
   ## Decisões técnicas
 
-  - **Sem libs externas por padrão no front** (só fonte Inter via Google Fonts). Mapas, SMS/WhatsApp ficam como próximo passo deliberado, não dependência do dia 1.
+  - **Sem libs externas por padrão no front:** a fonte Inter é autohospedada em `assets/fonts/` (sem Google Fonts); mapas, SMS/WhatsApp ficam como próximo passo deliberado, não dependência do dia 1.
   - **Validação de agenda no servidor** (`booking.js`), não só no `<select>`: impede agendar no passado, fora da grade, em slot ocupado ou bloqueado — front sozinho não protege nada.
   - **Validação de documentos padronizada (Fase 0, `utils/validators.js` + `zod`):** CPF com dígito verificador e CNS com checksum oficial DEF-CNS (antes só checava 15 dígitos); `audit_log` sanitizado (CPF/senha/token viram `[redigido]`) e append-only via triggers da `migration_002`; listagens admin/staff aceitam `?page=&pageSize=` com envelope `{data,page,pageSize,total}` (sem query, mantêm o array legado).
   - **Ordem de montagem no `app.js`** é intencional: `/admin/professionals` antes do `PATCH /admin/:kind/:id` genérico, senão o genérico captura a rota e devolve 404.
@@ -513,11 +521,11 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   Ordenados por prioridade (nenhum bloqueia o funcionamento atual):
 
   1. ~~Lembretes automáticos~~ — **parcialmente feito** (job da véspera existe); falta: envio real (e-mail/SMS/WhatsApp), preferências do paciente, retry.
-  2. Sem recuperação de senha ("esqueci minha senha").
+  2. ~~Recuperação de senha~~ — **feita:** forgot/reset com token de uso único e revogação de sessões; falta SMTP real configurado em produção.
   3. ~~Rate limiting / helmet / CORS~~ — **feito na Fase 0** (global + `/auth`, allowlist sem `*`).
   4. Validação server-side ainda parcial (`job_role`, `region` texto livre, reagendar usa `prompt()` no front) — CPF/CNS/datas cobertos (Fases 0–1).
-  5. ~~Paginação~~ — **feita** (envelope opt-in); falta: lint/CI, E2E automatizado no pipeline.
-  6. ~~`admin_level` granular no backend~~ — **feito (P0.4):** `requireCapability` aplicado de verdade (`users`, `appointments`, `diseases`, `audit`, `reports`); painel admin ainda unificado — separar visões por nível.
+  5. ~~Paginação~~ — **feita** (envelope opt-in); lint/CI e E2E automatizado já existem; falta manter o pipeline verde e ampliar cobertura.
+  6. ~~`admin_level` granular no backend~~ — **feito (P0.4):** `requireCapability` aplicado de verdade (`users`, `appointments`, `diseases`, `audit`, `reports`, `admins`); painel admin ainda unificado — separar visões por nível.
   7. ~~Retenção/expurgo~~ — **feito** (temporalidade + `purge:retention`); falta antes de dados reais: HTTPS/HSTS, DPO nomeado, revisão jurídica, KMS/Vault, Fase 2 (RNDS).
 
   Ver detalhes em `docs/PLANO_MELHORIAS.md`. Os achados da auditoria que

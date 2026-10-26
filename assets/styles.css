@@ -17,6 +17,18 @@
 /* P1 acessibilidade: texto visível só para leitor de tela (rótulos que o
    layout dispensa visualmente, mas a WCAG/e-MAG exige). */
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+/* O skip-link é .sr-only até receber foco: aí ele aparece fixo no canto
+   superior esquerdo. Sem isto o link de pular existia só para o leitor de
+   tela — o usuário de teclado/tabulação pressionava Tab e via nada. Só
+   âncoras (rótulos .sr-only não são focáveis, então o seletor é seguro). */
+a.sr-only:focus{
+  position:fixed; top:8px; left:8px; z-index:10000;
+  width:auto; height:auto; padding:10px 16px; margin:0; overflow:visible;
+  clip:auto; white-space:normal;
+  background:var(--surface); color:var(--ink); text-decoration:none;
+  border:1px solid var(--border); border-radius:var(--radius-xs);
+  box-shadow:0 6px 20px rgba(0,0,0,.18); font-weight:600;
+}
 
 :root{
   /* Cor — paleta "lagoa" */
@@ -48,6 +60,12 @@
   --shadow: 0 1px 2px rgba(14,42,39,.04), 0 8px 24px -12px rgba(14,42,39,.18);
   --shadow-sm: 0 1px 2px rgba(14,42,39,.06);
   --maxw: 1080px;
+
+  /* Escada de espaçamento. Substitui os style="" repetidos nos painéis —
+     as mesmas distâncias, agora nomeadas e com um único ponto de ajuste.
+     Fica em :root (não em .app-admin) para valer em todos os painéis. */
+  --sp-1:4px;  --sp-2:8px;  --sp-3:12px;
+  --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-7:32px;
 }
 
 *{ box-sizing:border-box; }
@@ -517,3 +535,426 @@ textarea.has-error {
   .hero .row .btn{ width:100%; min-height:48px; }
   .footer-grid a{ padding:10px 0; margin:0; }
 }
+
+/* ==========================================================================
+   ADMIN — camada responsiva (Fase 1 do refactor do admin.html)
+
+   Tudo aqui é escopado em .app-admin, que só o admin.html aplica no <body>.
+   dashboard.html e atendente.html usam o mesmo styles.css e NÃO recebem
+   nenhuma regra nova: o shell dos três painéis segue idêntico, mas só o
+   admin foi adaptado. Sem escopo, uma correção aqui viraria regressão nos
+   outros dois painéis.
+
+   Origem das regras: medição real com Playwright antes do refactor. A aba
+   Auditoria media 8099px de documento num viewport de 360px — a trilha de
+   auditoria tem texto sem quebra (hash, e-mail, `details` livre) e nada
+   abaixo dele tinha min-width:0, então o min-content subia de elo em elo
+   até o <html>. A raiz do bug era o min-width implícito do flex/grid, não a
+   largura da tabela.
+   ========================================================================== */
+
+/* ---------- A. Utilitários (trocam style="" inline) — globais, todos os painéis) ---------- */
+/* m-0/mt-0 vêm primeiro de propósito: as direcionais (mt-4, mb-1…) precisam
+   poder sobrescrever o reset quando as duas classes aparecem juntas. */
+.m-0{ margin:0; }
+.mt-0{ margin-top:0; }
+.mt-1{ margin-top:var(--sp-1); }
+.mt-2{ margin-top:var(--sp-2); }
+.mt-3{ margin-top:var(--sp-3); }
+.mt-4{ margin-top:var(--sp-4); }
+.mt-5{ margin-top:var(--sp-5); }
+.mt-6{ margin-top:var(--sp-6); }
+.mb-1{ margin-bottom:var(--sp-1); }
+.mb-2{ margin-bottom:var(--sp-2); }
+.mb-3{ margin-bottom:var(--sp-3); }
+.mb-4{ margin-bottom:var(--sp-4); }
+.mr-1{ margin-right:var(--sp-1); }
+.gap-2{ gap:var(--sp-2); }
+.gap-3{ gap:var(--sp-3); }
+.gap-4{ gap:var(--sp-4); }
+.gap-5{ gap:var(--sp-5); }
+/* "grid-column:1/-1" aparecia dezenas de vezes (descrição de doença, rua do
+   endereço, campos de perfil). */
+.col-full{ grid-column:1/-1; }
+.grow{ flex:1 1 12rem; min-width:0; }
+.btn-block{ width:100%; }
+.btn-danger{ background:var(--danger); border-color:var(--danger); color:#fff; }
+.btn-danger:hover{ background:#9C2D21; border-color:#9C2D21; color:#fff; }
+/* Contorno destrutivo: botão outline com texto/borda vermelhos (era um
+   style="" com color+border-color em todo botão "Cancelar" das listas). */
+.btn-outline-danger{ color:var(--danger); border-color:var(--danger); }
+.btn-outline-danger:hover{ background:var(--danger-bg); border-color:var(--danger); color:var(--danger); }
+.text-danger{ color:var(--danger); }
+.text-sm{ font-size:.88rem; }
+.text-xs{ font-size:.78rem; }
+/* Subtítulo colado no título que vem logo acima (o margin-top:-8px que
+   aparecia 7x no admin.html). Só margin-top — assim pode combinar com .mb-*. */
+.card-sub{ margin-top:-8px; }
+/* Alinha a linha de botão ao fundo do campo vizinho, sem <span aria-hidden>
+   de espaçamento (admin.html usava um &nbsp; para isso). */
+.field-actions{ display:flex; align-items:flex-end; margin-bottom:var(--sp-4); }
+.field-narrow{ max-width:8rem; }
+/* Cartão de destaque (boas-vindas / perfil incompleto): fundo primary-100
+   com borda primary — era um style="" repetido em 2 lugares do dashboard. */
+.card-highlight{ background:var(--primary-100); border-color:var(--primary); }
+.items-start{ align-items:start; }
+.list-plain{ font-size:.9rem; padding-left:1.15rem; margin:10px 0; }
+.dpo-contact{ font-weight:600; margin:10px 0 0; overflow-wrap:anywhere; }
+/* Esconde um elemento preservando o display original ao remover a classe
+   (o oposto de style="display:none", que o JS precisa zerar). */
+.hide{ display:none !important; }
+/* Código que o paciente pode tocar para selecionar inteiro (MFA secret). */
+.select-all{ user-select:all; }
+/* Caixa de código de 6 dígitos / campo de largura fixa. */
+.field-code{ max-width:220px; }
+/* Campo de UF no endereço: 80px fixos ao lado do CEP que cresce. */
+.field-uf{ flex:0 0 80px; }
+.text-upper{ text-transform:uppercase; }
+/* Select de filtro: largura estável em desktop, 100% no celular. O 160px/170px
+   fixo do style="" antigo obrigava cada select a ocupar a própria linha em 360. */
+.app-admin .filter-select{ width:auto; min-width:10.5rem; flex:0 0 auto; }
+@media (max-width:620px){
+  .app-admin .filter-select{ width:100%; min-width:0; flex:1 1 100%; }
+}
+
+/* ---------- B. Raiz do estouro: min-width:0 em toda a cadeia ---------- */
+/* Sem isto, o min-content de um item de lista (e-mail + 3 botões) propaga
+   pelo flex do .container até o documento inteiro. */
+.app-admin .app-main,
+.app-admin .container,
+.app-admin .card,
+.app-admin .item,
+.app-admin .item > *,
+.app-admin .dl > *{ min-width:0; }
+/* .container usa margin:0 auto para centralizar, e margem auto no eixo
+   cruzado DESLIGA o align-items:stretch do flex column em .app-main: o
+   container passava a ser fit-content e crescia até o min-content do filho
+   mais largo (a barra de sub-abas levava o documento a 422px num viewport de
+   360). Width:100% devolve o comportamento previsível — o max-width continua
+   capping em 1080/1440/1680 e o auto centraliza. */
+.app-admin .container{ width:100%; }
+
+/* Texto gerado por máquina (e-mail, hash, details da auditoria) precisa poder
+   quebrar no meio da palavra; texto escrito por gente quebra só se necessário. */
+.app-admin .item h3{ overflow-wrap:break-word; }
+.app-admin .item p,
+.app-admin .dl dd,
+.app-admin td,
+.app-admin code,
+.app-admin .field-msg{ overflow-wrap:anywhere; }
+/* .tabs tem overflow-x:auto, mas sem min-width:0 ele estourava o cartão
+   inteiro em vez de rolar dentro dele. */
+.app-admin .tabs{ min-width:0; scroll-padding-inline:var(--sp-3); }
+/* Alvo do scrollIntoView dos botões Editar/Detalhe: o cabeçalho rolável não
+   pode cobrir o item que acabou de ser aberto. */
+.app-admin [id]{ scroll-margin-top:24px; }
+
+/* ---------- C. Item de lista responsivo ---------- */
+/* flex-wrap deixa a linha de ações cair para baixo do texto em vez de
+   espremer os dois; min-width:0 no .item-main deixa o texto encolher até a
+   largura disponível e quebrar. */
+.app-admin .item{ flex-wrap:wrap; align-items:flex-start; }
+.app-admin .item-main{ flex:1 1 16rem; min-width:0; }
+.app-admin .item-actions{
+  display:flex; flex:0 0 auto; gap:var(--sp-2);
+  margin-left:auto; flex-wrap:wrap;
+}
+.app-admin .item-meta{
+  flex:0 0 auto; margin-left:auto; white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+@media (max-width:620px){
+  /* Abaixo de 620 o grupo de ações vira uma faixa cheia no rodapé do item:
+     alvos de 44px com folga, empilhados, sem aperto lateral. */
+  .app-admin .item-actions{ flex:1 1 100%; margin-left:0; }
+  .app-admin .item-actions .btn{ flex:1 1 auto; }
+}
+
+/* ---------- D. Tabela: rolagem no ponteiro, card no toque ---------- */
+.app-admin .table-wrap{ width:100%; overflow-x:auto; overscroll-behavior-x:contain; }
+.app-admin .table-wrap table{ min-width:34rem; }
+.app-admin .table-wrap::-webkit-scrollbar{ height:8px; }
+.app-admin .table-wrap::-webkit-scrollbar-thumb{ background:var(--border); border-radius:999px; }
+
+@media (max-width:760px){
+  /* Modo card: a tabela deixa de ser tabela. Rótulos via data-label no <td>,
+     thead só para leitor de tela. Escolhido no lugar de scroll horizontal
+     porque o público tem baixa familiaridade digital e o dedo não converge
+     para arrastar uma tabela. */
+  .app-admin table[data-card],
+  .app-admin table[data-card] tbody,
+  .app-admin table[data-card] tr,
+  .app-admin table[data-card] td{ display:block; width:100%; }
+  .app-admin table[data-card] thead{ display:none; }
+  .app-admin .table-wrap table{ min-width:0; }
+  .app-admin table[data-card] tr{
+    border:1px solid var(--border); border-radius:var(--radius);
+    padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3);
+    background:var(--surface);
+  }
+  .app-admin table[data-card] tr:last-child{ margin-bottom:0; }
+  .app-admin table[data-card] td{
+    display:flex; align-items:baseline; gap:var(--sp-3);
+    padding:7px 0; border-bottom:none; text-align:left;
+  }
+  .app-admin table[data-card] td::before{
+    content:attr(data-label);
+    flex:0 0 7.5rem;
+    font-size:.72rem; font-weight:700; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--muted);
+  }
+  /* A linha de ações é a única que fica cheia, sem rótulo. */
+  .app-admin table[data-card] td[data-label=""]::before,
+  .app-admin table[data-card] .item-actions{ flex:1 1 100%; }
+}
+
+/* ---------- E. Modal (componente único, substitui os <style> injetados) ---------- */
+/* Linhas de resumo do modal de revisão (P5.1). */
+.review-lines{ margin:0 0 var(--sp-2); line-height:1.7; }
+.review-lines p{ margin:2px 0; }
+.modal-overlay{
+  position:fixed; inset:0; z-index:9999; display:none;
+  align-items:center; justify-content:center;
+  /* env() cobre a notch e a barra de gesto do iPhone */
+  padding:max(20px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right))
+          max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));
+  background:rgba(14,42,39,.55);
+  overscroll-behavior:contain;
+}
+.modal-overlay.show{ display:flex; }
+/* Sem max-height + overflow o conteúdo mais alto que a viewport era cortado
+   em cima E embaixo, sem rolagem para alcançar nenhuma das pontas. */
+.modal-card{
+  width:min(32rem,100%); max-height:92vh; max-height:92dvh;
+  overflow-y:auto; overscroll-behavior:contain;
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  padding:var(--sp-6); box-shadow:0 20px 60px rgba(0,0,0,.22);
+  -webkit-overflow-scrolling:touch;
+}
+.modal-card-wide{ width:min(40rem,100%); }
+.modal-card h2{ margin:0 0 var(--sp-2); font-size:1.15rem; }
+.modal-card > p{ margin:0 0 var(--sp-4); }
+.modal-actions{
+  display:flex; flex-wrap:wrap; gap:var(--sp-3);
+  justify-content:flex-end; margin-top:var(--sp-5);
+}
+@media (max-width:620px){
+  /* Empilhados e cheios: o polegar chega na ação destrutiva sem mirar. */
+  .modal-card{ padding:var(--sp-5); }
+  .modal-actions{ flex-direction:column-reverse; }
+  .modal-actions .btn{ width:100%; }
+}
+/* Rolagem do fundo travada enquanto o modal está aberto. */
+body.modal-open{ overflow:hidden; }
+
+/* ---------- F. Cartão de estatística ---------- */
+/* O #stats usava .grid-5 emitindo até 4 cartões → sobrava uma coluna morta
+   acima de 1300px e um cartão ocupava 1/5 da largura em 4K. auto-fit
+   elimina a coluna fantasma e preenche a largura disponível. */
+.stats-grid{
+  display:grid; gap:var(--sp-4);
+  grid-template-columns:repeat(auto-fit, minmax(11rem, 1fr));
+}
+.stat-card{ padding:var(--sp-4) var(--sp-5); }
+.stat-label{
+  margin:0; font-size:.74rem; font-weight:700;
+  letter-spacing:.05em; text-transform:uppercase; color:var(--muted);
+}
+.stat-value{
+  margin:.15em 0 0; font-size:1.9rem;
+  font-variant-numeric:tabular-nums; /* alinha dígitos entre cartões */
+}
+
+/* ---------- G. Lista de definições (substitui a grade de divs) ---------- */
+/* row2() emitava <div><span>rótulo</span><p>valor</p></div> dentro de uma
+   grade — leitor de tela ouvia rótulo e valor como texto solto. */
+.app-admin .dl{
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:var(--sp-3) var(--sp-4); margin:0;
+}
+.app-admin .dl dt{
+  font-size:.74rem; font-weight:700; letter-spacing:.04em;
+  text-transform:uppercase; color:var(--muted);
+}
+.app-admin .dl dd{ margin:2px 0 0; font-weight:500; }
+.app-admin .dl-col-full{ grid-column:1/-1; }
+@media (max-width:760px){ .app-admin .dl{ grid-template-columns:1fr; } }
+
+/* ---------- H. Barra de progresso (Minha conta) ---------- */
+/* Era um gradiente de borda escrito em style="" com flex:1 inline. */
+.meter{ display:flex; align-items:center; gap:var(--sp-3); margin:var(--sp-4) 0; }
+.meter-track{
+  flex:1 1 auto; height:10px; border-radius:999px;
+  background:var(--border); overflow:hidden;
+}
+.meter-fill{ height:100%; width:0%; background:var(--primary); border-radius:999px; }
+.meter-value{ font-variant-numeric:tabular-nums; }
+
+/* Esmaecimento que mostra que a faixa rola (data-scroll vem do ui.js).
+     "end" = tem mais à direita, "start" = tem mais à esquerda, "both" = meio
+     de uma faixa longa. Sem data-scroll não há máscara — faixa que cabe fica
+     intacta. */
+.app-admin .tabs[data-scroll]{
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 30px),transparent 100%);
+  mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 30px),transparent 100%);
+}
+.app-admin .tabs[data-scroll="start"]{
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 30px,#000 100%);
+  mask-image:linear-gradient(90deg,transparent 0,#000 30px,#000 100%);
+}
+.app-admin .tabs[data-scroll="both"]{
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);
+  mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);
+}
+
+/* ---------- I. Sub-painéis (saem do <style> inline da página) ---------- */
+.app-admin .subpanel{ display:none; }
+.app-admin .subpanel.active{ display:block; }
+/* A barra de sub-abas fica colada no conteúdo (sem o respiro de 20px que a
+   regra base das abas deixa acima e abaixo). */
+.app-admin .tabbar-sub{ margin-bottom:var(--sp-4); }
+
+/* ---------- I2. Estado de erro dentro do container ---------- */
+/* Sem isto, uma falha de rede deixava o skeleton pulsando para sempre depois
+   que o toast de 3,5s já tinha sumido — a tela parecia eternamente "carregando". */
+.state-error{
+  padding:var(--sp-5) var(--sp-2); text-align:center;
+  color:var(--danger); font-size:.92rem;
+}
+.state-error p{ margin:0 0 var(--sp-3); }
+.state-error .btn{ color:var(--ink); }
+
+/* ---------- J. Método de entrada, não só largura de tela ---------- */
+/* Tela pequena não é sinônimo de dedo: notebook com touch é grande e táctil. */
+@media (pointer: coarse){
+  .app-admin .btn{ min-height:48px; }
+  .app-admin .btn-sm{ min-height:44px; padding:9px 14px; font-size:.9rem; }
+  .app-admin .tab{ min-height:44px; padding:12px 14px; }
+  .app-admin .sidebar .tab{ min-height:44px; }
+  .app-admin .item-actions{ gap:var(--sp-3); }
+  .app-admin .item{ padding:var(--sp-4) var(--sp-2); }
+}
+.app-admin button,
+.app-admin .tab,
+.app-admin a{ -webkit-tap-highlight-color:rgba(15,122,107,.16); }
+.app-admin button,
+.app-admin .tab,
+.app-admin a,
+.app-admin input,
+.app-admin select,
+.app-admin textarea{ touch-action:manipulation; }
+
+@media (max-width:620px){
+  /* Abaixo de 620 o grupo de ações vira uma faixa cheia no rodapé do item:
+     alvos de 44px com folga, empilhados, sem aperto lateral. */
+  .app-admin .item-actions{ flex:1 1 100%; margin-left:0; }
+  .app-admin .item-actions .btn{ flex:1 1 auto; }
+}
+
+/* ---------- K. Barra lateral no celular (≤620) ---------- */
+/* Antes: 3 linhas empilhadas (marca / e-mail / Sair) com as abas rolando
+   numa 4ª, e "Minha conta" fora da tela. Agora 2 linhas: marca + conta na
+   primeira, abas rolando na segunda ocupando a largura toda. */
+@media (max-width:620px){
+  /* A coluna da marca era `auto`, e sob pressão o grid a comprimia abaixo do
+     próprio texto: "Saúde+" aparecia como "Sa". max-content fixa a marca e o
+     1fr encolhe o e-mail (que trunca com reticências), mantendo o Sair
+     inteiro. Este bloco precisa ficar DEPOIS da regra base .app-rail e da
+     base .stats-grid — empate de especificidade resolve pela ordem. */
+  .app-admin .app-rail{
+    grid-template-columns:max-content minmax(0,1fr);
+    grid-template-areas:"brand user" "tabs tabs";
+    gap:var(--sp-3); padding:10px 12px;
+  }
+  .app-admin .rail-brand{ grid-area:brand; align-self:center; }
+  .app-admin .rail-user{
+    grid-area:user; flex-direction:row; align-items:center; gap:var(--sp-3);
+    padding:0; border-top:none; border-left:none;
+    min-width:0; overflow:hidden;
+  }
+  .app-admin .rail-user-head{ flex-direction:row; align-items:center; gap:var(--sp-2); min-width:0; flex:1 1 auto; }
+  .app-admin .rail-user-head .badge{ flex:0 0 auto; }
+  /* e-mail longo encolhe com reticências em vez de empurrar o Sair para fora */
+  .app-admin .rail-user-email{
+    font-size:.78rem; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; word-break:normal; min-width:0;
+  }
+  .app-admin .rail-signout{ width:auto; flex:0 0 auto; }
+  .app-admin .sidebar.tabs{ grid-area:tabs; }
+  /* Abas mais compactas: cabem ~4 das 5 e o esmaecimento avisa da quinta. */
+  .app-admin .sidebar.tabs .tab{ padding:10px 11px; font-size:.92rem; }
+  /* Dois indicadores por linha em vez de quatro empilhados: o conteúdo
+     começa ~2 dobras de tela antes. */
+  .stats-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .stat-value{ font-size:1.6rem; }
+  /* Botão de filtro com a largura toda: alvo de toque grande, sem mira. */
+  .app-admin form.row .btn{ flex:1 1 100%; }
+}
+
+/* ---------- O. "Carregar mais" (paginação real da API) ---------- */
+.load-more{
+  display:flex; justify-content:center; padding:var(--sp-4) 0 var(--sp-1);
+}
+.load-more-end{
+  margin:var(--sp-4) 0 0; text-align:center;
+}
+
+/* ---------- P. Overview em telas largas (Fase 6) ---------- */
+/* "Atenção + atalhos" e "Atividade" ficam em duas células independentes em
+   vez de a atividade atravessar duas linhas: item que atravessa linhas divide
+   a altura entre elas e deixa um vão artificial sob o cartão curto. */
+.app-admin .overview-main{ display:flex; flex-direction:column; }
+/* Abaixo de 1180 o Início é uma coluna só: com duas colunas cada bloco
+   ficaria estreito demais para as tabelas de 7 colunas da agenda. */
+@media (min-width:1180px){
+  .app-admin #overview{
+    display:grid; grid-template-columns:minmax(0,7fr) minmax(0,5fr);
+    gap:var(--sp-5); align-items:start;
+  }
+  .app-admin #overview .stats-grid{ grid-column:1 / -1; margin-top:0; }
+  .app-admin #overview .overview-main{ grid-column:1; }
+  .app-admin #overview .overview-activity{ grid-column:2; }
+  /* Dentro da coluna estreita, os itens de "atenção" quebram a linha para o
+     botão caber em tela cheia. */
+  .app-admin #overview .overview-attention .item-actions{ flex:1 1 100%; margin-left:0; }
+}
+@media (min-width:1900px){
+  /* Na TV as duas metades ficam iguais: a atividade é a lista mais longa e
+     uma coluna de 1/3 cortaria as linhas. */
+  .app-admin #overview{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+}
+
+/* ---------- L. Telas grandes: notebook largo, desktop, TV e 4K ---------- */
+/* ≥1600px é onde o admin senta na recepção: o conteúdo crescia só até 1080px
+   e deixava ~292px de margem morta em cada lado num monitor de 1920. */
+@media (min-width:1600px){
+  .app-admin{
+    --maxw:1440px;
+    font-size:17px; /* degrau de tipo para distância de leitura maior */
+  }
+  .app-admin .container{ padding:var(--sp-7) 32px 80px; }
+  .app-admin h1{ font-size:2.4rem; }
+  .app-admin .stat-value{ font-size:2.5rem; }
+  .app-admin .btn{ min-height:52px; padding:13px 24px; font-size:1rem; }
+  .app-admin .btn-sm{ min-height:48px; padding:11px 18px; font-size:.95rem; }
+  .app-admin .item{ padding:18px var(--sp-2); }
+  .app-admin .card{ padding:var(--sp-6); }
+  .app-admin table{ font-size:1rem; }
+  .app-admin td, .app-admin th{ padding:12px var(--sp-3); }
+  .app-admin .stats-grid{ gap:var(--sp-5); }
+  /* Acima de 1600 sobra largura de sobra para as grades de 4 e 5 colunas,
+     que colapsavam para 2 e 3 logo depois de 1150/1300 (o rail de 256px
+     comia a diferença e as colunas ficavam de 190px). */
+  .app-admin .app-shell .grid-4{ grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .app-admin .app-shell .grid-5{ grid-template-columns:repeat(5,minmax(0,1fr)); }
+}
+@media (min-width:2200px){
+  /* Teto de largura: sem ele a linha de texto passaria de 75 caracteres em 4K
+     (regra do DESIGN.md). Além do limite, sobra margem — que é o certo. */
+  .app-admin{ --maxw:1680px; font-size:18px; }
+  .app-admin .stats-grid{ grid-template-columns:repeat(auto-fit, minmax(13rem, 1fr)); }
+}
+
+/* ---------- M. Safe area no fim da página ---------- */
+.app-admin .container{ padding-bottom:calc(64px + env(safe-area-inset-bottom)); }
+.app-admin .toast{ bottom:calc(24px + env(safe-area-inset-bottom)); }

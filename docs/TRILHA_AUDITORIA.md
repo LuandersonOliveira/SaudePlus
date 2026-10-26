@@ -1,8 +1,8 @@
 # Saúde+ — Manual da trilha de auditoria (Aula 8)
 
 > Auditoria é **sistemática, independente, documentada e baseada em evidência**.
-> **Achado = evidência comparada com o critério** (ex.: "log X mostra acesso sem
-> MFA" vs critério "N1 da PSI").
+> **Achado = evidência comparada com o critério** (ex.: "log X mostra acesso sem MFA" vs critério "N1 da PSI").  
+> Revisão: 2026-10-26.
 
 ## 1. Tipos e quando usar
 

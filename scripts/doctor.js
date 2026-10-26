@@ -44,9 +44,13 @@ const COLUNAS_ESPERADAS = [
   ['exams', 'duration_minutes'],
   ['health_units', 'cnes_code'],
   ['diseases', 'source'],
+  // Vínculo profissional ↔ atendente. Sem esta coluna, o atendente nunca é
+  // filtrado pela própria agenda e o vínculo some do painel do admin.
+  ['professionals', 'user_id'],
 ];
 const TABELAS_ESPERADAS = [
   'refresh_tokens',
+  'password_reset_tokens',
   'audit_log',
   'professionals',
   'professional_offers',

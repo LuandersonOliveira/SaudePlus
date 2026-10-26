@@ -1,14 +1,16 @@
 # Plano de Melhorias — Saúde+ (Lagoa Conectada)
 
-Análise gerada em 2026-07-20. Escopo: leitura completa do backend (Node/Express + MySQL) e do frontend (HTML/CSS/JS vanilla). Nenhum arquivo foi alterado — este documento é só diagnóstico + plano de ação.
+Análise gerada em 2026-07-20. Atualizado em 2026-10-26 com base em verificação do código.
 
 ## Visão geral do projeto
 
 - **Frontend**: HTML5/CSS3/JS puro (sem build step), 5 páginas (`index`, `auth`, `dashboard`, `admin`, `atendente`) + `assets/api.js` (cliente HTTP) + `assets/styles.css`.
-- **Backend**: Node/Express, MySQL via `mysql2/promise`, JWT em `localStorage`, `bcryptjs` para hash.
-- **Domínio**: agendamento de consultas/exames, alertas de doenças por região, lembretes e unidades de saúde para a rede de Lagoa de Itaenga.
-- **Papéis**: `paciente`, `atendente` (precisa ativação), `admin`.
-- **Sem git repo** neste diretório (`git init` nunca rodado) — histórico de mudanças não rastreado.
+- **Backend**: Node/Express, MySQL via `mysql2/promise`. Auth com access token curto + refresh rotativo; sessões gerenciadas com cookies httpOnly/secure em produção.
+- **Domínio**: agendamento de consultas/exames, alertas de doenças por região, lembretes, unidades de saúde e gestão administrativa para a rede de Lagoa de Itaenga.
+- **Papéis**: `paciente`, `atendente` (precisa ativação), `admin` com `admin_level` granular (`superadmin`, `gestor`, `atendimento`, `alertas`).
+- **Repositório**: git inicializado (há histórico). Schema em `server/schema.sql` com **14 tabelas** (inclui `refresh_tokens` e `password_reset_tokens`; `professionals.user_id` presente).
+- **Fonte**: Inter autohospedada em `assets/fonts/` (sem Google Fonts).
+- **Migrations**: `migrate:all` cobre migrações incluindo `professional-user` entre v3 e security.
 
 Pontos fortes já presentes no código (vale reconhecer, não é tudo dívida técnica):
 - SQL 100% parametrizado (`?` bindings) em todas as rotas — sem injeção SQL.
@@ -21,33 +23,32 @@ Pontos fortes já presentes no código (vale reconhecer, não é tudo dívida t�
 
 ### 🔴 Crítico — segurança
 
-1. **`.env` real commitado no diretório do projeto** (`server/.env`), com senha de banco e `JWT_SECRET` reais em texto plano, junto de `ADMIN_PASSWORD=admin1234.`. Mesmo sem git ainda, isso é o arquivo que será commitado no primeiro `git init` + `git add .` se ninguém prestar atenção — o `.gitignore` já lista `.env`, mas o arquivo físico com segredo real está solto no disco/repo.
-   - Ação: girar `JWT_SECRET` e senha do MySQL antes de qualquer deploy real; garantir que `.env` nunca entre em nenhum commit (checar `git status` no primeiro commit).
-2. **Sem rate limiting em `/auth/login`** — força bruta de senha é trivial. README já lista isso como pendência conhecida.
-3. **JWT em `localStorage`** sem blocklist/revogação — token vazado (XSS) fica válido até expirar (7 dias por padrão). Aceitável para escopo educacional, arriscado para dado de saúde real (o próprio README já sinaliza isso).
-4. **Sem Helmet / cabeçalhos de segurança HTTP** (`X-Content-Type-Options`, `X-Frame-Options`, CSP) — `app.js` só tem `cors` + `express.json()`.
-5. **CORS default `origin: '*'`** quando `CORS_ORIGIN` não definido (`app.js:19`) — hoje mitigado pelo `.env` local, mas é fallback perigoso se `.env` faltar em produção.
-6. **Sem validação de formato de entrada** (email, CPF, telefone, datas) além de checagem de presença — abre espaço para dado sujo no banco (CPF inválido, datas malformadas aceitas como string livre).
-7. **Sem HTTPS/produção discutido** — README já lista como próximo passo, mas nenhum guia de deploy existe ainda.
+1. **`.env`**: manter fora do VCS (verificado). Girar segredos antes de qualquer deploy real. Existe `server/.env.example` para template.
+2. **Rate limiting**: aplicado em rotas sensíveis (login e recuperação de senha). Ainda avaliar hardening por IP em produção.
+3. **Tokens**: access curto (15 min), refresh rotativo (30d) com revogação por família/reuso; logout revoga. HttpOnly/secure em produção conforme configuração. Ainda há atenção a XSS (sanitização presente) e necessidade de HTTPS/HSTS em produção.
+4. **Segurança HTTP**: Helmet e CORS configurados. Revisar configuração por ambiente.
+5. **Validação**: há validações no backend (incluindo CPF/formatos e regras de agendamento). Manter cobertura e aplicar em todos os fluxos críticos.
+6. **HTTPS/produção**: pendente configurar HTTPS/HSTS e revisar política de cookies por ambiente.
+7. **MFA**: TOTP implementado com tentativas limitadas e proteção contra replay.
 
 ### 🟠 Alto — robustez / correção
 
-8. **Sem testes automatizados** (nenhum `jest`/`vitest`/`mocha` no `package.json`, nenhuma pasta `test/`). Qualquer regressão só é pega manualmente.
-9. **Sem `.env.example`** de fato no repo (README referencia `cp .env.example .env`, mas só existe `server/.env` real — falta o template).
-10. **Rotas de agendamento (`appointments`, `exams`) duplicam lógica quase idêntica** entre `me/*.routes.js`, `admin.routes.js` e `staff.routes.js` (mesmo `ENTITY_MAP`, mesmo `PATCH /:kind/:id`, mesma validação de status) — 3 cópias do mesmo padrão. Candidato natural a um helper compartilhado (`makeEntityRouter` ou serviço comum), reduzindo risco de uma cópia divergir da outra em uma correção futura.
-11. **Reminders são somente leitura** — não existe geração automática (ex.: lembrete 1 dia antes de consulta). Já documentado como pendência no README.
-12. **Sem paginação real** — rotas usam só `LIMIT` fixo (max 100-200), sem `OFFSET`/cursor, então dado além do limite fica inacessível pela UI.
-13. **Sem tratamento de erro estruturado por tipo** — o `error handler` global (`app.js:40`) sempre devolve 500 genérico; erros de constraint do MySQL (ex: FK, unique) não são traduzidos em mensagens úteis pro usuário.
-14. **`role` de usuário só pode ser alterado direto no banco** (comentário em `admin.users.routes.js:54`) — não há fluxo de promoção de atendente para admin pela própria aplicação; pode ser intencional (segurança), mas vale documentar como decisão, não lacuna.
+8. **Testes**: 327 testes `node:test` passando + `test:race` + E2E Playwright (29/29 verificados). Cobertura em expansão contínua.
+9. **`.env.example`**: presente em `server/`.
+10. **Rotas de agendamento**: já há consolidações em partes, mas ainda pode haver duplicação entre camadas; manter revisão ao evoluir.
+11. **Reminders**: geração automática implementada (job diário) com persistência e exibição no painel do paciente. Envio por e-mail quando SMTP configurado.
+12. **Paginação**: implementada em partes nas listagens administrativas.
+13. **Tratamento de erro**: melhorado (tradução de alguns erros e respostas mais claras). Continuar padronizando.
+14. **Promoção de papéis**: controlada por capability (`admins` com permissão para promover admin). Alterações registradas com trilha.
 
 ### 🟡 Médio — manutenibilidade / DX
 
-15. **Sem linter/formatter configurado** (não há `.eslintrc`, não há `prettier` no `package.json`) — havia um comentário `eslint-disable-next-line` em `app.js:39` mas nenhuma config de ESLint no projeto.
-16. **Sem CI** (não há `.github/workflows`, nem outro pipeline) — sem checagem automática em PR.
-17. **Sem tipagem** (JS puro, sem TypeScript nem JSDoc consistente) — em projeto de saúde com schema rico (20+ campos em `users`), TS ou JSDoc reduziria erro de campo trocado entre frontend/backend.
-18. **`assets/api.js` é só um arquivo global (IIFE)**, sem módulos ES — funcional para o tamanho atual, mas escala mal se o frontend crescer.
-19. **Sem `package.json` no nível raiz** (só dentro de `server/`) — o `npx serve .` do frontend não é gerenciado como dependência do projeto.
-20. **Datas tratadas como string livre** (`scheduled_at`) sem checagem de formato/futuro — permite agendar no passado.
+15. **Lint/formatter**: ESLint configurado (`eslint.config.mjs`), `npm run lint`. Prettier opcional.
+16. **CI**: `.github/workflows/ci.yml` com lint, suíte + E2E (MySQL 8.4 + Playwright Chromium) e `npm audit critical`.
+17. **Tipagem**: JS puro com JSDoc em pontos críticos; migração incremental para TS ainda opcional.
+18. **Frontend**: `assets/api.js` global funcional; estrutura atual atende escopo.
+19. **Root package.json**: existe com scripts `dev`, `test`, `lint`, `setup`, `doctor`.
+20. **Datas**: validação de formato/futuro aplicada em fluxos críticos (backend). Manter em todos os endpoints.
 
 ### 🟢 Baixo — nice-to-have
 
@@ -58,7 +59,7 @@ Pontos fortes já presentes no código (vale reconhecer, não é tudo dívida t�
 
 ### 🔵 Recebimento de dados e formulário de cadastro (campo a campo)
 
-Análise do wizard de 4 passos (`auth.html`) cruzada com o que a rota `POST /auth/signup` (`auth.routes.js`) realmente valida. Achado central: **o front valida muito mais do que o back exige** — toda a integridade de dado de cadastro hoje depende do JS do navegador, não do servidor. Qualquer chamada direta à API (Postman, script, front alternativo) contorna 100% dessas regras.
+Análise do wizard de cadastro (`auth.html`, hoje em 2 passos — na época deste diagnóstico eram 4) cruzada com o que a rota `POST /auth/signup` (`auth.routes.js`) realmente valida. Achado central: **o front valida muito mais do que o back exige** — toda a integridade de dado de cadastro hoje depende do JS do navegador, não do servidor. Qualquer chamada direta à API (Postman, script, front alternativo) contorna 100% dessas regras.
 
 **Campo `job_role` (cargo/função do atendente) — o exemplo citado**
 25. **`job_role` é texto livre** (`<input id="jobRoleInput" placeholder="Ex: Recepcionista, Médico, Enfermeiro...">`, `auth.html`) em vez de seletor fechado. Efeito prático: mesmo cargo vira 5 strings diferentes no banco ("Enfermeira", "enfermeiro", "Enferm.", "ENFERMEIRA(O)"), quebrando qualquer filtro/relatório por cargo no admin. Ação: trocar por `<select>` com lista fixa de cargos da rede de saúde (Recepcionista, Enfermeiro(a), Médico(a), Motorista, Auxiliar Administrativo, Outro — com campo livre condicional só para "Outro", no mesmo padrão já usado em "Especialidade" no dashboard).
@@ -103,41 +104,37 @@ Mesma análise campo a campo aplicada agora às 3 telas internas (`dashboard.htm
 
 ## Plano de ação sugerido (ordem recomendada)
 
-### Fase 1 — Segurança básica (antes de qualquer deploy real)
-- [ ] Girar `JWT_SECRET` e senha MySQL; nunca reusar os valores atuais do `.env` presente no disco.
-- [ ] Criar `server/.env.example` de verdade (sem segredos) para bater com o README.
-- [ ] Adicionar rate limiting em `/auth/login` e `/auth/signup` (`express-rate-limit`).
-- [ ] Adicionar `helmet` em `app.js`.
-- [ ] Trocar fallback de CORS de `'*'` para bloqueio explícito quando `CORS_ORIGIN` ausente em produção (`NODE_ENV=production`).
-- [ ] `git init` + primeiro commit com checagem manual de `git status` para garantir que `.env` real não entra.
+### Fase 1 — Segurança básica (deploy)
+- [x] Rate limiting em rotas sensíveis (login, recuperação de senha).
+- [x] Helmet e CORS configurados.
+- [x] Access 15 min + refresh rotativo 30d, logout revoga, MFA TOTP.
+- [x] Recuperação de senha (forgot/reset) implementada.
+- [ ] HTTPS/HSTS e httpOnly/secure total do access em produção.
+- [ ] SMTP de produção configurado e testado.
 
 ### Fase 2 — Robustez de dados
-- [ ] Validação de payload (ex.: `zod` ou `express-validator`) em todas as rotas `POST`/`PUT`/`PATCH` — formato de email, CPF, datas futuras.
-- [ ] Igualar obrigatoriedade de campo entre front e back no `/auth/signup` (CPF, RG, nascimento, gênero, nome da mãe, celular) — decidir a regra uma vez e validar no servidor, não só no HTML.
-- [ ] Validar dígito verificador de CPF (função pura) tanto no front (feedback imediato) quanto no back (garantia real).
-- [ ] Trocar `job_role` de texto livre para `<select>` com lista fixa de cargos + opção "Outro" condicional (mesmo padrão do campo "Especialidade" no dashboard).
-- [ ] Validar `scheduled_at` no back como não-passado em `appointments`/`exams` (hoje só o front trava via `min`).
-- [ ] Reavaliar obrigatoriedade de `reference_point`/`zone` — condicionar a exigência de ponto de referência a `zone === 'rural'`.
-- [ ] Extrair lógica duplicada de `appointments`/`exams` (admin + staff + me) num helper único parametrizado por tabela.
-- [ ] Implementar geração automática de `reminders` (job simples, ex. `node-cron`, rodando 1x/dia, criando lembrete N horas antes de `scheduled_at`).
-- [ ] Adicionar paginação real (`OFFSET`/cursor) nas listagens administrativas.
-- [ ] Substituir `prompt()` de reagendamento (admin e atendente) por modal com `<input type="datetime-local">` + validação de data futura no back.
-- [ ] Trocar `region` do formulário de doenças de texto livre para `<select>` reaproveitando os bairros já cadastrados em `health_units`.
-- [ ] Adicionar campo livre condicional ("Outro") em `exam_type`, replicando o padrão já usado em `specialty`.
-- [ ] Diferenciar "paciente não encontrado" de "paciente encontrado mas inativo" na busca do atendente (`GET /staff/patients`), sem vazar dado sensível.
-- [ ] Adicionar campo de observação/motivo opcional ao alterar `account_status` de usuário, registrado no `audit_log`.
+- [x] Validação no backend em fluxos críticos (auth, agendamentos, admin).
+- [x] Validação de CPF e regras de data/futuro em pontos-chave.
+- [x] Geração automática de lembretes (job).
+- [x] Paginação em listagens administrativas (parcial).
+- [ ] Padronizar validação em todas as rotas POST/PUT/PATCH (zod/express-validator).
+- [ ] Substituir `prompt()/confirm()` nativos em alguns fluxos por modais consistentes.
+- [ ] Diferenciar "paciente não encontrado" vs "inativo" na busca do atendente sem vazar dados sensíveis.
+- [ ] Política de retenção/expurgo e trilha completa conforme LGPD (Fase 1 em andamento).
 
 ### Fase 3 — Qualidade e manutenção
-- [ ] Adicionar testes (Jest + supertest para rotas, mínimo: auth, isolamento por `user_id`, bloqueio de admin).
-- [ ] Adicionar ESLint + Prettier, script `npm run lint`.
-- [ ] Adicionar CI simples (GitHub Actions: lint + testes) assim que houver repositório remoto.
-- [ ] Avaliar migração incremental para TypeScript ou, no mínimo, JSDoc nos modelos de dados principais (`User`, `Appointment`, `Exam`).
+- [x] Testes automatizados (`node:test`) + `test:race` + E2E Playwright.
+- [x] ESLint + CI com lint/suite/E2E + `npm audit critical`.
+- [x] Auditoria encadeada, hardening, rate limit/helmet/CORS, paginação, `admin_level` granular.
+- [ ] Ampliar cobertura E2E contínua (agendamentos ponta a ponta, fluxos por papel).
 
-### Fase 4 — Produto / próximos passos (já sinalizados no README)
-- [ ] Recuperação de senha ("esqueci minha senha").
-- [ ] Blocklist de token / logout server-side (se token vazar).
-- [ ] HTTPS obrigatório + política de retenção de dados (LGPD) antes de uso com pacientes reais.
-- [ ] Confirmar com a Secretaria de Saúde termo de consentimento para coleta de dado sensível.
+### Fase 4 — Produto / conformidade
+- [x] LGPD Fase 1.
+- [x] Recuperação de senha, lembretes por e-mail, CI.
+- [ ] DPO nominal designado.
+- [ ] Revisão jurídica.
+- [ ] KMS/Vault para segredos.
+- [ ] RNDS/Gov.br credenciados.
 
 ## Observação sobre uso de plugins/skills
 

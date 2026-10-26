@@ -108,8 +108,11 @@ test('migrationScripts devolve exatamente o que o migrate:all executa, na mesma 
   // aparência de cobertura a um caminho que não conhecia as migrations novas.
   const scripts = migrationScripts();
   const pkg = require('../package.json');
-  const esperada = (pkg.scripts['migrate:all'].match(/npm run (migrate:[\w:]+)/g) || [])
-    .map((n) => n.replace('npm run ', '').replace(/:/g, '-') + '.js');
+  const esperada = (pkg.scripts['migrate:all'].match(/npm run (migrate:[\w:-]+)/g) || [])
+    .map((n) => {
+      const cmd = pkg.scripts[n.replace('npm run ', '')];
+      return /node\s+(?:\.\/)?scripts\/([\w.-]+\.js)/.exec(cmd)[1];
+    });
 
   assert.ok(esperada.length >= 6, 'o migrate:all deveria encadear todas as migrations');
   assert.deepEqual(
@@ -120,6 +123,11 @@ test('migrationScripts devolve exatamente o que o migrate:all executa, na mesma 
 
   const idx = (nome) => scripts.indexOf(nome);
   assert.ok(idx('migrate-v3.js') < idx('migrate-privacy.js'), 'privacy depende das colunas de v3');
+  assert.ok(
+    idx('migrate-v3.js') < idx('migrate-professional-user-link.js'),
+    'o vínculo profissional↔atendente depende da tabela professionals criada em v3'
+  );
+  assert.ok(idx('migrate-professional-user-link.js') > -1, 'sem esta migration o atendente nunca é filtrado pela própria agenda');
   assert.ok(idx('migrate-security.js') < idx('migrate-audit.js'), 'audit depende de refresh_tokens');
   assert.ok(idx('migrate-interop.js') > -1, 'interop precisa existir - sem ele o MFA some em silêncio');
   // E as migrations da Fase 5, que era exatamente o que faltava.

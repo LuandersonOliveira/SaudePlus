@@ -3,7 +3,7 @@
 > Documento de planejamento para transformar o Saúde+ em sistema apto a operar
 > numa Secretaria Municipal de Saúde (Lagoa de Itaenga/PE), com interoperabilidade
 > SUS (RNDS/FHIR) e conformidade LGPD para dados sensíveis de saúde.
-> Criado em 09/10/2026 a partir da leitura do código atual.
+> Criado em 09/10/2026 a partir da leitura do código atual. Revisão: 2026-10-26.
 
 ## 0. Ponto de partida (o que já existe — verificado no código)
 

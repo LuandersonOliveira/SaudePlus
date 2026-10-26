@@ -167,8 +167,15 @@ test('o e-mail carrega o paciente, não o texto cru do banco', async () => {
 test('o lote inteiro não morre quando um envio falha', async () => {
   const a = await criarUsuario();
   const b = await criarUsuario();
-  const dia = amanha();
-  // O job só enxerga agendamentos de amanhã — sem eles não há lembrete.
+  // Uma data futura e isolada: o banco de desenvolvimento tem o seed demo em
+  // "amanhã", e o resumo do lote conta todos os usuários encontrados. Rodar
+  // esta prova em "amanhã" media também os lembretes do seed.
+  const base = new Date();
+  base.setDate(base.getDate() + 45);
+  const alvo = new Date(base);
+  alvo.setDate(alvo.getDate() + 1);
+  const dia = `${alvo.getFullYear()}-${pad(alvo.getMonth() + 1)}-${pad(alvo.getDate())}`;
+  // O job só enxerga agendamentos do dia seguinte a `now` — sem eles não há lembrete.
   for (const u of [a, b]) {
     await pool.query(
       `INSERT INTO appointments (id, user_id, specialty, location, scheduled_at, status)
@@ -181,7 +188,7 @@ test('o lote inteiro não morre quando um envio falha', async () => {
     ? { enviado: false, motivo: 'erro_transporte', erro: 'ECONNREFUSED' }
     : { enviado: true }));
   try {
-    const r = await lembretes.runReminderJob();
+    const r = await lembretes.runReminderJob(base);
     assert.equal(r.failed, 0, 'uma falha de e-mail não é falha de criação do lembrete');
     assert.equal(r.pendentes, 1, 'o resumo precisa distinguir "não enviado" de "não criado"');
 

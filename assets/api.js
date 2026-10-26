@@ -106,7 +106,11 @@
       }
       if (res.status === 401) clearSession();
       var message = (data && (data.error || data.message)) || ('Erro inesperado (' + res.status + ')');
-      throw new Error(message);
+      // `status` permite ao painel diferenciar validação (4xx, mensagem do
+      // servidor já está em português) de falha de servidor (5xx, genérica).
+      var err = new Error(message);
+      err.status = res.status;
+      throw err;
     }
     return data;
   }

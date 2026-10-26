@@ -13,6 +13,7 @@
     "db:setup": "node scripts/db-setup.js",
     "db:migrate": "npm --prefix server run migrate:all",
     "db:seed": "npm --prefix server run seed:admin && npm --prefix server run seed:demo",
+    "db:clean:keep-admin": "node server/scripts/clean-db-keep-admin.js",
     "test": "npm --prefix server test",
     "test:race": "npm --prefix server run test:race",
     "test:all": "npm --prefix server run test:all",

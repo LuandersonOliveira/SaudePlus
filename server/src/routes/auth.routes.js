@@ -247,7 +247,7 @@ router.post('/login', async (req, res, next) => {
       });
     }
 
-    const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
+    const [rows] = await pool.query('SELECT * FROM users WHERE email = ? AND (deleted_at IS NULL)', [normalizedEmail]);
     if (!rows.length) {
       registerLoginFailure(loginAttempts, chave);
       return res.status(401).json({ error: 'Credenciais inválidas.' });

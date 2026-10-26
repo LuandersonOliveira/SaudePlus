@@ -37,7 +37,7 @@ router.get('/stats', async (req, res, next) => {
       `SELECT COUNT(*) AS total,
               COALESCE(SUM(account_status = 'pendente'), 0) AS pending,
               COALESCE(SUM(account_status = 'inativo'), 0) AS inactive
-       FROM users`
+       FROM users WHERE deleted_at IS NULL`
     );
     const [[units]] = await pool.query(
       'SELECT COUNT(*) AS total, COALESCE(SUM(active = 1), 0) AS active FROM health_units'
@@ -62,7 +62,7 @@ router.get('/export/summary.csv', requireCapability('reports'), async (req, res,
       COALESCE(SUM(account_status = 'ativo'), 0) AS active,
       COALESCE(SUM(account_status = 'pendente'), 0) AS pending,
       COALESCE(SUM(account_status = 'inativo'), 0) AS inactive
-      FROM users`);
+      FROM users WHERE deleted_at IS NULL`);
     const [[appointments]] = await pool.query(`SELECT
       COUNT(*) AS total,
       COALESCE(SUM(status = 'pendente'), 0) AS pending,
@@ -156,7 +156,7 @@ router.get('/history', requireCapability('users'), async (req, res, next) => {
     if (!userId) return res.status(400).json({ error: 'userId é obrigatório.' });
 
     const [[user]] = await pool.query(
-      'SELECT id, full_name, email, phone FROM users WHERE id = ?',
+      'SELECT id, full_name, email, phone FROM users WHERE id = ? AND deleted_at IS NULL',
       [userId]
     );
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });

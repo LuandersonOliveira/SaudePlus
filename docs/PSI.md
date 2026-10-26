@@ -2,7 +2,7 @@
 
 > Hierarquia: **Política** (o que fazer) → **Norma** (regra obrigatória) →
 > **Procedimento** (como fazer) → **Diretriz** (recomendação).
-> Aprovação: Direção. Revisão: anual ou após incidente. Exceção: formal, com
+> Aprovação: Direção. Revisão: anual ou após incidente. Revisão: 2026-10-26. Exceção: formal, com
 > prazo e aceite do risco pela Direção.
 
 ## POLÍTICA (aprovada pela Direção em ___/___/___)

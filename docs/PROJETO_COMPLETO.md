@@ -1,459 +1,357 @@
 # Saúde+ — documentação completa do projeto
 
-> Documento técnico consolidado a partir da leitura dos arquivos existentes no workspace em 18/09/2026. Ele descreve o comportamento implementado no código atual e separa explicitamente funcionalidades planejadas ou mencionadas em documentos antigos.
+> Documento técnico consolidado e revisado em 26/10/2026 a partir do código atual. Descreve o que está implementado e separa o que depende de configuração externa ou continua como próximo passo.
 
 ## 1. Resumo executivo
 
 O Saúde+ é uma aplicação web para apoiar o atendimento da rede de saúde de Lagoa de Itaenga. A solução tem três camadas:
 
-- **Frontend:** páginas HTML, CSS e JavaScript vanilla executadas no navegador.
-- **Backend:** API REST em Node.js e Express.
-- **Persistência:** MySQL acessado pelo `mysql2/promise`.
+- **Frontend:** páginas HTML, CSS e JavaScript vanilla, sem build.
+- **Backend:** API REST em Node.js + Express.
+- **Persistência:** MySQL 8 via `mysql2/promise`.
 
-Os fluxos implementados hoje são cadastro, login, perfil, agendamento de consultas, agendamento de exames, leitura de lembretes, visualização de alertas de doenças, consulta de unidades de saúde e operações administrativas. Existem três papéis: `paciente`, `atendente` e `admin`.
+Fluxos implementados: cadastro e login (com MFA opcional), recuperação de senha, perfil, agendamento de consultas e exames com agenda real, lembretes no painel e por e-mail, alertas de doenças, catálogo de unidades/profissionais/serviços, área do atendente e painel administrativo com níveis de permissão.
 
-### Estado importante do código atual
+Papéis: `paciente`, `atendente` e `admin`. O admin possui `admin_level` (`superadmin`, `gestor`, `atendimento`, `alertas`) com capabilities distintas.
 
-- Consultas e exames estão implementados ponta a ponta.
-- O escopo atual está deliberadamente limitado a consultas, exames, alertas epidemiológicos, lembretes e unidades de saúde.
-- Lembretes são lidos pelo paciente e gerados automaticamente na véspera de consultas/exames pendentes ou confirmados.
-- O painel administrativo possui indicadores de usuários pendentes, unidades ativas e alertas ativos, além de filtros de auditoria e gestão de alertas.
-- A aplicação usa JWT no `localStorage`; o README registra esse risco para produção.
-- A auditoria registra ações administrativas de agendamentos, doenças e usuários.
-
-## 2. Arquitetura e fluxo principal
+## 2. Arquitetura e inicialização
 
 ```text
 Navegador
-  páginas HTML + assets/api.js
+  HTML + assets/api.js + assets/ui.js
           |
-          | fetch + Authorization: Bearer <JWT>
+          | fetch + Authorization: Bearer <access token>
+          | cookie httpOnly <refresh token>
           v
 API Express (server/src/app.js)
-          |
           | pool.query parametrizado
           v
 MySQL (banco saude)
 ```
 
-### Inicialização
+1. `server/src/server.js` sobe o processo e agenda o job de lembretes.
+2. `server/src/app.js` carrega `.env`, aplica Helmet, CORS fechado, cookie parser, limites de corpo e rate limit; registra as rotas, 404 e erro 500.
+3. `server/src/db.js` cria o pool MySQL (`utf8mb4`, até 10 conexões, `dateStrings: true`).
+4. O navegador guarda o access token em `localStorage` e o refresh token em cookie `httpOnly`.
 
-1. `server/src/server.js` importa a aplicação Express.
-2. `server/src/app.js` carrega `.env`, configura CORS e JSON e registra as rotas.
-3. `server/src/db.js` cria um pool MySQL com até 10 conexões.
-4. O navegador carrega `assets/api.js`, recupera a sessão do `localStorage` e envia o JWT nas chamadas protegidas.
+## 3. Papéis, permissões e sessão
 
-### Fluxo de autenticação
+| Papel | Cadastro | Acesso principal | Restrições |
+| --- | --- | --- | --- |
+| `paciente` | Aberto | Próprios agendamentos, exames, lembretes, alertas, catálogo e conta | Não acessa dados de terceiros nem rotas administrativas |
+| `atendente` | Aberto, inicia `pendente` | Consultas/exames, busca de pacientes e histórico | Precisa ser ativado; sem vínculo profissional a agenda é fail-closed (vazia) |
+| `admin` | Criado/promovido por seed ou admin autorizado | Usuários, atendimentos, cadastros, auditoria e relatórios | Ações dependem de `admin_level`/capability |
 
-1. `auth.html` envia cadastro para `POST /auth/signup`.
-2. A API normaliza o e-mail, verifica duplicidade, aplica `bcryptjs` e grava o usuário.
-3. `POST /auth/login` verifica status da conta e senha.
-4. A API devolve um JWT com `id`, `email`, `role` e `full_name`.
-5. `assets/api.js` salva o token e os dados públicos do usuário no `localStorage`.
-6. O middleware `verifyToken` valida o JWT em cada rota protegida.
+### Capabilities por nível administrativo
 
-## 3. Papéis e permissões
+| Nível | Capabilities |
+| --- | --- |
+| `superadmin` | `users`, `appointments`, `diseases`, `units`, `audit`, `reports`, `admins` |
+| `gestor` | `users`, `appointments`, `diseases`, `units`, `audit`, `reports` |
+| `atendimento` | `appointments` |
+| `alertas` | `diseases` |
 
-| Papel       | Cadastro                                      | Acesso principal                                             | Restrições                                                |
-| ----------- | --------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------- |
-| `paciente`  | Aberto                                        | Próprios agendamentos, exames, lembretes, alertas e unidades | Não vê dados de outros usuários nem rotas administrativas |
-| `atendente` | Aberto, começa `pendente`                     | Consultas/exames de todos, busca de pacientes e histórico    | Precisa ser ativado; não acessa rotas exclusivas de admin |
-| `admin`     | Criado/promovido pelo script de seed ou banco | Usuários, históricos, agendamentos, doenças e auditoria      | Não deve alterar o próprio status pela API                |
+`requireCapability` é fail-closed: nível ausente ou desconhecido é negado. A capability `admins` é exclusiva do `superadmin`.
 
-### Middleware de segurança
+### Sessão
 
-- `verifyToken(req, res, next)`: extrai o header Bearer, valida o JWT usando `JWT_SECRET` e coloca o payload em `req.user`.
-- `requireAdmin(req, res, next)`: aceita somente `req.user.role === 'admin'`.
-- `requireStaff(req, res, next)`: aceita `atendente` ou `admin`.
+- Access token JWT curto, padrão **15 minutos** (`JWT_EXPIRES_IN`), enviado como Bearer.
+- Refresh token rotativo de **30 dias** (`JWT_REFRESH_EXPIRES_IN`), em cookie `httpOnly` e também aceito no corpo para clientes sem cookie.
+- O banco guarda apenas o SHA-256 do refresh token. Reuso de token revoga a família inteira.
+- Logout, troca de senha e ações administrativas de revogação invalidam refresh tokens ativos.
+- Login pode exigir TOTP (MFA). O replay de TOTP é bloqueado por atualização condicional do último passo usado.
 
 ## 4. Banco de dados
 
-O arquivo `server/schema.sql` cria o banco `saude` com `utf8mb4` e as tabelas abaixo.
+`server/schema.sql` cria o banco `saude` com `utf8mb4` e **14 tabelas**:
 
-### `users`
+`users`, `appointments`, `exams`, `reminders`, `diseases`, `health_units`, `professionals`, `unit_offers`, `professional_offers`, `work_schedules`, `schedule_blocks`, `audit_log`, `refresh_tokens`, `password_reset_tokens`.
 
-Cadastro de pacientes, atendentes e administradores.
+### Tabelas principais
 
-- Identidade: `id`, `full_name`, `email`, `password_hash`.
-- Acesso: `role` (`paciente`, `atendente`, `admin`) e `account_status` (`ativo`, `inativo`, `pendente`).
-- Contato: `phone`, `mobile`.
-- Documentos: `cpf`, `rg`.
-- Perfil: nascimento, gênero, tipo sanguíneo, nomes dos pais.
-- Endereço: CEP, rua, número, bairro, cidade, UF, zona e referência.
-- Atendente: `job_role`.
-- `email` é único. A senha nunca é devolvida pelas rotas.
+- **`users`**: identidade, contato, documentos, perfil, endereço, `role`, `account_status`, `admin_level`, `job_role`, consentimento LGPD e dados de MFA.
+- **`appointments`** e **`exams`**: agendamentos do paciente, com profissional/unidade, serviço, horário, status e observações.
+- **`reminders`**: lembretes do paciente, com `read`, `sent_at` e `send_error`.
+- **`diseases`**: alertas epidemiológicos por região, nível e status ativo.
+- **`health_units`**: unidades de saúde e bairros.
+- **`professionals`**: profissionais, vínculo opcional com `users.user_id` e status ativo.
+- **`unit_offers`** e **`professional_offers`**: serviços ofertados por unidade e por profissional.
+- **`work_schedules`** e **`schedule_blocks`**: janelas de atendimento e bloqueios de agenda.
+- **`audit_log`**: trilha administrativa encadeada por hash (`prev_hash`/`entry_hash`), com ator, ação, entidade, detalhes e data.
+- **`refresh_tokens`**: hash, família, expiração e revogação.
+- **`password_reset_tokens`**: hash do token de recuperação, expiração e uso.
 
-### `appointments`
-
-Consultas médicas do paciente. Possui especialidade, profissional opcional, unidade/local, data, observações e status. `user_id` referencia `users` com exclusão em cascata.
-
-### `exams`
-
-Exames separados de consultas, com tipo, local, data, observações e os mesmos status: `pendente`, `confirmado`, `cancelado` e `concluido`.
-
-### `reminders`
-
-Lembretes associados a um usuário, com título, mensagem, data (`remind_at`) e indicador `read`. O job do servidor cria lembretes únicos na véspera de consultas e exames.
-
-### `diseases`
-
-Alertas de doenças por região. Guarda nome, região, nível (`baixo`, `medio`, `alto`), descrição e flag `active`.
-
-### `health_units`
-
-Catálogo de unidades de saúde usado nos selects de consultas e exames. O schema insere dez unidades iniciais de Lagoa de Itaenga, com tipo (`ubs`, `hospital`, `clinica`, `caps`, `outro`) e bairro.
-
-### `audit_log`
-
-Rastreia ações administrativas com ator, ação, tipo/ID da entidade, detalhes e data. A função de gravação é tolerante a falhas: erro no log é impresso, mas não derruba a operação principal.
-
-### Status e regras de agendamento
+### Regras de agendamento
 
 - Novo agendamento nasce `pendente`.
-- O paciente pode editar ou cancelar registros pendentes/confirmados.
-- Registros cancelados ou concluídos não podem ser editados.
-- O cancelamento é lógico: muda o status para `cancelado` e preserva o histórico.
+- O paciente pode editar/cancelar registros pendentes ou confirmados.
+- Registros cancelados/concluídos não são editáveis.
+- Cancelamento é lógico: muda o status e preserva o histórico.
+- A disponibilidade considera oferta, profissional, unidade, horários, bloqueios e conflitos.
 
 ## 5. API REST
 
-Todas as queries usam parâmetros `?` do MySQL. Rotas marcadas como protegidas exigem `Authorization: Bearer <token>`.
+Todas as queries usam placeholders `?`. Rotas protegidas exigem `Authorization: Bearer <token>`.
 
-### Saúde e autenticação
+### Saúde, autenticação e conta
 
-| Método | Rota           | Proteção | Função                                                             |
-| ------ | -------------- | -------- | ------------------------------------------------------------------ |
-| GET    | `/health`      | Pública  | Retorna `{ ok: true }` para verificar disponibilidade da API.      |
-| POST   | `/auth/signup` | Pública  | Cria paciente ou atendente. Atendente inicia como pendente.        |
-| POST   | `/auth/login`  | Pública  | Valida e-mail/senha e gera JWT por padrão com validade de 7 dias.  |
-| GET    | `/auth/me`     | Login    | Devolve o perfil completo do próprio usuário, sem CPF/RG.          |
-| PUT    | `/auth/me`     | Login    | Atualiza perfil próprio; não permite alteração de papel ou status. |
+| Método | Rota | Função |
+| --- | --- | --- |
+| GET | `/health` | Disponibilidade básica da API |
+| GET | `/ready` | Disponibilidade + conexão com o banco + estado do lock de auditoria |
+| POST | `/auth/signup` | Cria paciente ou atendente (atendente nasce `pendente`) |
+| POST | `/auth/login` | Valida credenciais; pode exigir segundo fator |
+| POST | `/auth/mfa/verify` | Conclui login com TOTP |
+| POST | `/auth/mfa/setup` | Inicia configuração de MFA |
+| POST | `/auth/mfa/enable` | Confirma e ativa MFA |
+| POST | `/auth/mfa/disable` | Desativa MFA com validação |
+| POST | `/auth/password/forgot` | Solicita link de recuperação |
+| POST | `/auth/password/reset` | Redefine senha com token válido |
+| POST | `/auth/refresh` | Rotaciona access/refresh token |
+| POST | `/auth/logout` | Revoga a sessão |
+| GET/PUT | `/auth/me` | Lê/atualiza o próprio perfil |
+| GET | `/auth/me/export` | Exporta os dados do titular |
+| DELETE | `/auth/me` | Exclui/anonymiza a conta conforme LGPD |
+| GET | `/auth/govbr/login` | Inicia login Gov.br (quando configurado) |
+| GET | `/auth/govbr/callback` | Retorno do login Gov.br |
 
-### Área do paciente (`/me`)
+### Área do paciente
 
-| Método | Rota                          | Função                                                        |
-| ------ | ----------------------------- | ------------------------------------------------------------- |
-| GET    | `/me/appointments`            | Lista somente consultas cujo `user_id` é o usuário do token.  |
-| POST   | `/me/appointments`            | Cria consulta; exige especialidade, local e data/hora.        |
-| PUT    | `/me/appointments/:id`        | Edita uma consulta própria não cancelada/concluída.           |
-| PATCH  | `/me/appointments/:id/cancel` | Cancela uma consulta própria sem apagar o registro.           |
-| GET    | `/me/exams`                   | Lista somente exames próprios.                                |
-| POST   | `/me/exams`                   | Cria exame; exige tipo, local e data/hora.                    |
-| PUT    | `/me/exams/:id`               | Edita exame próprio não cancelado/concluído.                  |
-| PATCH  | `/me/exams/:id/cancel`        | Cancela exame próprio preservando o histórico.                |
-| GET    | `/me/reminders`               | Lista lembretes do próprio usuário ordenados por `remind_at`. |
+| Método | Rota | Função |
+| --- | --- | --- |
+| GET/POST | `/me/appointments` | Lista/cria consultas do próprio usuário |
+| PUT | `/me/appointments/:id` | Edita consulta própria |
+| PATCH | `/me/appointments/:id/cancel` | Cancela consulta própria |
+| GET/POST | `/me/exams` | Lista/cria exames do próprio usuário |
+| PUT | `/me/exams/:id` | Edita exame próprio |
+| PATCH | `/me/exams/:id/cancel` | Cancela exame próprio |
+| GET | `/me/reminders` | Lista lembretes próprios |
 
-### Dados gerais protegidos
+### Catálogo e dados gerais
 
-| Método | Rota            | Função                                           |
-| ------ | --------------- | ------------------------------------------------ |
-| GET    | `/diseases`     | Lista alertas; `?active=true` limita aos ativos. |
-| GET    | `/health-units` | Lista unidades com `id`, nome, tipo e bairro.    |
+| Método | Rota | Função |
+| --- | --- | --- |
+| GET | `/catalog/offers` | Serviços de uma unidade por tipo |
+| GET | `/catalog/professionals` | Profissionais habilitados para o serviço |
+| GET | `/catalog/availability` | Dias e horários livres |
+| GET | `/catalog/services` | Serviços disponíveis na rede |
+| GET | `/catalog/slots` | Cartões de vagas por unidade/dia |
+| GET | `/health-units` | Unidades ativas |
+| GET | `/diseases` | Alertas (filtro opcional `?active=true`) |
+| GET | `/public/stats` | Contagens agregadas sem PII |
+| GET | `/public/dpo` | Contato público do Encarregado LGPD |
 
-### Área de atendente (`/staff`)
+### Atendente
 
-Todas as rotas exigem `verifyToken` e `requireStaff`.
+Todas exigem `verifyToken` + `requireStaff`.
 
-| Método | Rota                          | Função                                                                 |
-| ------ | ----------------------------- | ---------------------------------------------------------------------- |
-| GET    | `/staff/appointments`         | Lista consultas de todos os usuários; `limit` padrão 50, máximo 200.   |
-| GET    | `/staff/exams`                | Lista exames de todos os usuários; `limit` padrão 50, máximo 200.      |
-| GET    | `/staff/patients?q=...`       | Busca pacientes ativos por nome ou e-mail, até 20 resultados.          |
-| GET    | `/staff/patients/:id/history` | Devolve perfil público, consultas e exames do paciente.                |
-| PATCH  | `/staff/:kind/:id`            | Atualiza status e/ou data de consulta/exame e registra `staff_update`. |
+| Método | Rota | Função |
+| --- | --- | --- |
+| GET | `/staff/appointments` | Agenda de consultas (fail-closed por vínculo) |
+| GET | `/staff/exams` | Agenda de exames (fail-closed por vínculo) |
+| GET | `/staff/patients?q=...` | Busca pacientes ativos |
+| GET | `/staff/patients/:id/history` | Histórico do paciente |
+| PATCH | `/staff/:kind/:id` | Atualiza status/data de consulta ou exame |
 
-`kind` só pode ser `appointments` ou `exams`. O histórico não devolve CPF/RG.
+### Administração
 
-### Área administrativa (`/admin`)
+Rotas sob `/admin` exigem `requireAdmin` e a capability indicada.
 
-Todas as rotas exigem `verifyToken` e `requireAdmin`.
+| Método | Rota | Capability | Função |
+| --- | --- | --- | --- |
+| GET | `/admin/stats` | `users` | Indicadores do painel |
+| GET | `/admin/export/summary.csv` | `reports` | Exportação agregada sem PII |
+| GET | `/admin/appointments` | `appointments` | Consultas de todos |
+| GET | `/admin/exams` | `appointments` | Exames de todos |
+| PATCH | `/admin/:kind/:id` | `appointments` | Confirma/cancela/reagenda |
+| GET | `/admin/history?userId=...` | `users` | Perfil e histórico |
+| GET/POST | `/admin/diseases` | `diseases` | Lista/cria alertas |
+| PATCH/DELETE | `/admin/diseases/:id` | `diseases` | Edita/remove alertas |
+| GET | `/admin/audit-log` | `audit` | Consulta a trilha |
+| GET | `/admin/audit-log/verify` | `audit` | Verifica a cadeia de hashes |
 
-| Método | Rota                        | Função                                                                             |
-| ------ | --------------------------- | ---------------------------------------------------------------------------------- |
-| GET    | `/admin/appointments`       | Lista consultas de todos; limite padrão 20, máximo 100.                            |
-| GET    | `/admin/exams`              | Lista exames de todos; limite padrão 20, máximo 100.                               |
-| PATCH  | `/admin/:kind/:id`          | Confirma, cancela ou reagenda qualquer consulta/exame; audita como `admin_update`. |
-| GET    | `/admin/users`              | Busca usuários por e-mail parcial; retorna dados resumidos.                        |
-| GET    | `/admin/history?userId=...` | Lista perfil resumido, consultas e exames de um usuário.                           |
-| GET    | `/admin/diseases`           | Lista todos os alertas, ativos ou não.                                             |
-| POST   | `/admin/diseases`           | Cria alerta e registra ação `create`.                                              |
-| DELETE | `/admin/diseases/:id`       | Apaga alerta e registra ação `delete`.                                             |
-| GET    | `/admin/audit-log`          | Lista ações administrativas, padrão 50 e máximo 200.                               |
+### Usuários, unidades e profissionais (admin)
 
-### Usuários administrativos (`/admin/users`)
+| Método | Rota | Função |
+| --- | --- | --- |
+| GET | `/admin/users` | Lista/busca usuários sem CPF/RG, com filtros por papel/e-mail |
+| GET | `/admin/users/:id` | Perfil completo para admin |
+| POST | `/admin/users` | Cria conta administrativa |
+| PATCH | `/admin/users/:id` | Altera status, cargo, nível e vínculo profissional |
+| DELETE | `/admin/users/:id` | Soft delete + revogação de acesso |
+| GET | `/health-units/manage` | Catálogo completo de unidades |
+| POST/PATCH | `/health-units` | Cria/edita unidade |
+| GET/POST | `/health-units/:id/offers` | Lista/adiciona serviços da unidade |
+| DELETE | `/health-units/:id/offers/:offerId` | Remove serviço da unidade |
+| GET/POST | `/admin/professionals` | Lista/cria profissionais |
+| PATCH | `/admin/professionals/:id` | Edita profissional |
+| POST/DELETE | `/admin/professionals/:id/offers` | Gerencia vínculos de serviço |
+| POST/DELETE | `/admin/professionals/:id/schedules` | Gerencia horários |
+| POST/DELETE | `/admin/professionals/:id/blocks` | Gerencia bloqueios |
 
-| Método | Rota               | Função                                                                                       |
-| ------ | ------------------ | -------------------------------------------------------------------------------------------- |
-| GET    | `/admin/users`     | Lista até 100 usuários, com filtros seguros por papel e e-mail. CPF/RG não aparecem.         |
-| GET    | `/admin/users/:id` | Devolve perfil completo, incluindo CPF/RG, somente ao admin.                                 |
-| PATCH  | `/admin/users/:id` | Altera `account_status` e/ou `job_role`; impede alterar o próprio status e audita a mudança. |
+### Interoperabilidade
 
-O campo `role` não é alterável por essa API; a decisão atual é exigir alteração direta no banco ou usar o seed.
+| Método | Rota | Função |
+| --- | --- | --- |
+| GET | `/interop/status` | Estado das integrações |
+| POST | `/interop/rnds/send` | Envio RNDS (capability `reports`, exige credenciamento) |
 
 ## 6. Frontend
 
-### `index.html` — página inicial
+### `index.html` — landing page
 
-Landing page pública com marca Saúde+, explicação em três passos, recursos de consultas/exames/alertas/lembretes, bloco de confiança, links para login/cadastro e política de privacidade. Ao carregar, verifica sessão local e redireciona usuários já autenticados para o painel correspondente ao papel.
+Apresentação pública, recursos, contadores agregados, links para login/cadastro e política de privacidade. Redireciona sessão existente para o painel do papel.
 
 ### `auth.html` — login e cadastro
 
-Contém duas abas:
+- Login com e-mail/senha e fluxo de MFA quando ativo.
+- Recuperação de senha.
+- Cadastro em **2 passos**: **Você** (tipo de conta e dados pessoais) e **Acesso** (credenciais). O restante do perfil fica em "Minha conta".
+- Máscaras de CPF, telefone e CEP; autopreenchimento ViaCEP com correção manual.
+- Atendente é criado como `pendente`.
 
-- **Login:** envia e-mail e senha para `authLogin`; redireciona admin para `admin.html`, atendente para `atendente.html` e paciente para `dashboard.html`.
-- **Cadastro:** wizard de quatro etapas: tipo de conta, dados pessoais, endereço e credenciais.
+### `dashboard.html` — paciente
 
-Funções principais: `switchTab`, `selectRole`, `goStep`, `validateStep2`, `validateStep3`, `lookupCep`, `maskCpf`, `maskPhone`, `maskCep`, `toggleOtherJobRole` e `submitSignup`.
+Abas: **Início**, **Agendar**, **Meus agendamentos**, **Alertas**, **Minha conta**.
 
-O cadastro usa ViaCEP para preencher rua, bairro, cidade e UF, mas permite correção manual. Contas de atendente são criadas como `pendente` e precisam de ativação administrativa.
+- Início: cards e próximos eventos.
+- Agendar: fluxo guiado por unidade → serviço → profissional → horário, para consulta ou exame.
+- Meus agendamentos: lista, edição e cancelamento.
+- Alertas: doenças ativas.
+- Minha conta: perfil, MFA, exportação e exclusão de conta.
 
-### `dashboard.html` — painel do paciente
+### `atendente.html` — atendimento
 
-Protege a entrada com `requireAuth`; redireciona admin e atendente para os próprios painéis. As abas atuais são:
+Abas: **Fila do dia**, **Agendamentos**, **Buscar paciente**, **Minha conta**. Permite confirmar, cancelar, reagendar e consultar histórico, respeitando o vínculo profissional.
 
-- **Início:** cards de consultas, exames, alertas ativos e lembretes não lidos; próximos eventos.
-- **Minha agenda:** consolida consultas e exames em ordem cronológica.
-- **Consultas:** cria, edita e cancela consultas.
-- **Exames:** cria, edita e cancela exames.
-- **Alertas:** exibe doenças ativas.
+### `admin.html` — administração
 
-Funções principais: `switchTab`, `nowLocalForInput`, `loadHealthUnits`, `loadAll`, `renderList`, `cancelItem`, `confirmCancel`, `editAppt`, `editExam`, `addAppt`, `addExam`, `toggleSpecialtyOutra`, `toggleExamTypeOutro`, `statusClass`, `levelClass` e `esc`.
+Abas: **Início**, **Atendimentos**, **Cadastros**, **Auditoria**, **Minha conta**.
 
-O arquivo também cria modal próprio para cancelamento e inclui navegação de abas pelas setas do teclado. Há definições duplicadas de algumas funções no final do script, especialmente edição de consulta, o que merece limpeza futura.
+- Cadastros: sub-abas **Pessoas**, **Rede** e **Doenças**.
+- Atendimentos: filtros, confirmação, cancelamento e reagendamento.
+- Auditoria: consulta e verificação da cadeia.
+- Minha conta: perfil, MFA e sessão.
+- Gating por `admin_level` esconde abas/operações sem capability.
 
-### `admin.html` — painel administrativo
+### `privacy.html` — privacidade
 
-Protege a entrada com `requireAuth` e `isAdmin`. As abas são visão geral, usuários/histórico, doenças e auditoria.
-
-Funções principais:
-
-- `loadOverview`: carrega consultas, exames e doenças ativas.
-- `renderActionableTable`: cria tabelas com confirmar, cancelar e reagendar.
-- `adminAction` e `confirmReagendar`: atualizam status/data via `/admin`.
-- `searchUsers`, `showHistory` e `viewUser`: buscam usuários, histórico e perfil detalhado.
-- `adminUpdateUser`: altera status/cargo permitido via `/admin/users`.
-- `loadDiseases`, `addDisease` e `delDisease`: gerenciam alertas.
-- `loadAuditLog`: exibe a trilha de auditoria.
-- `renderTable`, `renderCell`, `statusClass`, `levelClass` e `esc`: helpers de apresentação.
-
-O campo de motivo de alteração de usuário é enviado pelo frontend como `reason` e `status_notes`, mas a rota atual não persiste esses campos no `audit_log`.
-
-### `atendente.html` — painel de atendimento
-
-Protege a entrada com `requireRole(['atendente', 'admin'])`. Oferece fila do dia, consultas, exames e busca de pacientes.
-
-Funções principais: `formatJobRole`, `ensureReagendarModal`, `reagendar`, `confirmReagendar`, `loadAll`, `itemRow`, `act`, `searchPatient`, `viewPatient`, `renderHistory`, `fmtSimpleDate`, `statusClass`, `stat` e `esc`.
-
-O painel calcula pendências do dia, permite confirmar/cancelar/reagendar e mostra histórico de consultas/exames. A implementação atual da rota `/staff/patients` filtra apenas pacientes ativos, portanto a interface não consegue exibir avisos para contas inativas/pendentes apesar de possuir esse tratamento visual.
-
-### `privacy.html` — política de privacidade
-
-Página pública em linguagem simples que explica dados coletados, finalidade, acesso, proteção e direitos do usuário. O próprio arquivo informa que o texto ainda não é revisão jurídica e que o contato precisa ser confirmado antes de publicação real.
+Política em linguagem simples, com contato do DPO (via `/public/dpo`) e aviso de revisão jurídica pendente.
 
 ## 7. Assets compartilhados
 
 ### `assets/api.js`
 
-É o cliente HTTP global usado pelas páginas. A IIFE define:
+Cliente HTTP global: `apiGet`, `apiPost`, `apiPut`, `apiPatch`, `apiDelete`, login/signup, refresh, logout, sessão, `requireAuth`, `requireRole`, helpers de papel, datas e toast. Access token em `saude_token`; usuário resumido em `saude_user`.
 
-- `apiGet`, `apiPost`, `apiPut`, `apiPatch`, `apiDelete`: wrappers HTTP.
-- `authLogin` e `authSignup`: autenticação.
-- `signOut`: limpa sessão e vai para `auth.html`.
-- `getSession`, `requireAuth`, `requireRole`: leitura e proteção de sessão no frontend.
-- `isAdmin`, `isAtendente`, `isStaff`: verificações de papel.
-- `fmtDate`: formatação `pt-BR`.
-- `toast`: mensagens temporárias de sucesso/erro.
+### `assets/ui.js`
 
-O token fica em `saude_token` e o usuário resumido em `saude_user`. Respostas 401 limpam a sessão.
+Primitivas de UI: modais, `confirmDialog`, `loadingButton`, skeleton, estados vazios/erro, navegação por teclado em abas e utilitários visuais.
 
 ### `assets/styles.css`
 
-Define o design system inteiro: variáveis de cor/tipografia, reset básico, topbar, hero, containers, grids, cards, tabs, formulários, botões, badges, tabelas, listas, spinner, tela de autenticação, toast e estado visual de edição. Também inclui foco visível e `prefers-reduced-motion`.
+Design system com variáveis de cor/tipografia, componentes, responsividade, foco visível e `prefers-reduced-motion`. Fonte **Inter autohospedada** em `assets/fonts/inter-latin.woff2`.
 
 ## 8. Backend por arquivo
 
-### `server/src/app.js`
+- **`app.js`**: middlewares globais, CORS, rate limit, rotas, 404 e erro.
+- **`server.js`**: entrada do processo e job de lembretes.
+- **`db.js`**: pool MySQL.
+- **`middleware/auth.js`**: `verifyToken`, `requireAdmin`, `requireStaff`.
+- **`middleware/capabilities.js`**: mapa nível → capabilities, fail-closed.
+- **`middleware/rateLimit.js`**: limites global, de autenticação e de readiness.
+- **`middleware/audit.js`** e **`utils/audit.js`**: trilha encadeada e tolerante a falha.
+- **`middleware/crypto.js`** e **`utils/crypto.js`**: criptografia de documentos sensíveis.
+- **`routes/auth.routes.js`**: cadastro, login, MFA, refresh, reset, Gov.br e conta.
+- **`routes/me.booking.routes.js`**: implementação única de agendamentos do paciente.
+- **`routes/appointments.routes.js`** e **`exams.routes.js`**: fábricas para consulta/exame.
+- **`routes/reminders.routes.js`** e **`jobs/reminders.js`**: leitura e geração/envio de lembretes.
+- **`routes/catalog.routes.js`**: agenda inteligente.
+- **`routes/staff.routes.js`**: área do atendente.
+- **`routes/admin.routes.js`**: painel, atendimentos, alertas, auditoria e exportação.
+- **`routes/admin.users.routes.js`**: CRUD administrativo de usuários.
+- **`routes/admin.professionals.routes.js`**: profissionais, serviços, horários e bloqueios.
+- **`routes/units.routes.js`**: unidades e ofertas.
+- **`routes/public.routes.js`** e **`routes/interop.routes.js`**: vitrine e integrações.
+- **`utils/booking.js`**: disponibilidade, conflitos e duração.
+- **`utils/privacy.js`**: consentimento e anonimização.
+- **`utils/loginThrottle.js`** e **`utils/mfaAttempts.js`**: proteção contra força bruta e replay.
+- **`services/`**: `mailer`, `govbr`, `rnds`, `cnes`, `infodengue`.
 
-Monta o Express, carrega `.env`, configura CORS, JSON, `/health`, registra todas as rotas, trata 404 e possui middleware final de erro 500.
+## 9. Scripts e configuração
 
-### `server/src/server.js`
+### Raiz
 
-Ponto de entrada do processo. Escuta `PORT` ou 4000 e informa a URL no console.
-
-### `server/src/db.js`
-
-Cria o pool MySQL com host, porta, usuário, senha e banco vindos do ambiente. Usa `utf8mb4`, `waitForConnections`, limite de 10 conexões e `dateStrings: true`.
-
-### `server/src/routes/auth.routes.js`
-
-Implementa `signup`, `login`, `GET /me` e `PUT /me`. Também define `VALID_ROLES`, normaliza e-mails, aplica hash/comparação de senha, gera JWT e seleciona cuidadosamente os campos devolvidos.
-
-### `server/src/routes/appointments.routes.js`
-
-Router protegido para listar, criar, editar e cancelar consultas do usuário autenticado. Cada leitura/alteração contém `user_id` na query para impedir acesso cruzado.
-
-### `server/src/routes/exams.routes.js`
-
-Repete o mesmo padrão de propriedade e status para exames, usando `exam_type` no lugar de especialidade.
-
-### `server/src/routes/reminders.routes.js`
-
-Router protegido somente de leitura. Lista lembretes do usuário por data crescente; os registros são gerados pelo job automático do servidor.
-
-### `server/src/jobs/reminders.js`
-
-Job sem dependência externa que executa na inicialização e a cada 24 horas. Busca consultas e exames pendentes/confirmados do dia seguinte, cria um lembrete na véspera e verifica registros existentes para não duplicar notificações.
-
-### `server/src/routes/diseases.routes.js`
-
-Permite que qualquer usuário autenticado consulte alertas, com filtro opcional de ativos.
-
-### `server/src/routes/units.routes.js`
-
-Lista unidades ativas para os selects do frontend e fornece CRUD administrativo protegido: catálogo completo, cadastro, edição e ativação/desativação. As alterações são registradas na auditoria.
-
-### `server/src/routes/staff.routes.js`
-
-Protege atendentes/admins, lista agendamentos gerais, busca pacientes ativos, devolve históricos e atualiza status/data de consultas e exames. Usa `ENTITY_MAP` para selecionar somente tabelas permitidas e chama `logAction`.
-
-### `server/src/routes/admin.routes.js`
-
-Protege exclusivamente admin. Lista operações gerais, modifica agendamentos, busca usuários/históricos, cria/exclui doenças e consulta auditoria. `VALID_STATUS` e `ENTITY_MAP` controlam atualizações permitidas.
-
-### `server/src/routes/admin.users.routes.js`
-
-Lista usuários com filtros, devolve perfil administrativo completo e permite alterar status/cargo. `SAFE_ROLES` e `SAFE_STATUSES` evitam valores arbitrários.
-
-### `server/src/middleware/auth.js`
-
-Centraliza autenticação JWT e autorização por papel com `verifyToken`, `requireAdmin` e `requireStaff`.
-
-### `server/src/utils/audit.js`
-
-Expõe `logAction(actorId, action, entityType, entityId, details)`. Gera UUID e insere em `audit_log`; falha de auditoria é registrada sem interromper a operação.
-
-### `server/src/api.js`
-
-Arquivo que também contém cliente HTTP, sessão, redirecionamento por papel e helpers de UI. O conteúdo é uma versão paralela de `assets/api.js` e não é importado pelo backend nem pelas páginas atuais; deve ser tratado como legado/duplicado para não ser confundido com a API Express.
-
-## 9. Scripts e configuração do servidor
+`npm run setup`, `dev`, `start`, `db:setup`, `db:migrate`, `db:seed`, `db:clean:keep-admin`, `test`, `test:race`, `test:all`, `test:e2e`, `lint`, `check`, `doctor`, `smoke-test`, `backup`.
 
 ### `server/package.json`
 
-Define o pacote privado `saude-plus-server`, exige Node 18+, inicia com `src/server.js` e oferece `start`, `dev`, `migrate`, `seed:admin`, `migrate:supabase` e `smoke-test`. Dependências: Express, CORS, dotenv, JWT, MySQL e bcryptjs; Nodemon é de desenvolvimento.
+`start`, `dev`, `start:local`, `test`, `test:race`, `seed:admin`, `seed:demo`, `migrate:supabase`, `link:professionals-users`, migrações individuais, `migrate:all`, `purge:retention`, `backup`, `sync:cnes`, `sync:alerts`, `test:rnds`, `smoke-test`.
 
-`npm run migrate` aplica `migration_001.sql` em bancos existentes. `node scripts/smoke-test.js` valida a saúde da API e que rotas protegidas rejeitam chamadas sem token.
+### Ordem de `migrate:all`
 
-### `server/scripts/seed-admin.js`
+`v3` → `professional-user` → `security` → `privacy` → `interop` → `audit` → `audit:details` → `mfa:replay` → `booking:duration` → `reminder:delivery` → `password:reset`.
 
-Lê `ADMIN_EMAIL` e `ADMIN_PASSWORD`, valida a senha, cria ou promove o usuário para admin e atualiza o hash. É executado por `npm run seed:admin`.
+### Scripts operacionais
 
-### `server/scripts/diagnose-db.js`
+- `scripts/db-setup.js`: cria banco/schema e resolve a migração real pelo comando npm.
+- `scripts/doctor.js`: verifica ambiente, conexão, schema, migrations, CORS e configuração.
+- `scripts/serve-web.js`: servidor estático local.
+- `server/scripts/seed-admin.js`: cria/promove admin a partir de `ADMIN_EMAIL`/`ADMIN_PASSWORD`.
+- `server/scripts/seed-v3-demo.js`: dados de demonstração.
+- `server/scripts/link-professionals-to-users.js`: vincula profissionais a contas com senha aleatória.
+- `server/scripts/clean-db-keep-admin.js`: limpeza destrutiva de desenvolvimento, mantendo admin.
+- `server/scripts/purge-retention.js`: anonimização por inatividade.
+- `server/scripts/backup.js`: backup.
+- `server/scripts/build-pdf.js`: gera HTML/PDF do checklist V3.
 
-Mostra configurações do banco sem revelar a senha inteira e testa conexão em `localhost` e `127.0.0.1`, ajudando a diagnosticar diferenças comuns do MySQL no Windows.
+### Configuração
 
-### `server/scripts/migrate-supabase.js`
+`server/.env.example` documenta porta, CORS, proxy, banco, JWT, criptografia, DPO, retenção, CNES/InfoDengue, RNDS, Gov.br, SMTP e admin inicial. Segredos reais não devem ser versionados.
 
-Migração opcional de uma tabela `profiles` do Supabase. Exige dependência adicional `@supabase/supabase-js`, usa senha temporária comum e insere usuários no MySQL. Deve ser revisado antes de uso: o valor de papel legado tratado no script não corresponde ao enum atual (`paciente`, `atendente`, `admin`).
+## 10. Segurança, LGPD e interoperabilidade
 
-### `server/scripts/build-pdf.js`
+- Helmet, CORS por allowlist (sem `*`), limite de corpo de 100 KB e rate limit.
+- Bloqueio progressivo de login por `IP|e-mail`, com Map limitado e varrido.
+- MFA TOTP com bloqueio de replay e limite de tentativas.
+- Senhas com bcrypt; tokens de refresh/reset guardados apenas como hash.
+- CPF/RG/CNS criptografados em coluna; logs e respostas administrativas minimizam PII.
+- Auditoria encadeada por hash, com verificação de integridade e gravação tolerante a falha.
+- LGPD: consentimento versionado, exportação, exclusão/anonimização, retenção e canal do DPO.
+- Integrações opcionais: CNES, InfoDengue, RNDS e Gov.br — todas dependem de configuração/credenciamento.
 
-Lê `docs/TAREFAS_SIMPLES_V3.md`, converte Markdown com `temp_marked.js`, grava `TAREFAS_SIMPLES_V3.html` e chama o Chrome em modo headless para gerar o PDF correspondente.
+## 11. Testes, lint e CI
 
-### `server/scripts/temp_marked.js`
-
-Bundle gerado do parser Markdown `marked` v15.0.12, usado pelo script de PDF. Não deve ser editado manualmente.
-
-### `server/.gitignore`
-
-Ignora `node_modules`, `.env` e arquivos de log. O `.env` real não deve ser compartilhado nem versionado.
-
-### `server/migration_001.sql`
-
-Migração para bancos antigos: adiciona perfil estendido, status de conta, converte papel legado `user` para `paciente` e ajusta o enum de papéis. Deve ser usada somente sobre banco existente; instalação nova usa `schema.sql`.
-
-## 10. Documentação e artefatos
-
-| Arquivo                                  | Conteúdo                                                                                          |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `README.md`                              | Setup local, decisões técnicas, segurança, pendências e comandos principais.                      |
-| `ROTEIRO_TESTE_ALUNOS.md`                | Roteiro manual para testar paciente, admin, segurança, CORS e problemas comuns.                   |
-| `docs/PLANO_MELHORIAS.md`                | Diagnóstico de backend, segurança, validação, qualidade e roadmap técnico.                        |
-| `docs/PLANO_UIUX.md`                     | Diagnóstico de interface, acessibilidade, duplicação visual e roadmap de UX.                      |
-| `docs/PROJETO_DO_ZERO.md`                | Visão de produto, arquitetura alvo, papéis, sprints e preparação comercial.                       |
-| `docs/TAREFAS_SIMPLES_V2.md`             | Checklist de melhorias explicado para pessoas não técnicas.                                       |
-| `docs/TAREFAS_SIMPLES_V3.md`             | Checklist atualizado com itens feitos, parciais e pendentes, alinhado ao escopo atual do produto. |
-| `docs/TAREFAS_SIMPLES_V3.html`           | Renderização HTML da versão 3, produzida para impressão/PDF.                                      |
-| `docs/Conectados para o Sucesso 2.0.pdf` | Documento original de proposta do projeto.                                                        |
-| `docs/PROJETO_DO_ZERO.pdf`               | Versão PDF do plano de produto.                                                                   |
-| `docs/TAREFAS_SIMPLES_V2.pdf`            | Exportação PDF do checklist V2.                                                                   |
-| `docs/TAREFAS_SIMPLES_V3.pdf`            | Exportação PDF do checklist V3.                                                                   |
-
-Os PDFs são artefatos binários derivados ou documentos de referência; o código executável não os importa.
-
-## 11. Configurações do workspace
-
-### `.vscode/launch.json`
-
-Configuração de debug que abre o Chrome em `http://localhost:8080` usando a raiz do workspace como `webRoot`.
-
-### `.claude/settings.local.json`
-
-Configuração local de permissões para comandos de diagnóstico. Não participa da execução da aplicação e pode conter regras específicas da máquina/desenvolvimento.
-
-### `package-lock.json` da raiz
-
-Arquivo npm mínimo, sem pacotes na raiz. O frontend não possui `package.json`; o pacote executável fica em `server/`.
-
-### `server/package-lock.json`
-
-Lockfile das dependências npm do backend, usado para instalação reprodutível junto do `server/package.json`.
+- `npm test`: suíte `node:test` do backend (327 casos na última execução registrada).
+- `npm run test:race`: testes de concorrência em `server/test/race/`.
+- `npm run test:e2e`: Playwright (`e2e/login.spec.js`, `dashboard.spec.js`, `admin-responsive.spec.js`).
+- `npm run lint`: ESLint na raiz.
+- `npm run doctor`: diagnóstico de ambiente e schema.
+- CI em `.github/workflows/ci.yml`: lint, suíte + E2E com MySQL 8.4/Playwright e `npm audit` para vulnerabilidades críticas.
 
 ## 12. Como executar
 
-### Banco
-
 ```powershell
-mysql --default-character-set=utf8mb4 -u root -p < server/schema.sql
+npm run setup
+npm run doctor
+npm run dev
 ```
 
-### API
+O `setup` instala raiz/backend, cria o banco e aplica as migrações. O `dev` sobe API e front; em desenvolvimento, `start:local` permite rodar sem `DATA_ENCRYPTION_KEY` via `ALLOW_PLAINTEXT_DEV=1`. Em produção, a chave é obrigatória e o caminho `start:api` não liga o modo plaintext.
 
-```powershell
-cd server
-copy .env.example .env
-npm install
-npm run seed:admin
-npm start
-```
-
-> O repositório atual não contém `server/.env.example`, embora o README e o roteiro o referenciem. É necessário criar esse arquivo/template ou configurar `.env` manualmente.
-
-### Frontend
-
-Na raiz do projeto:
-
-```powershell
-npx serve .
-```
-
-O frontend usa `http://localhost:4000` como API padrão. Se a API ou a porta do frontend mudar, ajuste `PORT`, `CORS_ORIGIN` e/ou `window.API_BASE`.
+Front padrão: `http://localhost:8080`. API padrão: `http://localhost:4000`.
 
 ## 13. Lacunas e riscos verificados
 
-1. **Escopo alinhado:** consultas, exames, alertas epidemiológicos, lembretes e unidades de saúde são os módulos mantidos no produto.
-2. **Lembretes automáticos:** implementados pelo job diário de consultas e exames.
-3. **Validação no servidor:** várias validações de formato e datas dependem da interface; chamadas diretas podem enviar dados incompletos ou malformados.
-4. **Rate limiting:** não há proteção contra tentativas repetidas de login.
-5. **JWT no navegador:** token em `localStorage` não tem revogação server-side.
-6. **CORS:** o fallback atual permite `*` quando `CORS_ORIGIN` não é definido.
-7. **Testes automatizados:** não há framework/testes configurados no `package.json` atual.
-8. **Unidades:** CRUD administrativo implementado; bancos antigos precisam executar `migration_001.sql` para adicionar `health_units.active`.
-9. **Histórico de motivo:** alterações de status, cargo, nível administrativo, unidades e alertas são registradas no `audit_log`.
-10. **Arquivos paralelos:** `server/src/api.js` duplica o cliente de `assets/api.js` e não é usado pela API.
-11. **Níveis administrativos:** o banco e o login suportam `superadmin`, `gestor`, `atendimento` e `alertas`; o painel atual permanece unificado até que telas específicas por nível sejam criadas.
-12. **Exportação:** existe o endpoint autenticado `/admin/export/summary.csv`, limitado a indicadores agregados e sem dados pessoais identificáveis.
-13. **Migração:** bancos antigos precisam executar `npm run migrate` antes de usar o registro de último acesso e os níveis administrativos.
+1. **Produção:** exige HTTPS, SMTP real, chave de criptografia em KMS/Vault e CORS fechado no domínio correto.
+2. **RNDS/Gov.br:** implementados, mas dependem de credenciamento e certificados externos.
+3. **Paginação:** existe em partes da API; nem todas as listas administrativas têm paginação completa.
+4. **Front sem build:** decisão consciente; não há bundler, tipagem ou framework.
+5. **Acessibilidade:** há foco visível, ARIA e teclado; auditoria contínua ainda recomendada.
+6. **Dark mode:** ausente por decisão de escopo.
+7. **Texto jurídico:** `privacy.html` e documentos LGPD ainda requerem revisão jurídica formal antes de produção.
+8. **Dados de saúde reais:** exigem backup, retenção, resposta a incidentes e operação monitorada.
 
 ## 14. Conclusão
 
-O projeto atual é um protótipo funcional de gestão de consultas e exames com autenticação, separação de papéis, isolamento de dados por usuário e painel administrativo. A base está organizada em módulos pequenos e usa SQL parametrizado. Para aproximá-lo de produção com dados de saúde reais, as prioridades são validar entradas no servidor, proteger segredos e login, configurar HTTPS/CORS seguro, criar testes automatizados e implementar backup/retensão de dados.
+O Saúde+ é um sistema funcional de gestão de consultas e exames com autenticação forte, separação de papéis, agenda real, auditoria encadeada, proteção LGPD e painéis para paciente, atendente e administração. A base está organizada em módulos pequenos e SQL parametrizado. Para produção com dados reais, o foco deve ser operação segura (HTTPS, segredos, SMTP, backup), credenciamento das integrações e revisão jurídica dos textos e processos de privacidade.

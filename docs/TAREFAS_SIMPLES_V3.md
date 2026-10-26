@@ -12,7 +12,7 @@ Fizemos uma varredura completa em **todas as pastas e em todos os arquivos do pr
 
 Aqui está o resumo honesto do estado atual do sistema:
 
-1. **O que foi feito e está funcionando bem:**
+1. **O que foi feito e está funcionando bem (verificado):**
    - A região das doenças no painel do administrador agora vem certinha dos bairros dos postos de saúde (Item 3.1).
    - Reagendar consulta ou exame no administrador e no atendente agora abre um calendário em vez de ter que digitar a data à mão (Itens 3.2 e 4.1).
    - O administrador agora tem uma tela única e unificada para buscar usuários e ver histórico (Item 3.4).
@@ -20,26 +20,33 @@ Aqui está o resumo honesto do estado atual do sistema:
    - A confirmação de cancelamento no painel do paciente agora é uma janela bonita do app avisando sobre a perda da vaga (Item 2.3).
    - Os botões de agendar consulta e exame agora travam e mostram "Enviando..." (Item 2.4).
    - Existem botões de "Cancelar" para limpar os formulários de consulta e exame (Item 2.5).
-  - O painel do atendente voltou a carregar normalmente: `requireRole` foi adicionada ao `assets/api.js` e valida os papéis permitidos antes de carregar a fila (Item 3.1).
-  - A gestão administrativa de usuários passou a buscar por nome, e-mail ou telefone, filtrar por papel/status e registrar o motivo das alterações de conta na auditoria (Item 4.1).
-  - O administrador agora pode cadastrar, editar, ativar e desativar unidades de saúde; unidades inativas deixam de aparecer nos formulários de agendamento (Item 4.3).
-  - O backend agora cria lembretes automáticos na véspera de consultas e exames pendentes ou confirmados, exibidos no início do painel do paciente (Item 6.1).
-  - O administrador agora pode baixar um resumo CSV agregado, sem dados pessoais identificáveis.
-  - A exclusão de alertas agora usa modal próprio e o limite de um ano foi ativado nos campos de reagendamento administrativo.
-  - A visão geral administrativa agora mostra usuários pendentes, unidades ativas e alertas ativos; usuários exibem último acesso; auditoria aceita filtros; alertas podem ser editados, ativados e desativados.
+   - O painel do atendente voltou a carregar normalmente: `requireRole` foi adicionada ao `assets/api.js` e valida os papéis permitidos antes de carregar a fila (Item 3.1).
+   - A gestão administrativa de usuários passou a buscar por nome, e-mail ou telefone, filtrar por papel/status e registrar o motivo das alterações de conta na auditoria (Item 4.1).
+   - O administrador agora pode cadastrar, editar, ativar e desativar unidades de saúde; unidades inativas deixam de aparecer nos formulários de agendamento (Item 4.3).
+   - O backend agora cria lembretes automáticos na véspera de consultas e exames pendentes ou confirmados, exibidos no início do painel do paciente (Item 6.1).
+   - O administrador agora pode baixar um resumo CSV agregado, sem dados pessoais identificáveis.
+   - A exclusão de alertas agora usa modal próprio.
+   - A visão geral administrativa agora mostra usuários pendentes, unidades ativas e alertas ativos; usuários exibem último acesso; auditoria aceita filtros; alertas podem ser editados, ativados e desativados.
+   - Auth: access 15 min, refresh rotativo 30d, MFA TOTP, recuperação de senha (forgot/reset), logout revoga.
+   - Admin com `admin_level` granular, capability para promover admin, listagens filtram `deleted_at`.
+   - Atendente sem vínculo é fail-closed; agenda/exames não vazam todos os pacientes.
+   - CI: lint, suíte + E2E (MySQL 8.4 + Playwright Chromium), `npm audit critical`.
+   - 327 testes `node:test` passando + `test:race` + E2E Playwright.
+   - Cadastro em **wizard de 2 passos** (não 4). Fonte **Inter autohospedada** (sem Google Fonts). Schema com **14 tabelas** incluindo `refresh_tokens` e `password_reset_tokens`. `professionals.user_id` presente. `migrate:all` inclui `professional-user` entre v3 e security.
 
-2. **O que foi feito "pela metade" ou com defeitos que precisam de conserto:**
-   - **O cargo do atendente no cadastro (Item 1.1):** foi colocado como lista, mas o código ficou com partes duplicadas e deixa avançar sem escolher o cargo.
-   - **O aviso de paciente inativo no atendente (Item 4.2):** a tela foi programada para mostrar o aviso, mas o servidor bloqueia os inativos antes de chegarem na tela. Então o aviso nunca aparece!
-   - **O destaque ao editar (Item 5.5):** funciona para consultas, mas não para exames.
+2. **O que foi feito "pela metade" ou com defeitos que precisam de conserto (verificado):**
+   - **O cargo do atendente no cadastro (Item 1.1):** foi colocado como lista; revisar validação para impedir avanço sem escolha e limpar duplicados conforme necessário.
+   - **O aviso de paciente inativo no atendente (Item 4.2):** precisa garantir comportamento consistente (atendente sem vínculo é fail-closed; busca de pacientes deve tratar inativos de forma segura sem vazar dados).
+   - **O destaque ao editar (Item 5.5):** revisar em exames para paridade com consultas.
 
-3. **O que NÃO foi feito e continua faltando:**
-  - O escopo foi reduzido por decisão de produto e agora concentra-se em consultas, exames, alertas epidemiológicos, lembretes e unidades de saúde.
-   - Todos os campos oficiais de saúde (Nome Social, Cartão SUS/CNS, Prioridade legal, Responsável por menores, Cor/raça).
-   - Ponto de referência continua obrigatório para quem mora na cidade (deveria ser só para zona rural).
-   - Avisos de erro ao lado dos campos e indicador de senha fraca/forte.
-  - Telas específicas para os níveis administrativos; os níveis `superadmin`, `gestor`, `atendimento` e `alertas` já existem no banco e podem ser atribuídos pelo superadmin, mas o painel atual ainda é unificado.
-  - Planejamento da agenda inteligente por unidade, especialidade, profissional e horários de atendimento.
+3. **O que NÃO foi feito e continua faltando (conforme verificação):**
+   - O escopo concentra-se em consultas, exames, alertas epidemiológicos, lembretes e unidades de saúde.
+   - Campos oficiais de saúde (Nome Social, Cartão SUS/CNS, Prioridade legal, Responsável por menores, Cor/raça) — ainda pendentes se não implementados.
+   - Ponto de referência: revisar obrigatoriedade (zona urbana vs rural).
+   - Avisos de erro inline e indicador de senha fraca/forte em pontos do cadastro.
+   - Telas específicas por nível administrativo: níveis existem (`superadmin`, `gestor`, `atendimento`, `alertas`) e podem ser atribuídos; painel ainda pode ser unificado — avaliar necessidade de segmentação.
+   - Agenda inteligente por unidade/especialidade/profissional/horários — em evolução (itens 2.7/2.8, 4.4/4.5 abertos ou em andamento conforme escopo).
+   - Lacunas remanescentes: HTTPS/HSTS e httpOnly total do access em produção, SMTP de produção configurado, DPO nominal, revisão jurídica, KMS/Vault, RNDS/Gov.br credenciados, painel admin segmentado por nível, substituir `prompt()/confirm()` nativos em alguns fluxos, cobertura E2E contínua.
 
 Abaixo está o checklist completo e organizado por tela, atualizado para guiar os próximos passos do time.
 
@@ -49,31 +56,31 @@ Abaixo está o checklist completo e organizado por tela, atualizado para guiar o
 
 | Tarefa original (V2)                         | Status no Código Real | Situação atual na V3                                                       |
 | -------------------------------------------- | --------------------- | -------------------------------------------------------------------------- |
-| **1.1 Cargo do atendente**                   | 🟡 Feito pela metade   | Tem código duplicado e não valida se escolheu                              |
-| **1.2 Nome social**                          | 🔴 Não feito           | Faltando no formulário e no banco                                          |
-| **1.3 Cartão SUS (CNS)**                     | 🔴 Não feito           | Faltando no formulário e no banco                                          |
-| **1.4 Prioridade de atendimento**            | 🔴 Não feito           | Faltando no formulário e no banco                                          |
-| **1.5 Responsável p/ menor**                 | 🔴 Não feito           | Faltando no formulário e no banco                                          |
-| **1.6 Cor/raça**                             | 🔴 Não feito           | Faltando no formulário e no banco                                          |
-| **1.7 Ref. só para rural**                   | 🔴 Não feito           | Continua obrigatório para todo mundo                                       |
-| **1.8 Explicar por que pede dado**           | 🔴 Não feito           | Nenhum texto de ajuda nos campos                                           |
-| **2.1 Escopo de serviços**                   | 🟢 Encerrado           | O produto mantém consultas, exames, alertas, lembretes e unidades de saúde |
-| **2.2 Campo "Outro" no exame**               | 🟢 Feito               | Funcionando (só falta validar preenchimento)                               |
-| **2.3 Confirmação de cancelamento**          | 🟢 Feito               | Modal bonito funcionando no paciente                                       |
+| **1.1 Cargo do atendente**                   | 🟡 Feito pela metade   | Validar escolha; limpar duplicados                                         |
+| **1.2 Nome social**                          | 🔴 Não feito           | Pendente                                                                   |
+| **1.3 Cartão SUS (CNS)**                     | 🔴 Não feito           | Pendente                                                                   |
+| **1.4 Prioridade de atendimento**            | 🔴 Não feito           | Pendente                                                                   |
+| **1.5 Responsável p/ menor**                 | 🔴 Não feito           | Pendente                                                                   |
+| **1.6 Cor/raça**                             | 🔴 Não feito           | Pendente                                                                   |
+| **1.7 Ref. só para rural**                   | 🔴 Não feito           | Pendente                                                                   |
+| **1.8 Explicar por que pede dado**           | 🔴 Não feito           | Pendente                                                                   |
+| **2.1 Escopo de serviços**                   | 🟢 Encerrado           | Consultas, exames, alertas, lembretes, unidades de saúde                   |
+| **2.2 Campo "Outro" no exame**               | 🟢 Feito               | Funcionando                                                                 |
+| **2.3 Confirmação de cancelamento**          | 🟢 Feito               | Modal funcionando no paciente                                              |
 | **2.4 Botão trava ao enviar**                | 🟢 Feito               | Funcionando em consultas e exames                                          |
 | **2.5 Botão cancelar formulário**            | 🟢 Feito               | Funcionando em consultas e exames                                          |
-| **3.1 Região do alerta de doença**           | 🟢 Feito               | Puxa a lista de bairros dos postos                                         |
-| **3.2 Reagendar com calendário (admin)**     | 🟢 Feito               | Calendário clicável funcionando                                            |
-| **3.3 Motivo de status de conta**            | 🟢 Feito               | Motivo obrigatório ao mudar status e registrado na auditoria               |
-| **3.4 Unificar telas de busca**              | 🟢 Feito               | Busca unificada funcionando no admin                                       |
-| **4.1 Reagendar com calendário (atendente)** | 🟢 Feito               | Calendário clicável funcionando                                            |
-| **4.2 Avisar paciente inativo**              | 🟡 Com defeito         | Tela pronta, mas servidor não envia os dados                               |
-| **4.3 Cargo certo no cabeçalho**             | 🟡 Incompleto          | Faltam cargos como Motorista e Auxiliar                                    |
-| **5.1 Navegar abas com teclado**             | 🟢 Feito               | Setas do teclado funcionam nos painéis                                     |
-| **5.2 Erro claro nos campos**                | 🔴 Não feito           | Continua só com mensagem genérica no topo                                  |
-| **5.3 Indicador de senha fraca/forte**       | 🔴 Não feito           | Qualquer senha de 6 letras passa                                           |
-| **5.4 Limite de 1 ano no calendário**        | 🟡 Não ativado         | Código escrito, mas nunca é chamado                                        |
-| **5.5 Destacar formulário em edição**        | 🟡 Parcial             | Funciona em consulta, esquecido em exame                                   |
+| **3.1 Região do alerta de doença**           | 🟢 Feito               | Puxa bairros dos postos                                                    |
+| **3.2 Reagendar com calendário (admin)**     | 🟢 Feito               | Funcionando                                                                |
+| **3.3 Motivo de status de conta**            | 🟢 Feito               | Registrado na auditoria                                                    |
+| **3.4 Unificar telas de busca**              | 🟢 Feito               | Funcionando no admin                                                       |
+| **4.1 Reagendar com calendário (atendente)** | 🟢 Feito               | Funcionando                                                                |
+| **4.2 Avisar paciente inativo**              | 🟡 Revisar             | Atendente fail-closed; tratar sem vazar dados                              |
+| **4.3 Cargo certo no cabeçalho**             | 🟡 Revisar             | Incluir cargos faltantes                                                   |
+| **5.1 Navegar abas com teclado**             | 🟢 Feito               | Funcionando                                                                |
+| **5.2 Erro claro nos campos**                | 🔴 Não feito           | Pendente                                                                   |
+| **5.3 Indicador de senha fraca/forte**       | 🔴 Não feito           | Pendente                                                                   |
+| **5.4 Limite de 1 ano no calendário**        | 🟡 Revisar             | Verificar ativação em todos os fluxos                                      |
+| **5.5 Destacar formulário em edição**        | 🟡 Parcial             | Paridade entre consulta/exame                                              |
 
 ---
 
@@ -298,33 +305,40 @@ Abaixo está o checklist completo e organizado por tela, atualizado para guiar o
 Para o time não se perder tentando fazer tudo de uma vez, sugerimos aprovar as tarefas nestas 3 etapas lógicas:
 
 ### Etapa 1: Consertos prioritários do produto atual
-1. **Consertar a inicialização do Atendente** (Item 3.1) — concluído — e corrigir o aviso de paciente inativo (Item 3.2).
-2. **Consertar a gravação do motivo de status de usuário no Admin** (Item 4.1).
-3. **Ativar o limite de 1 ano no calendário de todas as telas** (Itens 2.4 e 3.4).
+1. **Consertar a inicialização do Atendente** (Item 3.1) — revisado/consolidado.
+2. **Revisar aviso de paciente inativo no Atendente** (Item 4.2) — garantir sem vazar dados.
+3. **Verificar limite de 1 ano no calendário** (Itens 2.4/3.4/4.1).
 
 ### Etapa 2: Alinhamento Oficial com o SUS e Cadastro Completo
-1. **Ajustar o Cargo do Atendente** (Item 1.1) e adicionar **Nome Social, CNS, Prioridade e Raça/Cor** (Itens 1.2 a 1.6).
-2. **Tornar o ponto de referência obrigatório apenas para zona rural** (Item 1.7).
-3. **Adicionar os textos explicativos e os avisos de erro em cada campo** (Itens 1.8 e 1.10).
-4. **Indicador de força de senha** (Item 1.9).
+1. **Ajustar Cargo do Atendente** (Item 1.1).
+2. **Adicionar Nome Social, CNS, Prioridade, Responsável p/ menor, Cor/Raça** (Itens 1.2–1.6).
+3. **Ponto de referência apenas para zona rural** (Item 1.7).
+4. **Textos explicativos e avisos inline** (Itens 1.8, 1.10).
+5. **Indicador de força de senha** (Item 1.9).
 
 ### Etapa 3: Automação, Gestão de Postos e Acabamento Visual
-1. **Gestão de Postos e Unidades de Saúde pelo Administrador** (Item 4.3) — concluído.
-2. **Geração automática de lembretes na véspera** (Item 6.1) — concluído.
-3. **Modal bonito ao excluir doenças e botões de tentar novamente** (Itens 4.2 e 2.6).
-4. **Blindagem e proteção contra senhas repetidas** (Itens 6.2 e 6.3).
+1. **Gestão de Postos/Unidades** (Item 4.3) — consolidado.
+2. **Lembretes automáticos** (Item 6.1) — consolidado.
+3. **Modais consistentes e botões de ação** (Itens 4.2, 2.6).
+4. **Blindagem e proteção contra senhas repetidas** (Itens 6.2, 6.3).
 
 ### Etapa 4: Governança administrativa
-1. **Definir níveis e permissões de administradores** antes de implementar novos papéis.
-2. **Ampliar relatórios somente após definir política de exportação e anonimização de dados sensíveis.**
+1. **Avaliar painel segmentado por `admin_level`** (superadmin/gestor/atendimento/alertas).
+2. **Definir política de exportação/anonimização e relatórios**.
 
 ### Etapa 5: Agenda por unidade e profissional
-1. Criar tabelas de profissionais, especialidades, vínculos e horários.
-2. Criar a gestão administrativa de profissionais e ofertas por unidade.
-3. Substituir os campos livres dos formulários de consulta e exame por selects dependentes.
-4. Criar cálculo de horários disponíveis e bloqueio de conflitos.
-5. Migrar agendamentos existentes que ainda possuem local/profissional em texto livre.
-6. Testar cenários de unidade sem oferta, profissional inativo, conflito de horário e troca de unidade durante o agendamento.
+1. Criar tabelas/gestão de profissionais, especialidades, vínculos e horários.
+2. Substituir campos livres por selects dependentes com validação no servidor.
+3. Cálculo de horários disponíveis e bloqueio de conflitos.
+4. Migrar/agrupar agendamentos existentes e testar cenários críticos.
+
+### Pendências transversais (conformidade/produção)
+- HTTPS/HSTS e httpOnly total do access em produção.
+- SMTP de produção configurado.
+- DPO nominal, revisão jurídica, KMS/Vault.
+- RNDS/Gov.br credenciados.
+- Substituir `prompt()/confirm()` nativos em alguns fluxos.
+- Cobertura E2E contínua.
 
 ---
 

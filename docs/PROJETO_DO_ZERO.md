@@ -75,7 +75,7 @@ Foi cogitado manter tudo em HTML/CSS/JS sem nenhum servidor próprio (dado salvo
 ```
 saude-plus/
 ├── index.html          # landing page
-├── auth.html            # login e cadastro (wizard 4 passos)
+├── auth.html            # login e cadastro (wizard de 2 passos: Você → Acesso)
 ├── dashboard.html        # painel do paciente
 ├── admin.html             # painel do administrador
 ├── atendente.html          # painel do atendente
@@ -349,7 +349,7 @@ Este apêndice condensa os dois diagnósticos completos já produzidos sobre a b
 - Acessibilidade de base já presente: `:focus-visible` global, `prefers-reduced-motion` respeitado, `aria-selected`/`role="tab"`/`role="tabpanel"` nas abas dos 3 painéis internos.
 - Sanitização de output (`esc()`) usada consistentemente antes de injetar dado dinâmico no DOM — evita XSS refletido.
 - Estado vazio tratado, feedback de carregamento (spinner) e de ação (toast) presentes em todo fluxo assíncrono.
-- Wizard de cadastro em 4 passos com indicador visual de progresso, máscaras de input em tempo real (CPF, telefone, CEP) e autopreenchimento via ViaCEP.
+- Wizard de cadastro em 2 passos (Você → Acesso) com indicador visual de progresso, máscaras em tempo real (CPF, telefone, CEP) e autopreenchimento via ViaCEP. Perfil completo vai para "Minha conta".
 
 ### 8.2 Segurança — crítico (backend)
 
@@ -374,7 +374,7 @@ Este apêndice condensa os dois diagnósticos completos já produzidos sobre a b
 ### 8.4 Manutenibilidade e DX — médio (backend)
 
 15. Sem linter/formatter configurado (`.eslintrc`, `prettier`).
-16. Sem CI configurado (Sprint 6 resolve).
+16. CI configurado em `.github/workflows/ci.yml` (lint, suíte + E2E com MySQL 8.4/Playwright, `npm audit` critical).
 17. Sem tipagem (JS puro, sem TypeScript/JSDoc consistente) em schema com 20+ campos em `users`.
 18. `assets/api.js` é um único arquivo global (IIFE), sem módulos ES.
 19. Sem `package.json` no nível raiz do projeto (só em `server/`).
@@ -430,7 +430,7 @@ O front valida mais do que o back exige — toda a integridade do cadastro hoje 
 
 ### 8.9 Refinamento — baixo impacto (UI/UX)
 
-16. Fonte Inter carregada via Google Fonts, sem hospedagem local — relevante para público rural com internet instável.
+16. Resolvido: Inter autohospedada em `assets/fonts/inter-latin.woff2`, sem request externo — adequada ao público rural com internet instável.
 17. Ícones SVG inline repetidos sem sprite/symbol compartilhado.
 18. Sem skeleton loading nas listas (usa spinner central genérico).
 19. Sem dark mode (ausência consciente, baixa prioridade dado o público).

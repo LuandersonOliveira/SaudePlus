@@ -410,7 +410,10 @@ CREATE TABLE IF NOT EXISTS professionals (
     job_title VARCHAR(100) NULL,
     registry VARCHAR(40) NULL,
     active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    user_id CHAR(36) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_professionals_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL,
+    UNIQUE KEY uq_professionals_user (user_id)
 ) ENGINE = InnoDB;
 
 -- O que cada UNIDADE oferece (especialidade de consulta ou tipo de exame)

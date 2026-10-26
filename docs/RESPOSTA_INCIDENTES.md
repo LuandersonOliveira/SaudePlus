@@ -1,5 +1,7 @@
 # Saúde+ — Playbook de Resposta a Incidentes (LGPD art. 48)
 
+> Revisão: 2026-10-26.
+
 ## 1. Triagem (até 24h)
 
 1. **Conter:** revogar `JWT_SECRET` (invalida todas as sessões) + `UPDATE refresh_tokens SET revoked = 1`;
@@ -17,7 +19,7 @@
 
 ## 3. Investigação e correção
 
-- Cruzar `audit_log` (`admin_view_user_docs`, `staff_update`, `lgpd_delete`) com janela do incidente.
+- Cruzar `audit_log` (`admin_view_user_docs`, `staff_update`, `lgpd_delete`, `auth_refresh_reuse_detected`) com janela do incidente.
 - Rodar `npm run smoke-test` + revisar `CORS_ORIGIN`, acessos DB, dependências (`npm audit`).
 - Lições aprendidas → atualizar RIPD e este playbook.
 

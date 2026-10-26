@@ -55,7 +55,11 @@ async function unitLabel(unitId) {
 router.get('/', async (req, res, next) => {
   try {
     const [professionals] = await pool.query(
-      'SELECT id, name, job_title, registry, active, created_at FROM professionals ORDER BY name'
+      `SELECT p.id, p.name, p.job_title, p.registry, p.active, p.user_id, p.created_at,
+              u.full_name AS user_name, u.email AS user_email, u.role AS user_role
+       FROM professionals p
+       LEFT JOIN users u ON u.id = p.user_id AND u.deleted_at IS NULL
+       ORDER BY p.name`
     );
     const [offers] = await pool.query(
       `SELECT po.id, po.professional_id, po.unit_id, po.kind, po.name, u.name AS unit_name

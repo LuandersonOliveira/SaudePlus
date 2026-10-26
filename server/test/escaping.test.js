@@ -93,7 +93,7 @@ test('esc() tolera null e undefined sem lançar', () => {
  * substituídas por dublês. Assim provamos que o clique chega à função certa
  * com os valores de data-*.
  */
-function extrairDelegado(html, alvo) {
+function extrairDelegado(html, alvo, fnNome = 'viewUser') {
   // Vários listeners de 'click' existem por página. O que nos interessa é o
   // delegado de data-act — identificado pelo closest('[data-act]') no corpo.
   const corpoDo = (marca) => {
@@ -140,6 +140,7 @@ function extrairDelegado(html, alvo) {
     ev: { target: elemento },
     showHistory: duble('showHistory'),
     viewUser: duble('viewUser'),
+    [fnNome]: duble(fnNome),
     viewPatient: duble('viewPatient'),
     rebookItem: duble('rebookItem'),
     cancelItem: duble('cancelItem'),
@@ -158,9 +159,9 @@ test('o clique em "Abrir histórico" chega a showHistory com o nome intacto', ()
   assert.deepEqual(chamadas, [['showHistory', ['abc-123', "Maria d'Ávila Souza"]]]);
 });
 
-test('o clique em "Abrir perfil" chega a viewUser', () => {
-  const chamadas = extrairDelegado(htmlDe('admin.html'), { act: 'view-user', id: 'abc-123' });
-  assert.deepEqual(chamadas, [['viewUser', ['abc-123']]]);
+test('o clique em "Visualizar" chega a openUserView', () => {
+  const chamadas = extrairDelegado(htmlDe('admin.html'), { act: 'user-view', id: 'abc-123' }, 'openUserView');
+  assert.deepEqual(chamadas, [['openUserView', ['abc-123']]]);
 });
 
 test('o clique em "Ver histórico" do atendente chega a viewPatient com o nome', () => {
@@ -276,7 +277,7 @@ test('todo data-act usado é tratado pelo listener delegado', () => {
 
 test('os botões de histórico carregam o id e o nome em data-attributes', () => {
   const esperado = {
-    'admin.html': ['show-history', 'view-user'],
+    'admin.html': ['show-history', 'user-view'],
     'atendente.html': ['view-history'],
   };
   for (const [p, acoes] of Object.entries(esperado)) {

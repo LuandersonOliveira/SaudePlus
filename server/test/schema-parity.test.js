@@ -87,6 +87,7 @@ const COLUNAS = [
   ['professionals', 'name'],
   ['professionals', 'job_title'],
   ['professionals', 'registry'],
+  ['professionals', 'user_id'],
   ['work_schedules', 'professional_id'],
   ['work_schedules', 'unit_id'],
   ['work_schedules', 'weekday'],
@@ -118,6 +119,7 @@ const TABELAS = [
   'health_units',
   'audit_log',
   'refresh_tokens',
+  'password_reset_tokens',
   'professionals',
   'unit_offers',
   'professional_offers',
@@ -271,7 +273,7 @@ test('o README documenta a ordem real das migrations', () => {
 
   // E a linha precisa bater com o que o script realmente executa.
   const pkg = require('../package.json');
-  const executadas = (pkg.scripts['migrate:all'].match(/migrate:[\w:]+/g) || [])
+  const executadas = (pkg.scripts['migrate:all'].match(/migrate:[\w:-]+/g) || [])
     .map((m) => m.replace('migrate:', ''));
   assert.ok(executadas.length >= 6, `migrate:all só encadeia ${executadas.length} migrations`);
   let anterior = -1;

@@ -2,7 +2,7 @@
 
 > Base: LGPD arts. 16, 37. Controladora: Secretaria Municipal de Saúde de
 > Lagoa de Itaenga/PE. Operador (software): equipe/fornecedor do Saúde+.
-> Revisar a cada mudança de finalidade ou de schema. Versão 1 — 09/10/2026.
+> Revisar a cada mudança de finalidade ou de schema. Versão 1 — 09/10/2026. Revisão: 2026-10-26.
 
 ## 1. Inventário de tratamentos
 
@@ -13,9 +13,10 @@
 | T3 | Consultas/exames agendados | `appointments`, `exams` | Prestação do serviço de saúde | idem T1 | titular; staff; admin | RNDS (RAC/REL, Fase 2) |
 | T4 | Lembretes | `reminders` | Continuidade do cuidado | idem T1 | titular | — |
 | T5 | Alertas epidemiológicos | `diseases` | Saúde pública (dado agregado, sem titular) | art. 11, II, b | todos logados | painel público futuro (agregado) |
-| T6 | Sessões | JWT (15 min) + `refresh_tokens` (hash) | Segurança do acesso | art. 16, I (cumprimento de obrigação de segurança, art. 46) | sistema | — |
-| T7 | Auditoria | `audit_log` (append-only) | Responsabilização (art. 6º, X) | art. 16, I | admin (`alertas` não vê) | ANPD/Poder Judiciário se requisitado |
+| T6 | Sessões | JWT access (15 min) + `refresh_tokens` rotativos (hash) | Segurança do acesso | art. 16, I (cumprimento de obrigação de segurança, art. 46) | sistema | — |
+| T7 | Auditoria | `audit_log` (append-only, hash encadeado com triggers) | Responsabilização (art. 6º, X) | art. 16, I | admin (`alertas` não vê) | ANPD/Poder Judiciário se requisitado |
 | T8 | Consentimento | `users.privacy_version/consent_at/consent_ip` | Prova da base legal e da versão da política aceita | art. 8º, §3º (ônus da prova) | admin | — |
+| T9 | Recuperação de senha / rotação | `password_reset_tokens` (hash, uso único) | Segurança de conta | art. 16, I | sistema | — |
 
 ## 2. Direitos do titular — como exercer (prazo: 15 dias)
 
@@ -36,12 +37,10 @@
 | Conta paciente inativa | 5 anos sem login (`RETENTION_INACTIVE_YEARS`) | anonimização automática (`npm run purge:retention -- --apply`) |
 | Consultas/exames passados | prazos legais do SUS (validar com Procuradoria) | mantidos anonimizados p/ estatística |
 | `refresh_tokens` revogados/expirados | 90 dias | DELETE físico no expurgo |
+| `password_reset_tokens` usados/expirados | 24h após expiração/uso | DELETE físico no expurgo |
 | `audit_log` | prazo legal + prescrição (validar; sugerido 5 anos) | avaliação jurídica antes de qualquer remoção (hoje: sem remoção) |
 | Backups | ciclo do backup + criptografia | restore testado; expurgo acompanha a base |
 
 ## 4. Segurança (resumo — detalhe em PLANO_RNDS_LGPD.md)
 
-Sessão curta + refresh rotativo; bcrypt; CPF/RG/CNS cifrados (AES-256-GCM, chave em
-`DATA_ENCRYPTION_KEY`, futuro KMS/Vault); TLS em produção; CORS allowlist; helmet;
-rate-limit; validação server-side (CPF/CNS); RBAC por papel + `admin_level`;
-audit append-only com `details` sanitizado; `.env` fora do git.
+Sessão curta (15 min) + refresh rotativo com detecção de reuso; bcrypt; MFA TOTP (staff/admin); CPF/RG/CNS cifrados (AES-256-GCM, chave em `DATA_ENCRYPTION_KEY`, futuro KMS/Vault); TLS em produção; CORS allowlist; helmet; rate-limit global e por `/auth`; validação server-side (CPF/CNS); RBAC por papel + `admin_level`; anonimização transacional em `DELETE /auth/me`; audit append-only com hash encadeado e `details` sanitizado; `.env` fora do git. 14 tabelas no schema.

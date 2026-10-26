@@ -133,6 +133,11 @@ export default [
         fetch: 'readonly', expect: 'readonly', test: 'readonly',
         describe: 'readonly', beforeAll: 'readonly', afterAll: 'readonly',
         device: 'readonly',
+        // Só existem dentro de page.evaluate(), que roda no navegador. Não
+        // são globais do Node — declarar aqui é dizer a verdade sobre o
+        // padrão, no mesmo espírito do getSession em assets/.
+        document: 'readonly', window: 'readonly', getComputedStyle: 'readonly',
+        location: 'readonly',
       },
     },
   },

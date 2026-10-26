@@ -1,764 +1,635 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
-  <meta charset="utf-8">
-  <title>Saúde+ — Lista de Ajustes Pendentes e Melhorias (Versão 3)</title>
-  <style>
-    @page {
-      size: A4;
-      margin: 16mm 18mm 16mm 18mm;
-    }
-
-    * {
-      box-sizing: border-box;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 11.5pt;
-      line-height: 1.5;
-      color: #1f2328;
-      background: #fff;
-      margin: 0;
-      padding: 0;
-    }
-
-    h1 {
-      font-size: 19pt;
-      font-weight: 800;
-      color: #0E2A27;
-      margin: 0 0 12pt 0;
-      line-height: 1.25;
-      border-bottom: 2.5px solid #0F7A6B;
-      padding-bottom: 6pt;
-    }
-
-    h2 {
-      font-size: 14pt;
-      font-weight: 700;
-      color: #0E2A27;
-      margin: 18pt 0 8pt 0;
-      padding-bottom: 4pt;
-      border-bottom: 1px solid #d0d7de;
-      page-break-after: avoid;
-      break-after: avoid;
-    }
-
-    h3 {
-      font-size: 12pt;
-      font-weight: 700;
-      color: #0B5C50;
-      margin: 14pt 0 6pt 0;
-      page-break-after: avoid;
-      break-after: avoid;
-    }
-
-    h4 {
-      font-size: 11pt;
-      font-weight: 600;
-      color: #0E2A27;
-      margin: 10pt 0 4pt 0;
-      page-break-after: avoid;
-      break-after: avoid;
-    }
-
-    p {
-      margin: 0 0 8pt 0;
-    }
-
-    blockquote {
-      margin: 10pt 0;
-      padding: 8pt 12pt;
-      background: #F3F7F5;
-      border-left: 4px solid #0F7A6B;
-      border-radius: 0 6px 6px 0;
-      color: #4b5563;
-      font-size: 10.5pt;
-    }
-
-    blockquote p:last-child {
-      margin-bottom: 0;
-    }
-
-    hr {
-      border: none;
-      border-top: 1px solid #d0d7de;
-      margin: 16pt 0;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 10pt 0 14pt 0;
-      font-size: 10pt;
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-
-    th,
-    td {
-      border: 1px solid #d0d7de;
-      padding: 6pt 8pt;
-      text-align: left;
-      vertical-align: top;
-    }
-
-    th {
-      background-color: #F3F7F5;
-      color: #0E2A27;
-      font-weight: 700;
-    }
-
-    tr:nth-child(even) td {
-      background-color: #fafbfc;
-    }
-
-    ul,
-    ol {
-      margin: 0 0 10pt 0;
-      padding-left: 18pt;
-    }
-
-    li {
-      margin-bottom: 4pt;
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-
-    li>input[type="checkbox"] {
-      margin-right: 5pt;
-      vertical-align: middle;
-    }
-
-    code {
-      font-family: Consolas, "SF Mono", Monaco, monospace;
-      font-size: 9.5pt;
-      background-color: #f6f8fa;
-      border: 1px solid #e1e4e8;
-      border-radius: 4px;
-      padding: 1pt 4pt;
-      color: #24292e;
-    }
-
-    strong {
-      color: #0E2A27;
-    }
-
-    a {
-      color: #0F7A6B;
-      text-decoration: none;
-    }
-  </style>
+<meta charset="utf-8">
+<title>Saúde+ — Lista de Ajustes Pendentes e Melhorias (Versão 3)</title>
+<style>
+  @page {
+    size: A4;
+    margin: 16mm 18mm 16mm 18mm;
+  }
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 11.5pt;
+    line-height: 1.5;
+    color: #1f2328;
+    background: #fff;
+    margin: 0;
+    padding: 0;
+  }
+  h1 {
+    font-size: 19pt;
+    font-weight: 800;
+    color: #0E2A27;
+    margin: 0 0 12pt 0;
+    line-height: 1.25;
+    border-bottom: 2.5px solid #0F7A6B;
+    padding-bottom: 6pt;
+  }
+  h2 {
+    font-size: 14pt;
+    font-weight: 700;
+    color: #0E2A27;
+    margin: 18pt 0 8pt 0;
+    padding-bottom: 4pt;
+    border-bottom: 1px solid #d0d7de;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  h3 {
+    font-size: 12pt;
+    font-weight: 700;
+    color: #0B5C50;
+    margin: 14pt 0 6pt 0;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  h4 {
+    font-size: 11pt;
+    font-weight: 600;
+    color: #0E2A27;
+    margin: 10pt 0 4pt 0;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  p {
+    margin: 0 0 8pt 0;
+  }
+  blockquote {
+    margin: 10pt 0;
+    padding: 8pt 12pt;
+    background: #F3F7F5;
+    border-left: 4px solid #0F7A6B;
+    border-radius: 0 6px 6px 0;
+    color: #4b5563;
+    font-size: 10.5pt;
+  }
+  blockquote p:last-child {
+    margin-bottom: 0;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid #d0d7de;
+    margin: 16pt 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10pt 0 14pt 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid #d0d7de;
+    padding: 6pt 8pt;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background-color: #F3F7F5;
+    color: #0E2A27;
+    font-weight: 700;
+  }
+  tr:nth-child(even) td {
+    background-color: #fafbfc;
+  }
+  ul, ol {
+    margin: 0 0 10pt 0;
+    padding-left: 18pt;
+  }
+  li {
+    margin-bottom: 4pt;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  li > input[type="checkbox"] {
+    margin-right: 5pt;
+    vertical-align: middle;
+  }
+  code {
+    font-family: Consolas, "SF Mono", Monaco, monospace;
+    font-size: 9.5pt;
+    background-color: #f6f8fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 4px;
+    padding: 1pt 4pt;
+    color: #24292e;
+  }
+  strong {
+    color: #0E2A27;
+  }
+  a {
+    color: #0F7A6B;
+    text-decoration: none;
+  }
+</style>
 </head>
-
 <body>
-  <h1>Saúde+ — Lista de Ajustes Pendentes e Melhorias (Versão 3)</h1>
-  <blockquote>
-    <p><strong>Para quem é este documento:</strong> para o time do projeto — vocês não precisam saber programar para
-      entender e decidir sobre estas tarefas. Cada item explica <strong>onde</strong> fica (qual tela, qual campo),
-      <strong>o que muda</strong> e <strong>por que muda</strong>. A parte de programar quem faz é a IA; a parte de
-      decidir &quot;faz sentido ou não&quot; é do time.</p>
-    <p>Marque a caixinha <code>[x]</code> quando o time decidir que aquele item está aprovado e pronto (ou concluído).
-    </p>
-  </blockquote>
-  <hr>
-  <h2>O que aconteceu desde a Versão 2 (Diagnóstico Geral)</h2>
-  <p>Fizemos uma varredura completa em <strong>todas as pastas e em todos os arquivos do projeto</strong> para checar o
-    que realmente foi implementado e o que ainda está faltando do <code>TAREFAS_SIMPLES_V2</code>. </p>
-  <p>Aqui está o resumo honesto do estado atual do sistema:</p>
-  <ol>
-    <li><strong>O que foi feito e está funcionando bem:</strong>
-      <ul>
-        <li>A região das doenças no painel do administrador agora vem certinha dos bairros dos postos de saúde (Item
-          3.1).</li>
-        <li>Reagendar consulta ou exame no administrador e no atendente agora abre um calendário em vez de ter que
-          digitar a data à mão (Itens 3.2 e 4.1).</li>
-        <li>O administrador agora tem uma tela única e unificada para buscar usuários e ver histórico (Item 3.4).</li>
-        <li>As abas dos painéis agora podem ser trocadas usando as setas do teclado (Item 5.1).</li>
-        <li>A confirmação de cancelamento no painel do paciente agora é uma janela bonita do app avisando sobre a perda
-          da vaga (Item 2.3).</li>
-        <li>Os botões de agendar consulta e exame agora travam e mostram &quot;Enviando...&quot; (Item 2.4).</li>
-        <li>Existem botões de &quot;Cancelar&quot; para limpar os formulários de consulta e exame (Item 2.5).</li>
-      </ul>
-    </li>
-  </ol>
-  <ul>
-    <li>O painel do atendente voltou a carregar normalmente: <code>requireRole</code> foi adicionada ao
-      <code>assets/api.js</code> e valida os papéis permitidos antes de carregar a fila (Item 3.1).</li>
-    <li>A gestão administrativa de usuários passou a buscar por nome, e-mail ou telefone, filtrar por papel/status e
-      registrar o motivo das alterações de conta na auditoria (Item 4.1).</li>
-    <li>O administrador agora pode cadastrar, editar, ativar e desativar unidades de saúde; unidades inativas deixam de
-      aparecer nos formulários de agendamento (Item 4.3).</li>
-    <li>O backend agora cria lembretes automáticos na véspera de consultas e exames pendentes ou confirmados, exibidos
-      no início do painel do paciente (Item 6.1).</li>
-    <li>O administrador agora pode baixar um resumo CSV agregado, sem dados pessoais identificáveis.</li>
-    <li>A exclusão de alertas agora usa modal próprio e o limite de um ano foi ativado nos campos de reagendamento
-      administrativo.</li>
-    <li>A visão geral administrativa agora mostra usuários pendentes, unidades ativas e alertas ativos; usuários exibem
-      último acesso; auditoria aceita filtros; alertas podem ser editados, ativados e desativados.</li>
-  </ul>
-  <ol start="2">
-    <li>
-      <p><strong>O que foi feito &quot;pela metade&quot; ou com defeitos que precisam de conserto:</strong></p>
-      <ul>
-        <li><strong>O cargo do atendente no cadastro (Item 1.1):</strong> foi colocado como lista, mas o código ficou
-          com partes duplicadas e deixa avançar sem escolher o cargo.</li>
-        <li><strong>O aviso de paciente inativo no atendente (Item 4.2):</strong> a tela foi programada para mostrar o
-          aviso, mas o servidor bloqueia os inativos antes de chegarem na tela. Então o aviso nunca aparece!</li>
-        <li><strong>O destaque ao editar (Item 5.5):</strong> funciona para consultas, mas não para exames.</li>
-      </ul>
-    </li>
-    <li>
-      <p><strong>O que NÃO foi feito e continua faltando:</strong></p>
-    </li>
-  </ol>
-  <ul>
-    <li>O escopo foi reduzido por decisão de produto e agora concentra-se em consultas, exames, alertas epidemiológicos,
-      lembretes e unidades de saúde.</li>
-    <li>Todos os campos oficiais de saúde (Nome Social, Cartão SUS/CNS, Prioridade legal, Responsável por menores,
-      Cor/raça).</li>
-    <li>Ponto de referência continua obrigatório para quem mora na cidade (deveria ser só para zona rural).</li>
-    <li>Avisos de erro ao lado dos campos e indicador de senha fraca/forte.</li>
-    <li>Telas específicas para os níveis administrativos; os níveis <code>superadmin</code>, <code>gestor</code>,
-      <code>atendimento</code> e <code>alertas</code> já existem no banco e podem ser atribuídos pelo superadmin, mas o
-      painel atual ainda é unificado.</li>
-  </ul>
-  <p>Abaixo está o checklist completo e organizado por tela, atualizado para guiar os próximos passos do time.</p>
-  <hr>
-  <h2>Painel Rápido de Status (V2 → V3)</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Tarefa original (V2)</th>
-        <th>Status no Código Real</th>
-        <th>Situação atual na V3</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><strong>1.1 Cargo do atendente</strong></td>
-        <td>🟡 Feito pela metade</td>
-        <td>Tem código duplicado e não valida se escolheu</td>
-      </tr>
-      <tr>
-        <td><strong>1.2 Nome social</strong></td>
-        <td>🔴 Não feito</td>
-        <td>Faltando no formulário e no banco</td>
-      </tr>
-      <tr>
-        <td><strong>1.3 Cartão SUS (CNS)</strong></td>
-        <td>🔴 Não feito</td>
-        <td>Faltando no formulário e no banco</td>
-      </tr>
-      <tr>
-        <td><strong>1.4 Prioridade de atendimento</strong></td>
-        <td>🔴 Não feito</td>
-        <td>Faltando no formulário e no banco</td>
-      </tr>
-      <tr>
-        <td><strong>1.5 Responsável p/ menor</strong></td>
-        <td>🔴 Não feito</td>
-        <td>Faltando no formulário e no banco</td>
-      </tr>
-      <tr>
-        <td><strong>1.6 Cor/raça</strong></td>
-        <td>🔴 Não feito</td>
-        <td>Faltando no formulário e no banco</td>
-      </tr>
-      <tr>
-        <td><strong>1.7 Ref. só para rural</strong></td>
-        <td>🔴 Não feito</td>
-        <td>Continua obrigatório para todo mundo</td>
-      </tr>
-      <tr>
-        <td><strong>1.8 Explicar por que pede dado</strong></td>
-        <td>🔴 Não feito</td>
-        <td>Nenhum texto de ajuda nos campos</td>
-      </tr>
-      <tr>
-        <td><strong>2.1 Escopo de serviços</strong></td>
-        <td>🟢 Encerrado</td>
-        <td>O produto mantém consultas, exames, alertas, lembretes e unidades de saúde</td>
-      </tr>
-      <tr>
-        <td><strong>2.2 Campo &quot;Outro&quot; no exame</strong></td>
-        <td>🟢 Feito</td>
-        <td>Funcionando (só falta validar preenchimento)</td>
-      </tr>
-      <tr>
-        <td><strong>2.3 Confirmação de cancelamento</strong></td>
-        <td>🟢 Feito</td>
-        <td>Modal bonito funcionando no paciente</td>
-      </tr>
-      <tr>
-        <td><strong>2.4 Botão trava ao enviar</strong></td>
-        <td>🟢 Feito</td>
-        <td>Funcionando em consultas e exames</td>
-      </tr>
-      <tr>
-        <td><strong>2.5 Botão cancelar formulário</strong></td>
-        <td>🟢 Feito</td>
-        <td>Funcionando em consultas e exames</td>
-      </tr>
-      <tr>
-        <td><strong>3.1 Região do alerta de doença</strong></td>
-        <td>🟢 Feito</td>
-        <td>Puxa a lista de bairros dos postos</td>
-      </tr>
-      <tr>
-        <td><strong>3.2 Reagendar com calendário (admin)</strong></td>
-        <td>🟢 Feito</td>
-        <td>Calendário clicável funcionando</td>
-      </tr>
-      <tr>
-        <td><strong>3.3 Motivo de status de conta</strong></td>
-        <td>🟢 Feito</td>
-        <td>Motivo obrigatório ao mudar status e registrado na auditoria</td>
-      </tr>
-      <tr>
-        <td><strong>3.4 Unificar telas de busca</strong></td>
-        <td>🟢 Feito</td>
-        <td>Busca unificada funcionando no admin</td>
-      </tr>
-      <tr>
-        <td><strong>4.1 Reagendar com calendário (atendente)</strong></td>
-        <td>🟢 Feito</td>
-        <td>Calendário clicável funcionando</td>
-      </tr>
-      <tr>
-        <td><strong>4.2 Avisar paciente inativo</strong></td>
-        <td>🟡 Com defeito</td>
-        <td>Tela pronta, mas servidor não envia os dados</td>
-      </tr>
-      <tr>
-        <td><strong>4.3 Cargo certo no cabeçalho</strong></td>
-        <td>🟡 Incompleto</td>
-        <td>Faltam cargos como Motorista e Auxiliar</td>
-      </tr>
-      <tr>
-        <td><strong>5.1 Navegar abas com teclado</strong></td>
-        <td>🟢 Feito</td>
-        <td>Setas do teclado funcionam nos painéis</td>
-      </tr>
-      <tr>
-        <td><strong>5.2 Erro claro nos campos</strong></td>
-        <td>🔴 Não feito</td>
-        <td>Continua só com mensagem genérica no topo</td>
-      </tr>
-      <tr>
-        <td><strong>5.3 Indicador de senha fraca/forte</strong></td>
-        <td>🔴 Não feito</td>
-        <td>Qualquer senha de 6 letras passa</td>
-      </tr>
-      <tr>
-        <td><strong>5.4 Limite de 1 ano no calendário</strong></td>
-        <td>🟡 Não ativado</td>
-        <td>Código escrito, mas nunca é chamado</td>
-      </tr>
-      <tr>
-        <td><strong>5.5 Destacar formulário em edição</strong></td>
-        <td>🟡 Parcial</td>
-        <td>Funciona em consulta, esquecido em exame</td>
-      </tr>
-    </tbody>
-  </table>
-  <hr>
-  <h2>1. Tela de Cadastro e Acesso (<code>auth.html</code>)</h2>
-  <h3>1.1 Consertar a escolha de Cargo do Atendente</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> primeiro passo do cadastro, ao escolher a opção
-      &quot;Atendente&quot;.
-      <strong>O que muda:</strong>
-      <ol>
-        <li>Limpar a repetição de campos que ficou no código visual.</li>
-        <li>Impedir que o atendente avance para o passo 2 sem escolher um cargo.</li>
-        <li>Se ele escolher a opção &quot;Outro&quot;, obrigar a escrever qual é o cargo no campo que abre embaixo.
-          <strong>Por que:</strong> hoje um atendente consegue clicar em &quot;Continuar&quot; sem escolher nenhum
-          cargo, ou escolher &quot;Outro&quot; e deixar a caixa em branco.
-        </li>
-      </ol>
-    </li>
-  </ul>
-  <h3>1.2 Adicionar campo &quot;Nome social&quot;</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> passo 2 (dados pessoais), logo abaixo do campo
-      &quot;Nome completo&quot;.
-      <strong>O que muda:</strong> adicionar o campo opcional &quot;Nome social&quot;, com um aviso explicando:
-      <em>&quot;Preencha apenas se você tiver um nome pelo qual prefere ser chamado(a), diferente do seu registro
-        civil&quot;</em>.
-      <strong>Por que:</strong> direito garantido por lei e pelo SUS (Portaria nº 1.820/2009). Quem usa nome social
-      precisa ser acolhido pelo nome correto no posto de saúde.
-    </li>
-  </ul>
-  <h3>1.3 Adicionar número do Cartão SUS (CNS)</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> passo 2 (dados pessoais), junto aos campos de CPF e
-      RG.
-      <strong>O que muda:</strong> adicionar o campo opcional &quot;Cartão Nacional de Saúde (CNS)&quot; com limite e
-      formatação de 15 números, avisando: <em>&quot;O número que consta no seu cartão do SUS (opcional se não tiver em
-        mãos)&quot;</em>.
-      <strong>Por que:</strong> qualquer posto, hospital ou sistema oficial do governo usa o CNS como chave principal de
-      atendimento.
-    </li>
-  </ul>
-  <h3>1.4 Adicionar pergunta sobre Prioridade Legal de Atendimento</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> passo 2 (dados pessoais).
-      <strong>O que muda:</strong> adicionar uma caixinha de seleção: <em>&quot;Possui prioridade legal de
-        atendimento?&quot;</em> com as opções: <strong>Nenhuma, Idoso (60+), Gestante, Pessoa com deficiência (PCD),
-        Lactante</strong>. Se a pessoa preencher a data de nascimento e ela tiver 60 anos ou mais, o sistema seleciona
-      &quot;Idoso (60+)&quot; sozinho automaticamente.
-      <strong>Por que:</strong> a Lei 10.048/2000 exige prioridade no atendimento de saúde. Se o sistema não souber
-      disso, o atendente não tem como organizar a fila de forma humana e legal.
-    </li>
-  </ul>
-  <h3>1.5 Campo para Nome do Responsável (quando for menor de 18 anos)</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> passo 2 (dados pessoais).
-      <strong>O que muda:</strong> assim que o usuário digita a data de nascimento, se o sistema calcular que ele tem
-      menos de 18 anos, abre automaticamente um campo obrigatório: <em>&quot;Nome do responsável legal /
-        acompanhante&quot;</em>. Para maiores de idade, esse campo fica escondido.
-      <strong>Por que:</strong> crianças e adolescentes não comparecem a consultas nem assinam termos de saúde
-      desacompanhados.
-    </li>
-  </ul>
-  <h3>1.6 Adicionar campo &quot;Cor ou Raça&quot; (Autodeclaração)</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> passo 2 (dados pessoais).
-      <strong>O que muda:</strong> adicionar campo opcional com as opções oficiais do IBGE e do Ministério da Saúde:
-      <strong>Branca, Preta, Parda, Amarela, Indígena, Prefiro não informar</strong>.
-      <strong>Por que:</strong> é uma exigência de qualquer cadastro de saúde pública no Brasil para garantir que as
-      políticas de saúde cheguem com igualdade a todas as comunidades.
-    </li>
-  </ul>
-  <h3>1.7 Ponto de referência obrigatório APENAS para quem mora na zona rural</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> passo 3 (endereço), campo &quot;Ponto de
-      referência&quot;.
-      <strong>O que muda:</strong> hoje o formulário trava se você não colocar ponto de referência, mesmo morando em rua
-      asfaltada com número e CEP. Vai mudar para: se a pessoa marcar <strong>Zona Urbana</strong>, o ponto de referência
-      se torna opcional. Se marcar <strong>Zona Rural</strong>, o ponto de referência continua obrigatório com a dica:
-      <em>&quot;Ex: Sítio São José, após o engenho, próximo à casa de Dona Maria&quot;</em>.
-      <strong>Por que:</strong> na zona urbana o carteiro e a ambulância acham pelo CEP e número; na zona rural, sem
-      ponto de referência a ambulância não encontra a residência do paciente.
-    </li>
-  </ul>
-  <h3>1.8 Textos explicativos sob campos delicados (Transparência / LGPD)</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> passo 2 e passo 4 (dados pessoais e documentos).
-      <strong>O que muda:</strong> colocar uma letrinha miúda e cinza embaixo de campos delicados explicando a
-      finalidade:<ul>
-        <li>Embaixo do CPF: <em>&quot;Usado para garantir que seus agendamentos fiquem vinculados unicamente a
-            você.&quot;</em></li>
-        <li>Embaixo do Telefone: <em>&quot;Usado para avisar caso sua consulta precise ser reagendada.&quot;</em></li>
-        <li>Embaixo da Senha: <em>&quot;Sua senha é criptografada e ninguém da equipe tem acesso a ela.&quot;</em>
-          <strong>Por que:</strong> aumenta a confiança do morador no aplicativo e atende à Lei Geral de Proteção de
-          Dados (LGPD).
-        </li>
-      </ul>
-    </li>
-  </ul>
-  <h3>1.9 Indicador visual de senha fraca, média ou forte</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> passo 4 (criação da senha).
-      <strong>O que muda:</strong> enquanto a pessoa digita a senha, aparece uma barrinha colorida embaixo (vermelha =
-      fraca, amarela = média, verde = forte) com dicas curtas (ex: <em>&quot;misture letras e números&quot;</em>).
-      <strong>Por que:</strong> como o sistema guarda histórico médico, senhas fáceis como &quot;123456&quot; colocam a
-      privacidade do paciente em risco.
-    </li>
-  </ul>
-  <h3>1.10 Avisos de erro direto no campo errado (em vez de aviso genérico)</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> passos 2, 3 e 4 do cadastro.
-      <strong>O que muda:</strong> se faltar preencher um campo obrigatório ou se a senha for muito curta, a caixinha
-      daquele campo específico fica com borda vermelha e uma mensagem embaixo dizendo exatamente o que falta (ex:
-      <em>&quot;Informe seu celular com DDD&quot;</em> ou <em>&quot;O CEP precisa ter 8 dígitos&quot;</em>), em vez de
-      só mostrar um aviso genérico flutuando no topo da tela.
-      <strong>Por que:</strong> a pessoa que está se cadastrando no celular não sabe o que errou se o aviso não apontar
-      para o campo exato.
-    </li>
-  </ul>
-  <hr>
-  <h2>2. Tela do Paciente (<code>dashboard.html</code>)</h2>
-  <h3>2.1 Escopo atual do painel do paciente</h3>
-  <ul>
-    <li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> painel do paciente
-      (<code>dashboard.html</code>).
-      <strong>O que muda:</strong> o painel permanece concentrado em consultas, exames, alertas epidemiológicos,
-      lembretes e unidades de saúde.
-      <strong>Por que:</strong> decisão de produto: manter uma superfície menor e coerente com os módulos realmente
-      implementados no backend e no banco.
-    </li>
-  </ul>
-  <h3>2.3 Exigir preenchimento ao escolher &quot;Outro&quot; no tipo de exame</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> formulário de agendar exame, campo &quot;Tipo de
-      exame&quot;.
-      <strong>O que muda:</strong> hoje o campo de texto já abre quando escolhe &quot;Outro&quot;, mas o formulário
-      deixa enviar com o campo vazio. O sistema agora vai avisar: <em>&quot;Por favor, informe qual é o exame&quot;</em>
-      e não deixa enviar em branco.
-      <strong>Por que:</strong> evita que o posto receba um pedido de exame sem saber do que se trata.
-    </li>
-  </ul>
-  <h3>2.4 Ativar de verdade a trava de agendamento no futuro (máximo 1 ano)</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> todos os campos de escolher data e hora de consulta e
-      exame.
-      <strong>O que muda:</strong> o calendário do celular/computador não vai deixar selecionar nenhuma data com mais de
-      12 meses para a frente.
-      <strong>Por que:</strong> evita que a pessoa digite o ano errado sem perceber (ex: agendar para o ano 2035 por
-      engano). O código disso já existe no arquivo, mas estava desligado.
-    </li>
-  </ul>
-  <h3>2.5 Destacar visualmente o formulário de Exame ao clicar em &quot;Editar&quot;</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> formulário de exames no painel do paciente.
-      <strong>O que muda:</strong> quando o paciente clica no botão &quot;Editar&quot; de um agendamento da lista, a
-      tela sobe até o formulário e ele ganha uma borda colorida destacada avisando: <em>&quot;Você está editando este
-        agendamento&quot;</em>, com um botão claro para salvar ou cancelar a edição.
-      <strong>Por que:</strong> hoje isso só foi feito no formulário de consultas; em exames a pessoa clica em editar e
-      não fica claro na tela que o formulário mudou para modo de edição.
-    </li>
-  </ul>
-  <h3>2.6 Botão de &quot;Reagendar&quot; para itens cancelados</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> na lista de consultas e exames cancelados do
-      paciente.
-      <strong>O que muda:</strong> quando uma consulta ou exame constar como &quot;Cancelado&quot;, colocar um
-      botãozinho amigável <strong>&quot;Tentar agendar novamente&quot;</strong>, que já abre o formulário pré-preenchido
-      com a mesma especialidade e local, precisando apenas escolher uma nova data.
-      <strong>Por que:</strong> se a consulta foi cancelada (por falta de médico ou pelo próprio paciente), ele não
-      precisa preencher tudo do zero novamente.
-    </li>
-  </ul>
-  <h3>2.7 Agenda inteligente por unidade, especialidade e profissional</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> formulários de agendamento de consultas e exames no
-      painel do paciente.
-      <strong>O que muda:</strong> remover o campo livre de profissional. O paciente escolherá a unidade, depois a
-      especialidade disponível, o profissional vinculado e, por fim, um dia e horário disponíveis. O mesmo fluxo será
-      aplicado aos exames.
-      <strong>Por que:</strong> impedir combinações inválidas e evitar que o paciente escolha um profissional ou serviço
-      que não exista na unidade selecionada.
-    </li>
-  </ul>
-  <h3>2.8 Comportamento dos campos dependentes</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> selects de unidade, especialidade, profissional, dia
-      e horário.
-      <strong>O que muda:</strong> cada escolha atualizará o próximo campo; trocar unidade ou especialidade limpará as
-      escolhas dependentes; ausência de opções impedirá o envio.
-      <strong>Por que:</strong> garantir uma seleção guiada e coerente para o paciente.
-    </li>
-  </ul>
-  <hr>
-  <h2>3. Tela do Atendente (<code>atendente.html</code>)</h2>
-  <h3>3.1 Consertar o carregamento do painel do atendente (Erro de Login)</h3>
-  <ul>
-    <li><input checked="" disabled="" type="checkbox"> <strong>Concluído:</strong> <code>requireRole</code> foi
-      adicionada ao <code>assets/api.js</code>, que é o cliente carregado por <code>atendente.html</code>. A função
-      valida os papéis permitidos e redireciona usuários para o painel correto.
-      <strong>Resultado:</strong> o erro <code>ReferenceError: requireRole is not defined</code> foi eliminado e a tela
-      deixa de ficar presa no spinner antes de carregar a fila.
-    </li>
-  </ul>
-  <h3>3.2 Fazer o aviso de &quot;Paciente Inativo/Pendente&quot; funcionar de verdade</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> aba &quot;Buscar paciente&quot; no painel do
-      atendente.
-      <strong>O que muda:</strong> quando o atendente buscar pelo nome ou e-mail de um paciente cuja conta esteja
-      desativada ou ainda aguardando aprovação, o sistema vai avisar com destaque amarelo: <em>&quot;Este paciente já
-        tem cadastro no sistema, mas a conta está [Inativa / Pendente]. Não crie um novo cadastro — solicite ao
-        administrador a reativação da conta existente.&quot;</em>
-      <strong>Por que:</strong> a tela do atendente já tem esse aviso desenhado, mas o servidor estava filtrando os
-      inativos antes da tela receber. Corrigindo no servidor, evita-se a criação de cadastros duplicados no posto de
-      saúde.
-    </li>
-  </ul>
-  <h3>3.3 Completar a lista de cargos no cabeçalho do atendente</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> saudação no topo da tela do atendente (ex:
-      <em>&quot;Olá, Maria! Enfermeira · Painel de atendimento&quot;</em>).
-      <strong>O que muda:</strong> atualizar a regra de formatação para reconhecer todos os cargos reais (incluindo
-      <strong>Motorista</strong>, <strong>Auxiliar Administrativo</strong>, etc.), exibindo o nome do cargo sempre com
-      letra bonita e acentuação correta.
-      <strong>Por que:</strong> cargos como Motorista e Auxiliar Administrativo estavam ficando de fora da lista oficial
-      de formatação.
-    </li>
-  </ul>
-  <h3>3.4 Ativar o limite de data no calendário de reagendamento do atendente</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> janelinha de reagendar atendimento na tela do
-      atendente.
-      <strong>O que muda:</strong> não permitir selecionar datas passadas nem datas além de 1 ano no futuro.
-      <strong>Por que:</strong> evita erros de digitação durante o atendimento corrido no balcão do posto.
-    </li>
-  </ul>
-  <hr>
-  <h2>4. Tela do Administrador (<code>admin.html</code>)</h2>
-  <h3>4.1 Salvar de verdade o motivo ao ativar ou inativar uma conta</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> na aba &quot;Usuários e Histórico&quot;, ao abrir o
-      perfil de um usuário e alterar seu status para &quot;Inativo&quot; ou &quot;Ativo&quot;.
-      <strong>O que muda:</strong>
-      <ol>
-        <li>Quando o administrador preencher o campo &quot;Observação / Motivo&quot; (ex: <em>&quot;Paciente mudou de
-            cidade&quot;</em> ou <em>&quot;Cadastro duplicado da dona Josefa&quot;</em>), o sistema vai realmente salvar
-          essa explicação no histórico de auditoria do sistema.</li>
-        <li>Adicionar uma coluna ou linha no relatório de auditoria mostrando o motivo registrado.
-          <strong>Por que:</strong> hoje a tela do admin tem o campo para digitar o motivo, mas o servidor ignorava o
-          texto e não gravava em lugar nenhum! Ninguém conseguia saber depois por que uma conta foi bloqueada.
-        </li>
-      </ol>
-    </li>
-  </ul>
-  <h3>4.2 Janela bonita ao excluir alerta de doença</h3>
-  <ul>
-    <li><input checked="" disabled="" type="checkbox"> <strong>Concluído:</strong> a aba &quot;Doenças&quot; usa um
-      modal próprio para confirmar a exclusão e informar a consequência da ação.</li>
-  </ul>
-  <h3>4.3 Gestão de Postos e Unidades de Saúde (<code>health_units</code>)</h3>
-  <ul>
-    <li><input checked="" disabled="" type="checkbox"> <strong>Concluído:</strong> a aba <strong>&quot;Unidades de
-        Saúde&quot;</strong> permite cadastrar, editar, ativar e desativar unidades. As ações são registradas na
-      auditoria.
-      <strong>O que muda:</strong> permitir que o administrador:<ol>
-        <li>Veja a lista dos postos de saúde, UBSs e hospitais cadastrados no município.</li>
-        <li>Adicione uma nova unidade se um posto novo for inaugurado em Lagoa de Itaenga.</li>
-        <li>Altere o nome, bairro ou desative uma unidade que estiver em reforma.
-          <strong>Resultado:</strong> unidades inativas deixam de aparecer nos formulários de agendamento, sem apagar o
-          registro nem o histórico administrativo.
-        </li>
-      </ol>
-    </li>
-  </ul>
-  <h3>4.4 Gestão de profissionais e especialidades por unidade</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> nova área administrativa ligada às unidades de saúde.
-      <strong>O que muda:</strong> cadastrar profissionais, cargos, especialidades/tipos de exame, vínculos com
-      unidades, dias da semana, horários, folgas e bloqueios.
-      <strong>Por que:</strong> a unidade deve ser a fonte de verdade dos serviços e profissionais disponíveis.
-    </li>
-  </ul>
-  <h3>4.5 Regras de disponibilidade e conflito</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>O que muda:</strong> bloquear agendamentos fora do horário,
-      profissionais inativos, especialidades não vinculadas, unidades inativas e conflitos de horário. As regras deverão
-      ser validadas também no servidor.</li>
-  </ul>
-  <h3>4.6 Histórico e auditoria da agenda profissional</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>O que muda:</strong> auditar criação, alteração, ativação,
-      desativação e mudanças de horários de profissionais e ofertas por unidade.</li>
-  </ul>
-  <hr>
-  <h2>5. Tela Inicial (<code>index.html</code>) e Navegação Geral</h2>
-  <h3>5.1 Redirecionamento correto do Atendente na página inicial</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> página inicial (<code>index.html</code>).
-      <strong>O que muda:</strong> se uma pessoa já logada como Atendente acessar a página inicial do site, o sistema
-      deve enviá-la direto para <code>atendente.html</code>. (Hoje o código só checava Administrador e mandava os
-      atendentes para a tela do paciente por engano).
-      <strong>Por que:</strong> evita confusão e cliques desnecessários para os funcionários da rede municipal.
-    </li>
-  </ul>
-  <h3>5.2 Organização dos arquivos de conexão do sistema</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>Onde:</strong> arquivos técnicos de conexão
-      (<code>assets/api.js</code> e pasta <code>server</code>).
-      <strong>O que muda:</strong> consolidar todas as regras de conexão e permissões em um único arquivo oficial dentro
-      de <code>assets/api.js</code>, eliminando arquivos duplicados deixados na pasta errada do servidor.
-      <strong>Por que:</strong> evita que alterações feitas em uma parte do sistema deixem de funcionar em outras telas.
-    </li>
-  </ul>
-  <hr>
-  <h2>6. Inteligência e Automação do Sistema (&quot;Debaixo do Capô&quot;)</h2>
-  <blockquote>
-    <p><em>Estes itens são resolvidos diretamente na programação pela IA, mas o time de produto precisa saber que
-        existem para poder testar e validar o funcionamento.</em></p>
-  </blockquote>
-  <h3>6.1 Lembretes automáticos na véspera da consulta/exame</h3>
-  <ul>
-    <li><input checked="" disabled="" type="checkbox"> <strong>Concluído:</strong> o job
-      <code>server/src/jobs/reminders.js</code> executa na inicialização e a cada 24 horas, localiza consultas e exames
-      pendentes/confirmados do dia seguinte e cria lembretes únicos.
-      <strong>Resultado:</strong> os lembretes aparecem no início do painel do paciente como “Novo” ou “Lido”.
-    </li>
-  </ul>
-  <h3>6.2 Blindagem de segurança no cadastro e nas datas</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>O que muda:</strong> o servidor passará a validar com rigor os dados
-      recebidos:<ol>
-        <li>Bloquear cadastros que venham com CPF de formato inválido (ex: <code>111.111.111-11</code>).</li>
-        <li>Rejeitar qualquer tentativa de agendamento em datas passadas, mesmo que alguém tente burlar o formulário.
-        </li>
-        <li>Garantir que ninguém consiga criar conta sem os dados essenciais de saúde.
-          <strong>Por que:</strong> segurança e integridade de dados são indispensáveis para um sistema que será
-          apresentado e licenciado para a Secretaria de Saúde do município.
-        </li>
-      </ol>
-    </li>
-  </ul>
-  <h3>6.3 Proteção contra tentativas repetidas de senha (Força bruta)</h3>
-  <ul>
-    <li><input disabled="" type="checkbox"> <strong>O que muda:</strong> se alguém errar a senha 5 vezes seguidas na
-      tela de login, o sistema bloqueia novas tentativas por 5 minutos naquele computador.
-      <strong>Por que:</strong> impede que pessoas mal-intencionadas usem robôs para adivinhar senhas de pacientes ou da
-      administração.
-    </li>
-  </ul>
-  <hr>
-  <h2>7. Roteiro Sugerido de Execução para o Time (Próximas Reuniões)</h2>
-  <p>Para o time não se perder tentando fazer tudo de uma vez, sugerimos aprovar as tarefas nestas 3 etapas lógicas:</p>
-  <h3>Etapa 1: Consertos prioritários do produto atual</h3>
-  <ol>
-    <li><strong>Consertar a inicialização do Atendente</strong> (Item 3.1) — concluído — e corrigir o aviso de paciente
-      inativo (Item 3.2).</li>
-    <li><strong>Consertar a gravação do motivo de status de usuário no Admin</strong> (Item 4.1).</li>
-    <li><strong>Ativar o limite de 1 ano no calendário de todas as telas</strong> (Itens 2.4 e 3.4).</li>
-  </ol>
-  <h3>Etapa 2: Alinhamento Oficial com o SUS e Cadastro Completo</h3>
-  <ol>
-    <li><strong>Ajustar o Cargo do Atendente</strong> (Item 1.1) e adicionar <strong>Nome Social, CNS, Prioridade e
-        Raça/Cor</strong> (Itens 1.2 a 1.6).</li>
-    <li><strong>Tornar o ponto de referência obrigatório apenas para zona rural</strong> (Item 1.7).</li>
-    <li><strong>Adicionar os textos explicativos e os avisos de erro em cada campo</strong> (Itens 1.8 e 1.10).</li>
-    <li><strong>Indicador de força de senha</strong> (Item 1.9).</li>
-  </ol>
-  <h3>Etapa 3: Automação, Gestão de Postos e Acabamento Visual</h3>
-  <ol>
-    <li><strong>Gestão de Postos e Unidades de Saúde pelo Administrador</strong> (Item 4.3) — concluído.</li>
-    <li><strong>Geração automática de lembretes na véspera</strong> (Item 6.1) — concluído.</li>
-    <li><strong>Modal bonito ao excluir doenças e botões de tentar novamente</strong> (Itens 4.2 e 2.6).</li>
-    <li><strong>Blindagem e proteção contra senhas repetidas</strong> (Itens 6.2 e 6.3).</li>
-  </ol>
-  <h3>Etapa 4: Governança administrativa</h3>
-  <ol>
-    <li><strong>Definir níveis e permissões de administradores</strong> antes de implementar novos papéis.</li>
-    <li><strong>Ampliar relatórios somente após definir política de exportação e anonimização de dados
-        sensíveis.</strong></li>
-  </ol>
-  <h3>Etapa 5: Agenda por unidade e profissional</h3>
-  <ol>
-    <li>Criar tabelas de profissionais, especialidades, vínculos e horários.</li>
-    <li>Criar a gestão administrativa de profissionais e ofertas por unidade.</li>
-    <li>Substituir campos livres dos formulários de consulta e exame por selects dependentes.</li>
-    <li>Criar horários disponíveis e bloqueio de conflitos.</li>
-    <li>Migrar agendamentos existentes que usam local/profissional em texto livre.</li>
-    <li>Testar unidade sem oferta, profissional inativo, conflito de horário e troca de unidade.</li>
-  </ol>
-  <hr>
-  <h2>8. Como usar este documento</h2>
-  <ol>
-    <li>Em cada reunião, o time escolhe a Etapa que quer executar.</li>
-    <li>Leiam item por item.</li>
-    <li>Se o item estiver aprovado como prioridade do time, instruam a IA para executar o código daquela etapa.</li>
-    <li>Após testarem e confirmarem na prática que a tela está funcionando, marquem a caixinha <code>[x]</code>.</li>
-  </ol>
+<h1>Saúde+ — Lista de Ajustes Pendentes e Melhorias (Versão 3)</h1>
+<blockquote>
+<p><strong>Para quem é este documento:</strong> para o time do projeto — vocês não precisam saber programar para entender e decidir sobre estas tarefas. Cada item explica <strong>onde</strong> fica (qual tela, qual campo), <strong>o que muda</strong> e <strong>por que muda</strong>. A parte de programar quem faz é a IA; a parte de decidir &quot;faz sentido ou não&quot; é do time.</p>
+<p>Marque a caixinha <code>[x]</code> quando o time decidir que aquele item está aprovado e pronto (ou concluído).</p>
+</blockquote>
+<hr>
+<h2>O que aconteceu desde a Versão 2 (Diagnóstico Geral)</h2>
+<p>Fizemos uma varredura completa em <strong>todas as pastas e em todos os arquivos do projeto</strong> para checar o que realmente foi implementado e o que ainda está faltando do <code>TAREFAS_SIMPLES_V2</code>. </p>
+<p>Aqui está o resumo honesto do estado atual do sistema:</p>
+<ol>
+<li><p><strong>O que foi feito e está funcionando bem (verificado):</strong></p>
+<ul>
+<li>A região das doenças no painel do administrador agora vem certinha dos bairros dos postos de saúde (Item 3.1).</li>
+<li>Reagendar consulta ou exame no administrador e no atendente agora abre um calendário em vez de ter que digitar a data à mão (Itens 3.2 e 4.1).</li>
+<li>O administrador agora tem uma tela única e unificada para buscar usuários e ver histórico (Item 3.4).</li>
+<li>As abas dos painéis agora podem ser trocadas usando as setas do teclado (Item 5.1).</li>
+<li>A confirmação de cancelamento no painel do paciente agora é uma janela bonita do app avisando sobre a perda da vaga (Item 2.3).</li>
+<li>Os botões de agendar consulta e exame agora travam e mostram &quot;Enviando...&quot; (Item 2.4).</li>
+<li>Existem botões de &quot;Cancelar&quot; para limpar os formulários de consulta e exame (Item 2.5).</li>
+<li>O painel do atendente voltou a carregar normalmente: <code>requireRole</code> foi adicionada ao <code>assets/api.js</code> e valida os papéis permitidos antes de carregar a fila (Item 3.1).</li>
+<li>A gestão administrativa de usuários passou a buscar por nome, e-mail ou telefone, filtrar por papel/status e registrar o motivo das alterações de conta na auditoria (Item 4.1).</li>
+<li>O administrador agora pode cadastrar, editar, ativar e desativar unidades de saúde; unidades inativas deixam de aparecer nos formulários de agendamento (Item 4.3).</li>
+<li>O backend agora cria lembretes automáticos na véspera de consultas e exames pendentes ou confirmados, exibidos no início do painel do paciente (Item 6.1).</li>
+<li>O administrador agora pode baixar um resumo CSV agregado, sem dados pessoais identificáveis.</li>
+<li>A exclusão de alertas agora usa modal próprio.</li>
+<li>A visão geral administrativa agora mostra usuários pendentes, unidades ativas e alertas ativos; usuários exibem último acesso; auditoria aceita filtros; alertas podem ser editados, ativados e desativados.</li>
+<li>Auth: access 15 min, refresh rotativo 30d, MFA TOTP, recuperação de senha (forgot/reset), logout revoga.</li>
+<li>Admin com <code>admin_level</code> granular, capability para promover admin, listagens filtram <code>deleted_at</code>.</li>
+<li>Atendente sem vínculo é fail-closed; agenda/exames não vazam todos os pacientes.</li>
+<li>CI: lint, suíte + E2E (MySQL 8.4 + Playwright Chromium), <code>npm audit critical</code>.</li>
+<li>327 testes <code>node:test</code> passando + <code>test:race</code> + E2E Playwright.</li>
+<li>Cadastro em <strong>wizard de 2 passos</strong> (não 4). Fonte <strong>Inter autohospedada</strong> (sem Google Fonts). Schema com <strong>14 tabelas</strong> incluindo <code>refresh_tokens</code> e <code>password_reset_tokens</code>. <code>professionals.user_id</code> presente. <code>migrate:all</code> inclui <code>professional-user</code> entre v3 e security.</li>
+</ul>
+</li>
+<li><p><strong>O que foi feito &quot;pela metade&quot; ou com defeitos que precisam de conserto (verificado):</strong></p>
+<ul>
+<li><strong>O cargo do atendente no cadastro (Item 1.1):</strong> foi colocado como lista; revisar validação para impedir avanço sem escolha e limpar duplicados conforme necessário.</li>
+<li><strong>O aviso de paciente inativo no atendente (Item 4.2):</strong> precisa garantir comportamento consistente (atendente sem vínculo é fail-closed; busca de pacientes deve tratar inativos de forma segura sem vazar dados).</li>
+<li><strong>O destaque ao editar (Item 5.5):</strong> revisar em exames para paridade com consultas.</li>
+</ul>
+</li>
+<li><p><strong>O que NÃO foi feito e continua faltando (conforme verificação):</strong></p>
+<ul>
+<li>O escopo concentra-se em consultas, exames, alertas epidemiológicos, lembretes e unidades de saúde.</li>
+<li>Campos oficiais de saúde (Nome Social, Cartão SUS/CNS, Prioridade legal, Responsável por menores, Cor/raça) — ainda pendentes se não implementados.</li>
+<li>Ponto de referência: revisar obrigatoriedade (zona urbana vs rural).</li>
+<li>Avisos de erro inline e indicador de senha fraca/forte em pontos do cadastro.</li>
+<li>Telas específicas por nível administrativo: níveis existem (<code>superadmin</code>, <code>gestor</code>, <code>atendimento</code>, <code>alertas</code>) e podem ser atribuídos; painel ainda pode ser unificado — avaliar necessidade de segmentação.</li>
+<li>Agenda inteligente por unidade/especialidade/profissional/horários — em evolução (itens 2.7/2.8, 4.4/4.5 abertos ou em andamento conforme escopo).</li>
+<li>Lacunas remanescentes: HTTPS/HSTS e httpOnly total do access em produção, SMTP de produção configurado, DPO nominal, revisão jurídica, KMS/Vault, RNDS/Gov.br credenciados, painel admin segmentado por nível, substituir <code>prompt()/confirm()</code> nativos em alguns fluxos, cobertura E2E contínua.</li>
+</ul>
+</li>
+</ol>
+<p>Abaixo está o checklist completo e organizado por tela, atualizado para guiar os próximos passos do time.</p>
+<hr>
+<h2>Painel Rápido de Status (V2 → V3)</h2>
+<table>
+<thead>
+<tr>
+<th>Tarefa original (V2)</th>
+<th>Status no Código Real</th>
+<th>Situação atual na V3</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>1.1 Cargo do atendente</strong></td>
+<td>🟡 Feito pela metade</td>
+<td>Validar escolha; limpar duplicados</td>
+</tr>
+<tr>
+<td><strong>1.2 Nome social</strong></td>
+<td>🔴 Não feito</td>
+<td>Pendente</td>
+</tr>
+<tr>
+<td><strong>1.3 Cartão SUS (CNS)</strong></td>
+<td>🔴 Não feito</td>
+<td>Pendente</td>
+</tr>
+<tr>
+<td><strong>1.4 Prioridade de atendimento</strong></td>
+<td>🔴 Não feito</td>
+<td>Pendente</td>
+</tr>
+<tr>
+<td><strong>1.5 Responsável p/ menor</strong></td>
+<td>🔴 Não feito</td>
+<td>Pendente</td>
+</tr>
+<tr>
+<td><strong>1.6 Cor/raça</strong></td>
+<td>🔴 Não feito</td>
+<td>Pendente</td>
+</tr>
+<tr>
+<td><strong>1.7 Ref. só para rural</strong></td>
+<td>🔴 Não feito</td>
+<td>Pendente</td>
+</tr>
+<tr>
+<td><strong>1.8 Explicar por que pede dado</strong></td>
+<td>🔴 Não feito</td>
+<td>Pendente</td>
+</tr>
+<tr>
+<td><strong>2.1 Escopo de serviços</strong></td>
+<td>🟢 Encerrado</td>
+<td>Consultas, exames, alertas, lembretes, unidades de saúde</td>
+</tr>
+<tr>
+<td><strong>2.2 Campo &quot;Outro&quot; no exame</strong></td>
+<td>🟢 Feito</td>
+<td>Funcionando</td>
+</tr>
+<tr>
+<td><strong>2.3 Confirmação de cancelamento</strong></td>
+<td>🟢 Feito</td>
+<td>Modal funcionando no paciente</td>
+</tr>
+<tr>
+<td><strong>2.4 Botão trava ao enviar</strong></td>
+<td>🟢 Feito</td>
+<td>Funcionando em consultas e exames</td>
+</tr>
+<tr>
+<td><strong>2.5 Botão cancelar formulário</strong></td>
+<td>🟢 Feito</td>
+<td>Funcionando em consultas e exames</td>
+</tr>
+<tr>
+<td><strong>3.1 Região do alerta de doença</strong></td>
+<td>🟢 Feito</td>
+<td>Puxa bairros dos postos</td>
+</tr>
+<tr>
+<td><strong>3.2 Reagendar com calendário (admin)</strong></td>
+<td>🟢 Feito</td>
+<td>Funcionando</td>
+</tr>
+<tr>
+<td><strong>3.3 Motivo de status de conta</strong></td>
+<td>🟢 Feito</td>
+<td>Registrado na auditoria</td>
+</tr>
+<tr>
+<td><strong>3.4 Unificar telas de busca</strong></td>
+<td>🟢 Feito</td>
+<td>Funcionando no admin</td>
+</tr>
+<tr>
+<td><strong>4.1 Reagendar com calendário (atendente)</strong></td>
+<td>🟢 Feito</td>
+<td>Funcionando</td>
+</tr>
+<tr>
+<td><strong>4.2 Avisar paciente inativo</strong></td>
+<td>🟡 Revisar</td>
+<td>Atendente fail-closed; tratar sem vazar dados</td>
+</tr>
+<tr>
+<td><strong>4.3 Cargo certo no cabeçalho</strong></td>
+<td>🟡 Revisar</td>
+<td>Incluir cargos faltantes</td>
+</tr>
+<tr>
+<td><strong>5.1 Navegar abas com teclado</strong></td>
+<td>🟢 Feito</td>
+<td>Funcionando</td>
+</tr>
+<tr>
+<td><strong>5.2 Erro claro nos campos</strong></td>
+<td>🔴 Não feito</td>
+<td>Pendente</td>
+</tr>
+<tr>
+<td><strong>5.3 Indicador de senha fraca/forte</strong></td>
+<td>🔴 Não feito</td>
+<td>Pendente</td>
+</tr>
+<tr>
+<td><strong>5.4 Limite de 1 ano no calendário</strong></td>
+<td>🟡 Revisar</td>
+<td>Verificar ativação em todos os fluxos</td>
+</tr>
+<tr>
+<td><strong>5.5 Destacar formulário em edição</strong></td>
+<td>🟡 Parcial</td>
+<td>Paridade entre consulta/exame</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>1. Tela de Cadastro e Acesso (<code>auth.html</code>)</h2>
+<h3>1.1 Consertar a escolha de Cargo do Atendente</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> primeiro passo do cadastro, ao escolher a opção &quot;Atendente&quot;.
+<strong>O que muda:</strong> <ol>
+<li>Limpar a repetição de campos que ficou no código visual.</li>
+<li>Impedir que o atendente avance para o passo 2 sem escolher um cargo.</li>
+<li>Se ele escolher a opção &quot;Outro&quot;, obrigar a escrever qual é o cargo no campo que abre embaixo.
+<strong>Por que:</strong> hoje um atendente consegue clicar em &quot;Continuar&quot; sem escolher nenhum cargo, ou escolher &quot;Outro&quot; e deixar a caixa em branco.</li>
+</ol>
+</li>
+</ul>
+<h3>1.2 Adicionar campo &quot;Nome social&quot;</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> passo 2 (dados pessoais), logo abaixo do campo &quot;Nome completo&quot;.
+<strong>O que muda:</strong> adicionar o campo opcional &quot;Nome social&quot;, com um aviso explicando: <em>&quot;Preencha apenas se você tiver um nome pelo qual prefere ser chamado(a), diferente do seu registro civil&quot;</em>.
+<strong>Por que:</strong> direito garantido por lei e pelo SUS (Portaria nº 1.820/2009). Quem usa nome social precisa ser acolhido pelo nome correto no posto de saúde.</li>
+</ul>
+<h3>1.3 Adicionar número do Cartão SUS (CNS)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> passo 2 (dados pessoais), junto aos campos de CPF e RG.
+<strong>O que muda:</strong> adicionar o campo opcional &quot;Cartão Nacional de Saúde (CNS)&quot; com limite e formatação de 15 números, avisando: <em>&quot;O número que consta no seu cartão do SUS (opcional se não tiver em mãos)&quot;</em>.
+<strong>Por que:</strong> qualquer posto, hospital ou sistema oficial do governo usa o CNS como chave principal de atendimento.</li>
+</ul>
+<h3>1.4 Adicionar pergunta sobre Prioridade Legal de Atendimento</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> passo 2 (dados pessoais).
+<strong>O que muda:</strong> adicionar uma caixinha de seleção: <em>&quot;Possui prioridade legal de atendimento?&quot;</em> com as opções: <strong>Nenhuma, Idoso (60+), Gestante, Pessoa com deficiência (PCD), Lactante</strong>. Se a pessoa preencher a data de nascimento e ela tiver 60 anos ou mais, o sistema seleciona &quot;Idoso (60+)&quot; sozinho automaticamente.
+<strong>Por que:</strong> a Lei 10.048/2000 exige prioridade no atendimento de saúde. Se o sistema não souber disso, o atendente não tem como organizar a fila de forma humana e legal.</li>
+</ul>
+<h3>1.5 Campo para Nome do Responsável (quando for menor de 18 anos)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> passo 2 (dados pessoais).
+<strong>O que muda:</strong> assim que o usuário digita a data de nascimento, se o sistema calcular que ele tem menos de 18 anos, abre automaticamente um campo obrigatório: <em>&quot;Nome do responsável legal / acompanhante&quot;</em>. Para maiores de idade, esse campo fica escondido.
+<strong>Por que:</strong> crianças e adolescentes não comparecem a consultas nem assinam termos de saúde desacompanhados.</li>
+</ul>
+<h3>1.6 Adicionar campo &quot;Cor ou Raça&quot; (Autodeclaração)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> passo 2 (dados pessoais).
+<strong>O que muda:</strong> adicionar campo opcional com as opções oficiais do IBGE e do Ministério da Saúde: <strong>Branca, Preta, Parda, Amarela, Indígena, Prefiro não informar</strong>.
+<strong>Por que:</strong> é uma exigência de qualquer cadastro de saúde pública no Brasil para garantir que as políticas de saúde cheguem com igualdade a todas as comunidades.</li>
+</ul>
+<h3>1.7 Ponto de referência obrigatório APENAS para quem mora na zona rural</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> passo 3 (endereço), campo &quot;Ponto de referência&quot;.
+<strong>O que muda:</strong> hoje o formulário trava se você não colocar ponto de referência, mesmo morando em rua asfaltada com número e CEP. Vai mudar para: se a pessoa marcar <strong>Zona Urbana</strong>, o ponto de referência se torna opcional. Se marcar <strong>Zona Rural</strong>, o ponto de referência continua obrigatório com a dica: <em>&quot;Ex: Sítio São José, após o engenho, próximo à casa de Dona Maria&quot;</em>.
+<strong>Por que:</strong> na zona urbana o carteiro e a ambulância acham pelo CEP e número; na zona rural, sem ponto de referência a ambulância não encontra a residência do paciente.</li>
+</ul>
+<h3>1.8 Textos explicativos sob campos delicados (Transparência / LGPD)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> passo 2 e passo 4 (dados pessoais e documentos).
+<strong>O que muda:</strong> colocar uma letrinha miúda e cinza embaixo de campos delicados explicando a finalidade:<ul>
+<li>Embaixo do CPF: <em>&quot;Usado para garantir que seus agendamentos fiquem vinculados unicamente a você.&quot;</em></li>
+<li>Embaixo do Telefone: <em>&quot;Usado para avisar caso sua consulta precise ser reagendada.&quot;</em></li>
+<li>Embaixo da Senha: <em>&quot;Sua senha é criptografada e ninguém da equipe tem acesso a ela.&quot;</em>
+<strong>Por que:</strong> aumenta a confiança do morador no aplicativo e atende à Lei Geral de Proteção de Dados (LGPD).</li>
+</ul>
+</li>
+</ul>
+<h3>1.9 Indicador visual de senha fraca, média ou forte</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> passo 4 (criação da senha).
+<strong>O que muda:</strong> enquanto a pessoa digita a senha, aparece uma barrinha colorida embaixo (vermelha = fraca, amarela = média, verde = forte) com dicas curtas (ex: <em>&quot;misture letras e números&quot;</em>).
+<strong>Por que:</strong> como o sistema guarda histórico médico, senhas fáceis como &quot;123456&quot; colocam a privacidade do paciente em risco.</li>
+</ul>
+<h3>1.10 Avisos de erro direto no campo errado (em vez de aviso genérico)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> passos 2, 3 e 4 do cadastro.
+<strong>O que muda:</strong> se faltar preencher um campo obrigatório ou se a senha for muito curta, a caixinha daquele campo específico fica com borda vermelha e uma mensagem embaixo dizendo exatamente o que falta (ex: <em>&quot;Informe seu celular com DDD&quot;</em> ou <em>&quot;O CEP precisa ter 8 dígitos&quot;</em>), em vez de só mostrar um aviso genérico flutuando no topo da tela.
+<strong>Por que:</strong> a pessoa que está se cadastrando no celular não sabe o que errou se o aviso não apontar para o campo exato.</li>
+</ul>
+<hr>
+<h2>2. Tela do Paciente (<code>dashboard.html</code>)</h2>
+<h3>2.1 Escopo atual do painel do paciente</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> painel do paciente (<code>dashboard.html</code>).
+<strong>O que muda:</strong> o painel permanece concentrado em consultas, exames, alertas epidemiológicos, lembretes e unidades de saúde.
+<strong>Por que:</strong> decisão de produto: manter uma superfície menor e coerente com os módulos realmente implementados no backend e no banco.</li>
+</ul>
+<h3>2.3 Exigir preenchimento ao escolher &quot;Outro&quot; no tipo de exame</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> formulário de agendar exame, campo &quot;Tipo de exame&quot;.
+<strong>O que muda:</strong> hoje o campo de texto já abre quando escolhe &quot;Outro&quot;, mas o formulário deixa enviar com o campo vazio. O sistema agora vai avisar: <em>&quot;Por favor, informe qual é o exame&quot;</em> e não deixa enviar em branco.
+<strong>Por que:</strong> evita que o posto receba um pedido de exame sem saber do que se trata.</li>
+</ul>
+<h3>2.4 Ativar de verdade a trava de agendamento no futuro (máximo 1 ano)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> todos os campos de escolher data e hora de consulta e exame.
+<strong>O que muda:</strong> o calendário do celular/computador não vai deixar selecionar nenhuma data com mais de 12 meses para a frente.
+<strong>Por que:</strong> evita que a pessoa digite o ano errado sem perceber (ex: agendar para o ano 2035 por engano). O código disso já existe no arquivo, mas estava desligado.</li>
+</ul>
+<h3>2.5 Destacar visualmente o formulário de Exame ao clicar em &quot;Editar&quot;</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> formulário de exames no painel do paciente.
+<strong>O que muda:</strong> quando o paciente clica no botão &quot;Editar&quot; de um agendamento da lista, a tela sobe até o formulário e ele ganha uma borda colorida destacada avisando: <em>&quot;Você está editando este agendamento&quot;</em>, com um botão claro para salvar ou cancelar a edição.
+<strong>Por que:</strong> hoje isso só foi feito no formulário de consultas; em exames a pessoa clica em editar e não fica claro na tela que o formulário mudou para modo de edição.</li>
+</ul>
+<h3>2.6 Botão de &quot;Reagendar&quot; para itens cancelados</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> na lista de consultas e exames cancelados do paciente.
+<strong>O que muda:</strong> quando uma consulta ou exame constar como &quot;Cancelado&quot;, colocar um botãozinho amigável <strong>&quot;Tentar agendar novamente&quot;</strong>, que já abre o formulário pré-preenchido com a mesma especialidade e local, precisando apenas escolher uma nova data.
+<strong>Por que:</strong> se a consulta foi cancelada (por falta de médico ou pelo próprio paciente), ele não precisa preencher tudo do zero novamente.</li>
+</ul>
+<h3>2.7 Agenda inteligente por unidade, especialidade e profissional</h3>
+<ul>
+<li><p><input checked="" disabled="" type="checkbox"> 
+<strong>Onde:</strong> formulários de agendamento de consultas e exames no painel do paciente.
+<strong>O que muda:</strong> remover o campo livre/opcional de <strong>Profissional</strong> do formulário de consulta. O paciente deverá seguir uma seleção guiada:</p>
+<ol>
+<li>Escolher a unidade de saúde.</li>
+<li>Visualizar somente as especialidades disponíveis naquela unidade.</li>
+<li>Escolher a especialidade.</li>
+<li>Visualizar somente os profissionais vinculados à unidade e à especialidade escolhidas.</li>
+<li>Escolher um dia e horário realmente disponíveis para aquele profissional.</li>
+</ol>
+<p>O mesmo fluxo deverá existir para exames: a unidade exibirá apenas os tipos de exame e profissionais habilitados para aquela unidade, respeitando os dias e horários cadastrados.
+<strong>Por que:</strong> evita que o paciente selecione um profissional ou serviço que não existe na unidade escolhida e reduz pedidos impossíveis de atender.</p>
+</li>
+</ul>
+<h3>2.8 Comportamento dos campos dependentes</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> selects de unidade, especialidade, profissional, dia e horário.
+<strong>O que muda:</strong> cada escolha deve atualizar o próximo campo. Enquanto os dados são carregados, o select deve mostrar “Carregando...”; quando não houver opção compatível, deve explicar o motivo e impedir o envio.
+<strong>Regras:</strong> trocar a unidade limpa especialidade, profissional, data e horário; trocar a especialidade limpa profissional, data e horário; trocar o profissional recalcula os horários disponíveis.
+<strong>Por que:</strong> impede combinações inválidas e deixa o fluxo compreensível para o paciente.</li>
+</ul>
+<hr>
+<h2>3. Tela do Atendente (<code>atendente.html</code>)</h2>
+<h3>3.1 Consertar o carregamento do painel do atendente (Erro de Login)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Concluído:</strong> <code>requireRole</code> foi adicionada ao <code>assets/api.js</code>, que é o cliente carregado por <code>atendente.html</code>. A função valida os papéis permitidos e redireciona usuários para o painel correto.
+<strong>Resultado:</strong> o erro <code>ReferenceError: requireRole is not defined</code> foi eliminado e a tela deixa de ficar presa no spinner antes de carregar a fila.</li>
+</ul>
+<h3>3.2 Fazer o aviso de &quot;Paciente Inativo/Pendente&quot; funcionar de verdade</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> aba &quot;Buscar paciente&quot; no painel do atendente.
+<strong>O que muda:</strong> quando o atendente buscar pelo nome ou e-mail de um paciente cuja conta esteja desativada ou ainda aguardando aprovação, o sistema vai avisar com destaque amarelo: <em>&quot;Este paciente já tem cadastro no sistema, mas a conta está [Inativa / Pendente]. Não crie um novo cadastro — solicite ao administrador a reativação da conta existente.&quot;</em>
+<strong>Por que:</strong> a tela do atendente já tem esse aviso desenhado, mas o servidor estava filtrando os inativos antes da tela receber. Corrigindo no servidor, evita-se a criação de cadastros duplicados no posto de saúde.</li>
+</ul>
+<h3>3.3 Completar a lista de cargos no cabeçalho do atendente</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> saudação no topo da tela do atendente (ex: <em>&quot;Olá, Maria! Enfermeira · Painel de atendimento&quot;</em>).
+<strong>O que muda:</strong> atualizar a regra de formatação para reconhecer todos os cargos reais (incluindo <strong>Motorista</strong>, <strong>Auxiliar Administrativo</strong>, etc.), exibindo o nome do cargo sempre com letra bonita e acentuação correta.
+<strong>Por que:</strong> cargos como Motorista e Auxiliar Administrativo estavam ficando de fora da lista oficial de formatação.</li>
+</ul>
+<h3>3.4 Ativar o limite de data no calendário de reagendamento do atendente</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> janelinha de reagendar atendimento na tela do atendente.
+<strong>O que muda:</strong> não permitir selecionar datas passadas nem datas além de 1 ano no futuro.
+<strong>Por que:</strong> evita erros de digitação durante o atendimento corrido no balcão do posto.</li>
+</ul>
+<hr>
+<h2>4. Tela do Administrador (<code>admin.html</code>)</h2>
+<h3>4.1 Salvar de verdade o motivo ao ativar ou inativar uma conta</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> na aba &quot;Usuários e Histórico&quot;, ao abrir o perfil de um usuário e alterar seu status para &quot;Inativo&quot; ou &quot;Ativo&quot;.
+<strong>O que muda:</strong> <ol>
+<li>Quando o administrador preencher o campo &quot;Observação / Motivo&quot; (ex: <em>&quot;Paciente mudou de cidade&quot;</em> ou <em>&quot;Cadastro duplicado da dona Josefa&quot;</em>), o sistema vai realmente salvar essa explicação no histórico de auditoria do sistema.</li>
+<li>Adicionar uma coluna ou linha no relatório de auditoria mostrando o motivo registrado.
+<strong>Por que:</strong> hoje a tela do admin tem o campo para digitar o motivo, mas o servidor ignorava o texto e não gravava em lugar nenhum! Ninguém conseguia saber depois por que uma conta foi bloqueada.</li>
+</ol>
+</li>
+</ul>
+<h3>4.2 Janela bonita ao excluir alerta de doença</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Concluído:</strong> a aba &quot;Doenças&quot; usa um modal próprio para confirmar a exclusão e informar a consequência da ação.</li>
+</ul>
+<h3>4.3 Gestão de Postos e Unidades de Saúde (<code>health_units</code>)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Concluído:</strong> a aba <strong>&quot;Unidades de Saúde&quot;</strong> permite cadastrar, editar, ativar e desativar unidades. As ações são registradas na auditoria.
+<strong>O que muda:</strong> permitir que o administrador:<ol>
+<li>Veja a lista dos postos de saúde, UBSs e hospitais cadastrados no município.</li>
+<li>Adicione uma nova unidade se um posto novo for inaugurado em Lagoa de Itaenga.</li>
+<li>Altere o nome, bairro ou desative uma unidade que estiver em reforma.
+<strong>Resultado:</strong> unidades inativas deixam de aparecer nos formulários de agendamento, sem apagar o registro nem o histórico administrativo.</li>
+</ol>
+</li>
+</ul>
+<h3>4.4 Gestão de profissionais e especialidades por unidade</h3>
+<ul>
+<li><p><input checked="" disabled="" type="checkbox"> 
+<strong>Onde:</strong> nova área administrativa ligada à aba <strong>&quot;Unidades de Saúde&quot;</strong>.
+<strong>O que muda:</strong> cada unidade deverá permitir cadastrar e administrar:</p>
+<ul>
+<li>Profissional: nome, cargo, registro profissional quando aplicável e status ativo/inativo.</li>
+<li>Especialidades ou tipos de exame atendidos.</li>
+<li>Vínculo do profissional com uma ou mais unidades.</li>
+<li>Dias da semana e horários de atendimento na unidade.</li>
+<li>Intervalos, folgas e bloqueios de agenda.</li>
+</ul>
+<p><strong>Exemplos:</strong> Psicólogo(a) aparece em Psicologia; Médico(a) com Cardiologia aparece em Cardiologia; técnico ou responsável habilitado para laboratório aparece nos exames compatíveis.
+<strong>Por que:</strong> a unidade é a fonte de verdade da oferta de serviços. O paciente deve escolher somente aquilo que a unidade realmente oferece.</p>
+</li>
+</ul>
+<h3>4.5 Regras de disponibilidade e conflito</h3>
+<ul>
+<li><p><input checked="" disabled="" type="checkbox"> 
+<strong>Onde:</strong> backend, banco e painel administrativo.
+<strong>O que muda:</strong> o sistema deve impedir:</p>
+<ul>
+<li>Agendamento fora dos dias/horários do profissional.</li>
+<li>Dois pacientes no mesmo horário do mesmo profissional.</li>
+<li>Seleção de profissional inativo.</li>
+<li>Seleção de especialidade não vinculada à unidade.</li>
+<li>Agendamento em unidade inativa.</li>
+</ul>
+<p>A validação deve existir no servidor, não apenas nos selects do navegador.
+<strong>Por que:</strong> o paciente não pode contornar as regras enviando uma requisição manual para a API.</p>
+</li>
+</ul>
+<h3>4.6 Histórico e auditoria da agenda profissional</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> auditoria administrativa e histórico de unidade/profissional.
+<strong>O que muda:</strong> registrar criação, alteração, ativação, desativação e mudança de horários, informando administrador, data, unidade e motivo.
+<strong>Por que:</strong> mudanças na oferta de atendimento podem afetar agendamentos existentes e precisam ser rastreáveis.</li>
+</ul>
+<hr>
+<h2>5. Tela Inicial (<code>index.html</code>) e Navegação Geral</h2>
+<h3>5.1 Redirecionamento correto do Atendente na página inicial</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> página inicial (<code>index.html</code>).
+<strong>O que muda:</strong> se uma pessoa já logada como Atendente acessar a página inicial do site, o sistema deve enviá-la direto para <code>atendente.html</code>. (Hoje o código só checava Administrador e mandava os atendentes para a tela do paciente por engano).
+<strong>Por que:</strong> evita confusão e cliques desnecessários para os funcionários da rede municipal.</li>
+</ul>
+<h3>5.2 Organização dos arquivos de conexão do sistema</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Onde:</strong> arquivos técnicos de conexão (<code>assets/api.js</code> e pasta <code>server</code>).
+<strong>O que muda:</strong> consolidar todas as regras de conexão e permissões em um único arquivo oficial dentro de <code>assets/api.js</code>, eliminando arquivos duplicados deixados na pasta errada do servidor.
+<strong>Por que:</strong> evita que alterações feitas em uma parte do sistema deixem de funcionar em outras telas.</li>
+</ul>
+<hr>
+<h2>6. Inteligência e Automação do Sistema (&quot;Debaixo do Capô&quot;)</h2>
+<blockquote>
+<p><em>Estes itens são resolvidos diretamente na programação pela IA, mas o time de produto precisa saber que existem para poder testar e validar o funcionamento.</em></p>
+</blockquote>
+<h3>6.1 Lembretes automáticos na véspera da consulta/exame</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>Concluído:</strong> o job <code>server/src/jobs/reminders.js</code> executa na inicialização e a cada 24 horas, localiza consultas e exames pendentes/confirmados do dia seguinte e cria lembretes únicos.
+<strong>Resultado:</strong> os lembretes aparecem no início do painel do paciente como “Novo” ou “Lido”.</li>
+</ul>
+<h3>6.2 Blindagem de segurança no cadastro e nas datas</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>O que muda:</strong> o servidor passará a validar com rigor os dados recebidos:<ol>
+<li>Bloquear cadastros que venham com CPF de formato inválido (ex: <code>111.111.111-11</code>).</li>
+<li>Rejeitar qualquer tentativa de agendamento em datas passadas, mesmo que alguém tente burlar o formulário.</li>
+<li>Garantir que ninguém consiga criar conta sem os dados essenciais de saúde.
+<strong>Por que:</strong> segurança e integridade de dados são indispensáveis para um sistema que será apresentado e licenciado para a Secretaria de Saúde do município.</li>
+</ol>
+</li>
+</ul>
+<h3>6.3 Proteção contra tentativas repetidas de senha (Força bruta)</h3>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>O que muda:</strong> se alguém errar a senha 5 vezes seguidas na tela de login, o sistema bloqueia novas tentativas por 5 minutos naquele computador.
+<strong>Por que:</strong> impede que pessoas mal-intencionadas usem robôs para adivinhar senhas de pacientes ou da administração.</li>
+</ul>
+<hr>
+<h2>7. Roteiro Sugerido de Execução para o Time (Próximas Reuniões)</h2>
+<p>Para o time não se perder tentando fazer tudo de uma vez, sugerimos aprovar as tarefas nestas 3 etapas lógicas:</p>
+<h3>Etapa 1: Consertos prioritários do produto atual</h3>
+<ol>
+<li><strong>Consertar a inicialização do Atendente</strong> (Item 3.1) — revisado/consolidado.</li>
+<li><strong>Revisar aviso de paciente inativo no Atendente</strong> (Item 4.2) — garantir sem vazar dados.</li>
+<li><strong>Verificar limite de 1 ano no calendário</strong> (Itens 2.4/3.4/4.1).</li>
+</ol>
+<h3>Etapa 2: Alinhamento Oficial com o SUS e Cadastro Completo</h3>
+<ol>
+<li><strong>Ajustar Cargo do Atendente</strong> (Item 1.1).</li>
+<li><strong>Adicionar Nome Social, CNS, Prioridade, Responsável p/ menor, Cor/Raça</strong> (Itens 1.2–1.6).</li>
+<li><strong>Ponto de referência apenas para zona rural</strong> (Item 1.7).</li>
+<li><strong>Textos explicativos e avisos inline</strong> (Itens 1.8, 1.10).</li>
+<li><strong>Indicador de força de senha</strong> (Item 1.9).</li>
+</ol>
+<h3>Etapa 3: Automação, Gestão de Postos e Acabamento Visual</h3>
+<ol>
+<li><strong>Gestão de Postos/Unidades</strong> (Item 4.3) — consolidado.</li>
+<li><strong>Lembretes automáticos</strong> (Item 6.1) — consolidado.</li>
+<li><strong>Modais consistentes e botões de ação</strong> (Itens 4.2, 2.6).</li>
+<li><strong>Blindagem e proteção contra senhas repetidas</strong> (Itens 6.2, 6.3).</li>
+</ol>
+<h3>Etapa 4: Governança administrativa</h3>
+<ol>
+<li><strong>Avaliar painel segmentado por <code>admin_level</code></strong> (superadmin/gestor/atendimento/alertas).</li>
+<li><strong>Definir política de exportação/anonimização e relatórios</strong>.</li>
+</ol>
+<h3>Etapa 5: Agenda por unidade e profissional</h3>
+<ol>
+<li>Criar tabelas/gestão de profissionais, especialidades, vínculos e horários.</li>
+<li>Substituir campos livres por selects dependentes com validação no servidor.</li>
+<li>Cálculo de horários disponíveis e bloqueio de conflitos.</li>
+<li>Migrar/agrupar agendamentos existentes e testar cenários críticos.</li>
+</ol>
+<h3>Pendências transversais (conformidade/produção)</h3>
+<ul>
+<li>HTTPS/HSTS e httpOnly total do access em produção.</li>
+<li>SMTP de produção configurado.</li>
+<li>DPO nominal, revisão jurídica, KMS/Vault.</li>
+<li>RNDS/Gov.br credenciados.</li>
+<li>Substituir <code>prompt()/confirm()</code> nativos em alguns fluxos.</li>
+<li>Cobertura E2E contínua.</li>
+</ul>
+<hr>
+<h2>8. Como usar este documento</h2>
+<ol>
+<li>Em cada reunião, o time escolhe a Etapa que quer executar.</li>
+<li>Leiam item por item.</li>
+<li>Se o item estiver aprovado como prioridade do time, instruam a IA para executar o código daquela etapa.</li>
+<li>Após testarem e confirmarem na prática que a tela está funcionando, marquem a caixinha <code>[x]</code>.</li>
+</ol>
 
 </body>
-
 </html>

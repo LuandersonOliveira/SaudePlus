@@ -77,11 +77,9 @@ _Todos os achados desta seção foram corrigidos._
 
 ## LOW / dívida de produto
 
-- **Recuperação de senha** ("esqueci minha senha") não existe — o usuário que
-  esquece a senha perde a conta.
-- **Envio real dos lembretes**: o job monta e persiste a linha, mas não envia
-  e-mail/SMS/WhatsApp.
-- **Lint/CI**: não há `eslint` nem pipeline; a suíte `npm test` é o portão.
+- **Recuperação de senha**: **Resolvido** (Fase 7/implementado) — `POST /auth/password/forgot` + `/reset`, tela em `auth.html`.
+- **Envio real dos lembretes**: **Resolvido** (Fase 7) — `services/mailer.js` (SMTP genérico), `reminders.sent_at/send_channel/send_error`. Job grava antes de enviar; `sent_at` só quando transporte aceita.
+- **Lint/CI**: **Resolvido** — `eslint.config.mjs` + `npm run lint`; `.github/workflows/ci.yml` com lint → suíte + E2E (MySQL 8.4 + Playwright Chromium) → `npm audit critical`. Suíte `npm test` + `test:race` + E2E.
 
 ### Resolvido na Fase 7 (2026-10-18)
 
@@ -94,27 +92,13 @@ _Todos os achados desta seção foram corrigidos._
 | `proxy-addr` (achado no `npm audit`) | **Crítico e pré-existente**: IP spoofing via IPv4-mapped IPv6, na dependência que o express usa no `trust proxy` — ou seja, no IP de que o lockout de login depende. Corrigido com `npm audit fix`. |
 | `nodemon`→`chokidar`→`braces` (3 high) | Sem correção upstream: a `braces` 3.0.3, a mais nova, continua sinalizada. Exposta só na máquina do desenvolvedor (DoS por glob malicioso no watcher). **Aceitada** — e o `audit` do CI falha só em `critical`, para não treinar ninguém a ignorar o portão. |
 
-### E2E automatizado — resolvido (2026-10-18)
+### E2E automatizado — resolvido/parcial (2026-10-18, atualizado 2026-10-26)
 
-A cobertura era de contrato no servidor + verificação estática do front.
-Nenhuma das duas abre uma página, então a lacuna era exatamente a que o
-usuário vê: botão que não faz nada por erro de sintaxe no script, `onclick`
-apontando para função renomeada, painel que carrega e trava ao renderizar.
+Cobertura: login dos papéis, sessão sobrevivendo a reload, logout, guarda de painel sem sessão, URL única, abertura dos painéis sem erro de JS nem resposta 4xx. Suíte responsiva/admin e dashboard. `npm run test:e2e` verde (29/29 verificados).
 
-`npm run test:e2e` (Playwright + Chromium) cobre login dos papéis, sessão
-sobrevindo a reload, logout, guarda de painel sem sessão, a URL única e a
-abertura dos painéis sem erro de JS nem resposta 4xx. Sobe o `dev` sozinho.
+Coberto: navegação/admin responsivo, dashboard paciente (fluxos principais). 
 
-O que o navegador encontrou que nenhuma outra camada via:
-
-- `dashboard.html:880` manda o admin para o painel administrativo — a regra
-  existia no código sem nenhum teste; agora está travada.
-- Um teste que falhou por **corrida sua**, não por defeito: `page.goto()`
-  logo após clicar em Entrar aborta o POST em voo, o painel abre sem sessão
-  e `requireAuth()` joga para o login. O `entrar()` agora espera a resposta.
-
-Continua pendente: E2E de **agendamento** (criar consulta de ponta a ponta) e
-de outros papéis, que dependem do seed demo.
+Ainda pendente (conforme verificação): ampliar cobertura E2E contínua para agendamentos ponta a ponta e fluxos por papel conforme evolução. 327 testes `node:test` passando + `test:race`.
 
 ---
 

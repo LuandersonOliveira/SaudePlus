@@ -6,10 +6,17 @@ function jsonHandler(message) {
   };
 }
 
+// Permite elevar o teto em suítes E2E, que abrem vários painéis e fazem
+// dezenas de chamadas em poucos minutos. O padrão de produção não muda.
+function envLimit(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
 // Global: teto generoso anti-abuso (não deve afetar uso normal nem o smoke-test).
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 300,
+  limit: envLimit('RATE_LIMIT_GLOBAL_MAX', 300),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   handler: jsonHandler('Muitas requisições. Tente novamente em alguns minutos.'),
@@ -19,7 +26,7 @@ const globalLimiter = rateLimit({
 // Mantém a mensagem em PT-BR consistente com o restante da API.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 60,
+  limit: envLimit('RATE_LIMIT_AUTH_MAX', 60),
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   handler: jsonHandler('Muitas tentativas de autenticação. Tente novamente em alguns minutos.'),

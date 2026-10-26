@@ -6,3 +6,5 @@ node_modules/
 # Playwright: relatório HTML e artefatos de falha (trace/screenshot).
 playwright-report/
 test-results/
+# Sessão do global-setup: contém o JWT do admin real. NUNCA versionar.
+e2e/.auth/

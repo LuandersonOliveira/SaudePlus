@@ -113,6 +113,7 @@ test('toda coluna que o código referencia em migration está na lista do doctor
     ['users', 'totp_last_step'],
     ['appointments', 'duration_minutes'],
     ['exams', 'duration_minutes'],
+    ['professionals', 'user_id'],
   ];
   for (const par of esperadas) {
     assert.ok(
@@ -145,7 +146,7 @@ test('a lista do doctor bate com o que o schema.sql cria', () => {
 });
 
 test('as tabelas esperadas são as que o código consulta', () => {
-  for (const t of ['refresh_tokens', 'audit_log', 'professionals', 'professional_offers', 'work_schedules', 'schedule_blocks']) {
+  for (const t of ['refresh_tokens', 'password_reset_tokens', 'audit_log', 'professionals', 'professional_offers', 'work_schedules', 'schedule_blocks']) {
     assert.ok(TABELAS_ESPERADAS.includes(t), `doctor deveria verificar a tabela ${t}`);
   }
 });

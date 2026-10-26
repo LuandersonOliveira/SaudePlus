@@ -42,4 +42,6 @@
 
 ## 6. PDCA do SGSI (Aula 1/5)
 
-- **Plan:** este doc + SoA + RIPD. **Do:** Fases 0–2 + controles. **Check:** `verify` da trilha, `smoke-test`, revisão trimestral da SoA. **Act:** corrigir causa (não sintoma) e atualizar docs.
+- **Plan:** este doc + SoA + RIPD. **Do:** Fases 0–2 + controles. **Check:** `verify` da trilha, `smoke-test`, revisão trimestral da SoA, `npm audit` crítico no CI. **Act:** corrigir causa (não sintoma) e atualizar docs.
+
+> Revisão: 2026-10-26.

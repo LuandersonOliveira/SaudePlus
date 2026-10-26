@@ -10,7 +10,7 @@
 - **Sanções ANPD** (art. 52, dosimetria ativa): até 2% do faturamento por
   infração (teto R$ 50 mi), + publicização e bloqueio dos dados. Por isso o
   RIPD e o playbook de incidentes existem.
-- Encarregado (art. 41): `GET /public/dpo` — nomear pessoa real antes da produção.
+- Encarregado (art. 41): `GET /public/dpo` — canal público existe; nomear pessoa real antes da produção.
 
 ## 2. Marco Civil da Internet (Lei 12.965/2014) — o que nos obriga
 
@@ -20,7 +20,7 @@
 - **Responsabilidade por conteúdo de terceiros** (art. 19): só após ordem
   judicial (regra geral) — relevante para observações digitadas por usuários.
 - **Neutralidade e privacidade** (arts. 3º, 7º): sigilo das comunicações →
-  **TLS obrigatório em produção** (sem ele, o desenho atual é incompleto).
+  **TLS/HSTS obrigatório em produção** (pendente de deploy).
 
 ## 3. Lei Carolina Dieckmann (Lei 12.737/2012 — art. 154-A do CP)
 
@@ -35,8 +35,10 @@
 |---|---|
 | LGPD art. 11 (base p/ sensível) | `privacy.html` + ROPA T1–T3 |
 | LGPD art. 18 (direitos) | `GET /auth/me/export`, `DELETE /auth/me`, botões dashboard |
-| LGPD art. 41 (encarregado) | `GET /public/dpo` (preencher!) |
+| LGPD art. 41 (encarregado) | `GET /public/dpo` (canal público; nomear pessoa real) |
 | LGPD art. 46/48 (segurança/incidente) | SoA + `RESPOSTA_INCIDENTES.md` |
 | Marco Civil art. 13/15 (logs 6 meses) | `audit_log` + ROPA §3 |
-| Marco Civil art. 7º (sigilo) | TLS em produção (pendente de deploy!) |
-| CP art. 154-A (invasão) | MFA + rate-limit + trilhas (dissuasão e prova) |
+| Marco Civil art. 7º (sigilo) | TLS/HSTS em produção (pendente de deploy) |
+| CP art. 154-A (invasão) | MFA TOTP + rate-limit + trilhas (dissuasão e prova) |
+
+> Revisão: 2026-10-26.

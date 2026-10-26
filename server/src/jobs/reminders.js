@@ -192,16 +192,22 @@ async function runReminderJob(now = new Date()) {
     // A janela é a de HOJE, não a de amanhã: o lembrete da consulta de
     // amanhã é gravado com `remind_at = scheduled_at - 1 dia`, que é o dia
     // corrente. Filtrar pela janela do agendamento não encontra nada.
+    // Só os usuários deste lote: contar a janela inteira somava lembretes de
+    // outras execuções/testes e o resumo deixava de descrever o trabalho feito.
+    const usuariosDoLote = [...new Set([...appointments, ...exams].map((r) => r.user_id))];
     let pendentes = 0;
     try {
         const hoje = new Date(start);
         hoje.setDate(hoje.getDate() - 1);
-        const [[conta]] = await pool.query(
-            `SELECT COUNT(*) AS n FROM reminders
-       WHERE remind_at >= ? AND remind_at < ? AND sent_at IS NULL AND send_error IS NOT NULL`,
-            [toSqlDate(hoje), startSql]
-        );
-        pendentes = Number(conta.n) || 0;
+        if (usuariosDoLote.length) {
+            const [[conta]] = await pool.query(
+                `SELECT COUNT(*) AS n FROM reminders
+         WHERE remind_at >= ? AND remind_at < ? AND sent_at IS NULL AND send_error IS NOT NULL
+           AND user_id IN (?)`,
+                [toSqlDate(hoje), startSql, usuariosDoLote]
+            );
+            pendentes = Number(conta.n) || 0;
+        }
     } catch (err) {
         // A contagem é informativo: falhar nela não invalida o lote.
         console.error(`Falha ao contar lembretes pendentes: ${err.message}`);

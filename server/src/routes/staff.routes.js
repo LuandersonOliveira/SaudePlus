@@ -19,15 +19,30 @@ async function pagedList(res, next, { baseSql, countSql, params, page, pageSize,
   }
 }
 
+async function getLinkedProfessionalId(userId) {
+  const [[row]] = await pool.query('SELECT id FROM professionals WHERE user_id = ? AND active = 1 LIMIT 1', [userId]);
+  return row ? row.id : null;
+}
+
 router.get('/appointments', async (req, res, next) => {
   const { wantsPaged, page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 50, maxPageSize: 200 });
+  const isAdmin = req.user && req.user.role === 'admin';
+  const profId = isAdmin ? null : await getLinkedProfessionalId(req.user.id);
+  // Fail-closed: atendente sem profissional vinculado não enxerga a agenda de
+  // ninguém. Antes `profId` nulo caía no mesmo caminho do admin (sem WHERE).
+  const where = isAdmin ? '' : 'WHERE a.professional_id = ?';
+  const params = isAdmin ? [] : [profId];
+  const countSql = isAdmin
+    ? 'SELECT COUNT(*) AS total FROM appointments'
+    : 'SELECT COUNT(*) AS total FROM appointments a WHERE a.professional_id = ?';
   if (wantsPaged) {
     return pagedList(res, next, {
       baseSql: `SELECT a.*, u.full_name AS user_name, u.email AS user_email
        FROM appointments a JOIN users u ON u.id = a.user_id
+       ${where}
        ORDER BY a.scheduled_at DESC`,
-      countSql: 'SELECT COUNT(*) AS total FROM appointments',
-      params: [], page, pageSize, offset,
+      countSql,
+      params, page, pageSize, offset,
     });
   }
   try {
@@ -35,7 +50,8 @@ router.get('/appointments', async (req, res, next) => {
     const [rows] = await pool.query(
       `SELECT a.*, u.full_name AS user_name, u.email AS user_email
        FROM appointments a JOIN users u ON u.id = a.user_id
-       ORDER BY a.scheduled_at DESC LIMIT ?`, [limit]
+       ${where}
+       ORDER BY a.scheduled_at DESC LIMIT ?`, [...params, limit]
     );
     res.json(rows);
   } catch (err) { next(err); }
@@ -43,13 +59,22 @@ router.get('/appointments', async (req, res, next) => {
 
 router.get('/exams', async (req, res, next) => {
   const { wantsPaged, page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 50, maxPageSize: 200 });
+  const isAdmin = req.user && req.user.role === 'admin';
+  const profId = isAdmin ? null : await getLinkedProfessionalId(req.user.id);
+  // Mesmo fail-closed da agenda: sem vínculo, nenhum exame é listado.
+  const where = isAdmin ? '' : 'WHERE e.professional_id = ?';
+  const params = isAdmin ? [] : [profId];
+  const countSql = isAdmin
+    ? 'SELECT COUNT(*) AS total FROM exams'
+    : 'SELECT COUNT(*) AS total FROM exams e WHERE e.professional_id = ?';
   if (wantsPaged) {
     return pagedList(res, next, {
       baseSql: `SELECT e.*, u.full_name AS user_name, u.email AS user_email
        FROM exams e JOIN users u ON u.id = e.user_id
+       ${where}
        ORDER BY e.scheduled_at DESC`,
-      countSql: 'SELECT COUNT(*) AS total FROM exams',
-      params: [], page, pageSize, offset,
+      countSql,
+      params, page, pageSize, offset,
     });
   }
   try {
@@ -57,7 +82,8 @@ router.get('/exams', async (req, res, next) => {
     const [rows] = await pool.query(
       `SELECT e.*, u.full_name AS user_name, u.email AS user_email
        FROM exams e JOIN users u ON u.id = e.user_id
-       ORDER BY e.scheduled_at DESC LIMIT ?`, [limit]
+       ${where}
+       ORDER BY e.scheduled_at DESC LIMIT ?`, [...params, limit]
     );
     res.json(rows);
   } catch (err) { next(err); }
@@ -72,7 +98,7 @@ router.get('/patients', async (req, res, next) => {
     if (!q) return res.json([]);
     const [rows] = await pool.query(
       `SELECT id, full_name, email, phone, mobile, birth_date, gender, blood_type, account_status
-       FROM users WHERE role = 'paciente'
+       FROM users WHERE role = 'paciente' AND deleted_at IS NULL
        AND (full_name LIKE ? OR email LIKE ?)
        ORDER BY CASE account_status WHEN 'ativo' THEN 0 WHEN 'pendente' THEN 1 ELSE 2 END,
                 full_name
@@ -93,7 +119,8 @@ router.get('/patients/:id/history', async (req, res, next) => {
   try {
     const [[user]] = await pool.query(
       `SELECT id, full_name, email, phone, mobile, birth_date, gender, blood_type
-       FROM users WHERE id = ? AND role = 'paciente' AND account_status = 'ativo'`, [req.params.id]
+       FROM users WHERE id = ? AND role = 'paciente' AND account_status = 'ativo'
+       AND deleted_at IS NULL`, [req.params.id]
     );
     if (!user) return res.status(404).json({ error: 'Paciente não encontrado ou conta inativa.' });
 

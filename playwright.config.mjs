@@ -42,6 +42,12 @@ export default defineConfig({
   expect: { timeout: 7_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
 
+  // Faz UM login de admin e grava o storageState para a suíte inteira.
+  // `/auth/login` é limitado a 60 tentativas/15min e ainda trava o IP; com um
+  // login por teste a suíte responsiva estourava o limite e os testes
+  // seguintes morriam de timeout — falha de infraestrutura, não de página.
+  globalSetup: './e2e/global-setup.js',
+
   use: {
     baseURL: FRONT,
     trace: 'retain-on-failure',
@@ -59,5 +65,13 @@ export default defineConfig({
     timeout: 120_000,
     stdout: 'pipe',
     stderr: 'pipe',
+    // A suíte abre 3 painéis e dezenas de abas em poucos minutos; o teto de
+    // produção (300/15min) faz os últimos testes receberem 429. O limite
+    // continua coberto pelos testes de unidade, aqui ele só não pode mascarar
+    // uma falha real de página.
+    env: {
+      RATE_LIMIT_GLOBAL_MAX: '10000',
+      RATE_LIMIT_AUTH_MAX: '1000',
+    },
   },
 });
