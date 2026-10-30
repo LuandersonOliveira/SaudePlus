@@ -9,8 +9,53 @@
      para aquele serviço, atender no dia/horário e não ter conflito.
    ========================================================================== */
 
+const {
+  BOOKING_STATUS,
+  validateOutcome,
+  validateRescheduleReason,
+} = require('./booking-status');
+const { localDateStr } = require('./local-date');
+const { registrarEvento } = require('../services/booking-events');
+
 const KINDS = ['consulta', 'exame'];
 const MAX_DAYS_AHEAD = 366;
+
+// Janela devolvida por requisição nas rotas de disponibilidade. A agenda pode
+// ir até MAX_DAYS_AHEAD, mas o painel pagina de 30 em 30 dias: uma resposta
+// única de um ano inteiro multiplica consultas e slots sem uso real.
+const AVAILABILITY_PAGE_DAYS = 30;
+
+// NV02 — prioridade legal (Lei 10.048/2000). O campo `users.priority` já
+// existia, mas não alterava a oferta de vagas. Regra acordada: 10% das vagas
+// de cada dia/profissional (mínimo 1) ficam reservadas para idoso, gestante,
+// PCD e lactante. A reserva vale até 24 h antes do atendimento; depois disso
+// a vaga volta para todos, para não ficar ociosa.
+const PRIORITY_GROUPS = ['idoso', 'gestante', 'pcd', 'lactante'];
+const PRIORITY_QUOTA_RATIO = 0.10;
+const PRIORITY_RELEASE_HOURS = 24;
+const PRIORITY_LABEL = 'atendimento prioritário (Lei 10.048/2000)';
+const PRIORITY_MESSAGE =
+  `Este horário é reservado para ${PRIORITY_LABEL}. `
+  + 'Escolha outro horário ou tente novamente nas 24 horas anteriores.';
+
+/**
+ * Normaliza a janela pedida pela rota: `days` nunca passa de 30 e `offsetDays`
+ * nunca ultrapassa o fim da janela de 1 ano. É a única fonte de verdade para
+ * catálogo e slot — antes cada rota repetia seu próprio `clamp` (30/60),
+ * enquanto o agendamento aceitava 366 dias.
+ */
+function resolveAvailabilityWindow({ days, offsetDays } = {}) {
+  const pedido = Number.parseInt(days, 10);
+  const span = Number.isFinite(pedido)
+    ? Math.min(Math.max(pedido, 1), AVAILABILITY_PAGE_DAYS)
+    : AVAILABILITY_PAGE_DAYS;
+  const maxOffset = Math.max(MAX_DAYS_AHEAD - span, 0);
+  const pedidoOffset = Number.parseInt(offsetDays, 10);
+  const offset = Number.isFinite(pedidoOffset)
+    ? Math.min(Math.max(pedidoOffset, 0), maxOffset)
+    : 0;
+  return { days: span, offsetDays: offset };
+}
 
 // Fase 1 (item 3): mapa único tipo -> tabela/colunas, para consultas e exames
 // compartilharem a mesma validação. Parâmetro `tipo` ('consulta'|'exame');
@@ -35,7 +80,7 @@ function parseDateTime(value) {
 function pad(n) { return String(n).padStart(2, '0'); }
 
 function toDateStr(d) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return localDateStr(d);
 }
 
 function toMinutes(hhmm) {
@@ -43,6 +88,50 @@ function toMinutes(hhmm) {
   const parts = String(hhmm || '').split(':');
   if (parts.length < 2) return null;
   return Number(parts[0]) * 60 + Number(parts[1]);
+}
+
+function isPriorityUser(priority) {
+  return PRIORITY_GROUPS.includes(String(priority || ''));
+}
+
+async function prioridadeDoUsuario(pool, userId) {
+  if (!userId) return null;
+  const [rows] = await pool.query('SELECT priority FROM users WHERE id = ?', [userId]);
+  return rows.length ? rows[0].priority : null;
+}
+
+// Nº de vagas protegidas por dia/profissional. `ceil` garante o piso de 10% e
+// `max(1)` garante ao menos uma vaga mesmo em agendas curtas.
+function quotaPrioritaria(totalSlots) {
+  const total = Number(totalSlots) || 0;
+  if (total <= 0) return 0;
+  return Math.max(1, Math.ceil(total * PRIORITY_QUOTA_RATIO));
+}
+
+// Grade do dia: minutos de início únicos e ordenados. Duas agendas
+// sobrepostas não podem contar o mesmo horário duas vezes na cota.
+function gradeDoDia(rules) {
+  const minutos = new Set();
+  for (const rule of rules || []) {
+    const slot = Number(rule.slot || rule.slot_minutes) || DURACAO_PADRAO;
+    const start = Number(rule.start !== undefined ? rule.start : toMinutes(rule.start_time));
+    const end = Number(rule.end !== undefined ? rule.end : toMinutes(rule.end_time));
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) continue;
+    for (let m = start; m + slot <= end; m += slot) minutos.add(m);
+  }
+  return [...minutos].sort((a, b) => a - b);
+}
+
+// As primeiras N vagas do dia são as reservadas.
+function reservasDoDia(rules) {
+  const grade = gradeDoDia(rules);
+  return new Set(grade.slice(0, quotaPrioritaria(grade.length)));
+}
+
+// A reserva vale só até 24 h antes do atendimento; depois, libera para todos.
+function slotReservado({ rules, minutesOfDay, slotStartMs, nowMs = Date.now() }) {
+  if (!reservasDoDia(rules).has(minutesOfDay)) return false;
+  return slotStartMs - nowMs > PRIORITY_RELEASE_HOURS * 3600 * 1000;
 }
 
 // Erro (string) ou null quando a data está dentro da janela permitida.
@@ -161,15 +250,17 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
  *
  * @returns {{slot: number, start: number, end: number}|null}
  */
-function schedulePara(schedules, when) {
+function schedulePara(schedules, when, duracaoServico) {
   const minutesOfDay = when.getHours() * 60 + when.getMinutes();
+  const duracao = Number(duracaoServico) > 0 ? Number(duracaoServico) : null;
   for (const s of schedules) {
     const start = toMinutes(s.start_time);
     const end = toMinutes(s.end_time);
     const slotMin = Number(s.slot_minutes) || 30;
+    const ocupacao = duracao || slotMin;
     if (start === null || end === null) continue;
-    if (minutesOfDay >= start && minutesOfDay + slotMin <= end && (minutesOfDay - start) % slotMin === 0) {
-      return { slot: slotMin, start, end };
+    if (minutesOfDay >= start && minutesOfDay + ocupacao <= end && (minutesOfDay - start) % slotMin === 0) {
+      return { slot: slotMin, duration: ocupacao, start, end };
     }
   }
   return null;
@@ -185,17 +276,80 @@ async function agendasDoDia(pool, professionalId, unitId, when) {
 }
 
 /**
- * Duração, em minutos, do atendimento que seria marcado neste horário.
- *
- * Serviço sem profissional alocado não tem agenda: a unidade decide depois, e
- * 30 min é o padrão histórico.
+ * Dura��o declarada pelo servi�o na unidade. NULL significa "use o slot da
+ * agenda" - o comportamento hist�rico. A duracao do servico tem prioridade
+ * sobre o slot, mas o horario ainda precisa cair na grade.
  */
-async function duracaoMinutos(pool, { unitId, professionalId, scheduledAt }) {
+async function duracaoServico(pool, { unitId, serviceName, tipo }) {
+  if (!unitId || !serviceName || !tipo) return null;
+  const [[row]] = await pool.query(
+    `SELECT duration_minutes FROM unit_offers
+     WHERE unit_id = ? AND kind = ? AND name = ? AND active = 1`,
+    [unitId, tipo, serviceName]
+  );
+  const d = Number(row && row.duration_minutes);
+  return Number.isFinite(d) && d > 0 ? d : null;
+}
+
+/**
+ * Dura��o, em minutos, do atendimento que seria marcado neste hor�rio.
+ *
+ * Servi�o sem profissional alocado n�o tem agenda: a unidade decide depois, e
+ * 30 min � o padr�o hist�rico. Servi�o com dura��o pr�pria vence o slot.
+ */
+async function duracaoMinutos(pool, { unitId, professionalId, serviceName, tipo, scheduledAt }) {
   if (!professionalId) return DURACAO_PADRAO;
   const when = parseDateTime(scheduledAt);
   if (!when) return DURACAO_PADRAO;
-  const casa = schedulePara(await agendasDoDia(pool, professionalId, unitId, when), when);
-  return casa ? casa.slot : DURACAO_PADRAO;
+  const servico = await duracaoServico(pool, { unitId, serviceName, tipo });
+  const casa = schedulePara(await agendasDoDia(pool, professionalId, unitId, when), when, servico);
+  return casa ? casa.duration : DURACAO_PADRAO;
+}
+
+/**
+ * Trava utente e profissional na MESMA ordem em todas as requisições.
+ * Sem isso, A agenda o profissional X do utente 1 enquanto B agenda o
+ * profissional Y do utente 2: nenhuma das duas vê a outra e as duas passam.
+ * A ordenação por id elimina o ciclo clássico de deadlock.
+ */
+async function lockBookingActors(db, { userId, professionalId }) {
+  const alvos = [];
+  if (userId) alvos.push({ id: userId, tabela: 'users' });
+  if (professionalId) alvos.push({ id: professionalId, tabela: 'professionals' });
+  alvos.sort((a, b) => (a.id === b.id ? a.tabela.localeCompare(b.tabela) : a.id.localeCompare(b.id)));
+  for (const alvo of alvos) {
+    await db.query(`SELECT id FROM ${alvo.tabela} WHERE id = ? FOR UPDATE`, [alvo.id]);
+  }
+}
+
+async function validateUserOverlap(pool, { userId, scheduledAt, durationMinutes, excludeId }) {
+  if (!userId) return null;
+  const when = parseDateTime(scheduledAt);
+  if (!when) return null;
+  const duracao = Number(durationMinutes) > 0 ? Number(durationMinutes) : DURACAO_PADRAO;
+  const startMs = when.getTime();
+  const endMs = startMs + duracao * 60000;
+  const from = toDateStr(new Date(startMs - 24 * 3600 * 1000));
+  const to = toDateStr(new Date(endMs + 24 * 3600 * 1000));
+
+  for (const table of ['appointments', 'exams']) {
+    const [rows] = await pool.query(
+      `SELECT id, scheduled_at, duration_minutes FROM ${table}
+       WHERE user_id = ? AND status IN ('pendente', 'confirmado')
+         AND scheduled_at BETWEEN ? AND ?`,
+      [userId, `${from} 00:00:00`, `${to} 23:59:59`]
+    );
+    for (const row of rows) {
+      if (excludeId && row.id === excludeId) continue;
+      const inicio = parseDateTime(row.scheduled_at);
+      if (!inicio) continue;
+      const fim = inicio.getTime() + duracaoDe(row) * 60000;
+      if (overlaps(startMs, endMs, inicio.getTime(), fim)) {
+        return 'Este utente já tem outro atendimento neste horário.';
+      }
+    }
+  }
+  return null;
 }
 
 async function validateBooking(pool, opts) {
@@ -238,10 +392,28 @@ async function validateBooking(pool, opts) {
   if (!links.length) return 'Este profissional não atende este serviço nesta unidade.';
 
   const when = parseDateTime(scheduledAt);
-  const casa = schedulePara(await agendasDoDia(pool, professionalId, unitId, when), when);
+  if (!when) return 'Informe uma data e horário válidos.';
+  const servicoDuracao = await duracaoServico(pool, { unitId, serviceName, tipo });
+  const schedules = await agendasDoDia(pool, professionalId, unitId, when);
+  const casa = schedulePara(schedules, when, servicoDuracao);
   if (!casa) return 'O profissional não atende neste dia e horário.';
 
-  const slot = casa.slot;
+  // NV02: fora da janela de liberação, não-priority não ocupa vaga reservada.
+  // O front esconde essas vagas, mas a checagem fica no servidor porque o
+  // POST/PUT pode ser chamado direto.
+  //
+  // Editar o próprio registro sem mudar de horário não pode ser barrado: um
+  // agendamento anterior ao NV02 pode estar numa vaga que agora é reservada.
+  const atual = opts.currentScheduledAt ? parseDateTime(opts.currentScheduledAt) : null;
+  const jaEraNesteHorario = atual ? atual.getTime() === when.getTime() : false;
+  if (!jaEraNesteHorario && !isPriorityUser(opts.userPriority)) {
+    const minutesOfDay = when.getHours() * 60 + when.getMinutes();
+    if (slotReservado({ rules: schedules, minutesOfDay, slotStartMs: when.getTime() })) {
+      return PRIORITY_MESSAGE;
+    }
+  }
+
+  const slot = casa.duration;
 
   const dateStr = toDateStr(when);
   const intervals = await fetchBusyIntervals(pool, professionalId, dateStr, dateStr, excludeId);
@@ -252,6 +424,15 @@ async function validateBooking(pool, opts) {
       return 'Este horário já está ocupado para este profissional.';
     }
   }
+
+  const conflitoUsuario = await validateUserOverlap(pool, {
+    userId: opts.userId,
+    scheduledAt,
+    durationMinutes: slot,
+    excludeId,
+  });
+  if (conflitoUsuario) return conflitoUsuario;
+
   return null;
 }
 
@@ -263,6 +444,7 @@ async function validateBooking(pool, opts) {
 async function getAvailability(pool, opts) {
   const { unitId, professionalId, serviceName, fromDate, days = 30, excludeId } = opts;
   const tipo = resolveTipo(opts);
+  const prioritario = isPriorityUser(opts.userPriority);
   const empty = { days: [], reason: 'Nenhum horário disponível no momento.' };
 
   if (!unitId || !professionalId || !tipo) return empty;
@@ -284,6 +466,7 @@ async function getAvailability(pool, opts) {
   if (!links.length) {
     return { days: [], reason: 'Este profissional não atende este serviço nesta unidade.' };
   }
+  const servicoDuracao = await duracaoServico(pool, { unitId, serviceName, tipo });
 
   const [schedules] = await pool.query(
     `SELECT weekday, start_time, end_time, slot_minutes FROM work_schedules
@@ -320,6 +503,7 @@ async function getAvailability(pool, opts) {
 
     const dateStr = toDateStr(day);
     const isToday = dateStr === toDateStr(new Date());
+    const reservadas = prioritario ? new Set() : reservasDoDia(rules);
     const slots = new Set();
     for (const rule of rules) {
       for (let m = rule.start; m + rule.slot <= rule.end; m += rule.slot) {
@@ -329,7 +513,11 @@ async function getAvailability(pool, opts) {
         );
         if (slotDate.getTime() <= nowMs) continue;
         if (isToday && slotDate.getTime() < nowMs + 30 * 60000) continue;
-        const slotEnd = slotDate.getTime() + rule.slot * 60000;
+        if (reservadas.has(m)
+          && slotDate.getTime() - nowMs > PRIORITY_RELEASE_HOURS * 3600 * 1000) continue;
+        const ocupacao = servicoDuracao || rule.slot;
+        if (m + ocupacao > rule.end) continue;
+        const slotEnd = slotDate.getTime() + ocupacao * 60000;
         const busy = intervals.some(iv => overlaps(slotDate.getTime(), slotEnd, iv.start, iv.end));
         if (!busy) slots.add(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`);
       }
@@ -362,7 +550,11 @@ async function getAvailability(pool, opts) {
 async function findAvailabilityByService(pool, opts) {
   const tipo = resolveTipo(opts);
   const servico = String((opts && (opts.servico || opts.serviceName)) || '').trim();
-  const days = Math.min(Math.max(parseInt(opts && opts.days, 10) || 30, 1), 60);
+  const days = Math.min(
+    Math.max(parseInt(opts && opts.days, 10) || AVAILABILITY_PAGE_DAYS, 1),
+    AVAILABILITY_PAGE_DAYS
+  );
+  const prioritario = isPriorityUser(opts && opts.userPriority);
   const empty = { tipo: tipo || null, name: servico, days, totalVagas: 0, unidades: [], reason: 'Nenhum horário disponível no momento.' };
   if (!tipo || !servico) return { ...empty, reason: 'Informe o tipo e o nome do serviço.' };
 
@@ -385,6 +577,16 @@ async function findAvailabilityByService(pool, opts) {
     return { ...empty, reason: 'Nenhuma unidade oferece este serviço no momento.' };
   }
   const unitIds = unitRows.map((u) => u.id);
+  const [offerDurationRows] = await pool.query(
+    `SELECT unit_id, duration_minutes FROM unit_offers
+     WHERE kind = ? AND name = ? AND active = 1 AND unit_id IN (?)`,
+    [tipo, servico, unitIds]
+  );
+  const duracaoPorUnidade = new Map(
+    offerDurationRows
+      .filter((row) => Number(row.duration_minutes) > 0)
+      .map((row) => [row.unit_id, Number(row.duration_minutes)])
+  );
 
   // 2) profissionais ativos vinculados ao serviço nessas unidades
   const [linkRows] = await pool.query(
@@ -467,12 +669,14 @@ async function findAvailabilityByService(pool, opts) {
   const unitDays = new Map();
   for (const { unitId, profId, byWd, prof } of pairs) {
     const busy = busyByProf.get(profId) || [];
+    const servicoDuracao = duracaoPorUnidade.get(unitId) || null;
     for (let i = 0; i < days; i++) {
       const day = new Date(start.getTime() + i * 24 * 3600 * 1000);
       const rules = byWd[day.getDay()];
       if (!rules) continue;
       const dateStr = toDateStr(day);
       const isToday = dateStr === todayStr;
+      const reservadas = prioritario ? new Set() : reservasDoDia(rules);
       for (const rule of rules) {
         for (let m = rule.start; m + rule.slot <= rule.end; m += rule.slot) {
           const slotDate = new Date(
@@ -481,8 +685,12 @@ async function findAvailabilityByService(pool, opts) {
           );
           if (slotDate.getTime() <= nowMs) continue;
           if (isToday && slotDate.getTime() < nowMs + 30 * 60000) continue;
-          const slotEnd = slotDate.getTime() + rule.slot * 60000;
-          if (busy.some((iv) => overlaps(slotDate.getTime(), slotEnd, iv.start, iv.end))) continue;
+          if (reservadas.has(m)
+            && slotDate.getTime() - nowMs > PRIORITY_RELEASE_HOURS * 3600 * 1000) continue;
+          const ocupacao = servicoDuracao || rule.slot;
+          if (m + ocupacao > rule.end) continue;
+          const slotEnd = slotDate.getTime() + ocupacao * 60000;
+          if (busy.some((iv) => iv.start < slotEnd && iv.end > slotDate.getTime())) continue;
           const hora = `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
           if (!unitDays.has(unitId)) unitDays.set(unitId, new Map());
           const dayMap = unitDays.get(unitId);
@@ -561,87 +769,225 @@ async function findAvailabilityByService(pool, opts) {
  * opts = { kindKey: 'appointments'|'exams', id, body: {status, scheduled_at} }
  * Retorna { status, body } e, em sucesso, { audit: { entityType, details } }.
  */
-const BOOKING_STATUS = ['pendente', 'confirmado', 'cancelado', 'concluido'];
-
-async function applyBookingChange(pool, opts) {
+async function applyBookingChange(db, opts) {
+  const ownsConnection = typeof db.getConnection === 'function';
+  const conn = ownsConnection ? await db.getConnection() : db;
   const meta = opts.kindKey === 'appointments'
-    ? { table: 'appointments', tipo: 'consulta', serviceColumn: 'specialty', entityType: 'appointment' }
+    ? { table: 'appointments', tipo: 'consulta', serviceColumn: 'specialty', entityType: 'appointment', kind: 'consulta' }
     : opts.kindKey === 'exams'
-      ? { table: 'exams', tipo: 'exame', serviceColumn: 'exam_type', entityType: 'exam' }
+      ? { table: 'exams', tipo: 'exame', serviceColumn: 'exam_type', entityType: 'exam', kind: 'exame' }
       : null;
-  if (!meta) return { status: 404, body: { error: 'Tipo inválido.' } };
 
-  const { status, scheduled_at } = (opts && opts.body) || {};
-  const updates = [];
-  const params = [];
-  const logParts = [];
+  const run = async (c) => {
+    if (!meta) return { status: 404, body: { error: 'Tipo inválido.' } };
+    const body = (opts && opts.body) || {};
+    const { status, scheduled_at } = body;
+    const temOutcome = Object.prototype.hasOwnProperty.call(body, 'outcome');
+    const temMotivo = Object.prototype.hasOwnProperty.call(body, 'reschedule_reason');
+    const updates = [];
+    const params = [];
+    const logParts = [];
 
-  if (status !== undefined) {
-    if (!BOOKING_STATUS.includes(status)) {
-      return { status: 400, body: { error: 'Status inválido.' } };
+    if (status !== undefined) {
+      if (!BOOKING_STATUS.includes(status)) {
+        return { status: 400, body: { error: 'Status inválido.' } };
+      }
+      updates.push('status=?'); params.push(status); logParts.push(`status -> ${status}`);
     }
-    updates.push('status=?'); params.push(status); logParts.push(`status -> ${status}`);
-  }
-  if (scheduled_at) {
-    const windowError = validateScheduleWindow(scheduled_at);
-    if (windowError) return { status: 400, body: { error: windowError } };
-    updates.push('scheduled_at=?'); params.push(scheduled_at);
-    logParts.push(`reagendado para ${scheduled_at}`);
-  }
-  if (!updates.length) return { status: 400, body: { error: 'Nada para atualizar.' } };
+    if (temOutcome) {
+      const outcomeError = validateOutcome(body.outcome);
+      if (outcomeError) return { status: 400, body: { error: outcomeError } };
+      const outcome = body.outcome ? String(body.outcome).trim() : null;
+      updates.push('outcome=?'); params.push(outcome);
+      logParts.push(`desfecho -> ${outcome || 'limpo'}`);
+    }
 
-  // Se o registro tem profissional vinculado, revalida disponibilidade
-  // (dias/horários, conflito e bloqueios) — item 4.5.
-  if (scheduled_at) {
-    const [[record]] = await pool.query(
-      `SELECT professional_id, unit_id, ${meta.serviceColumn} AS service_name FROM ${meta.table} WHERE id = ?`,
+    const motivoFoiInformado = temMotivo;
+    let reason = temMotivo
+      ? (body.reschedule_reason ? String(body.reschedule_reason).trim() : null)
+      : null;
+    if (reason === null && (opts.autoReason || opts.defaultReason)) {
+      reason = opts.autoReason || opts.defaultReason;
+    }
+    const reasonEntrou = temMotivo || ((opts.autoReason || opts.defaultReason) && scheduled_at);
+    if (temMotivo || reason !== null) {
+      // Motivo só entra como coluna quando o chamador o enviou ou há default.
+      if (temMotivo || (opts.autoReason || opts.defaultReason)) {
+        const reasonError = validateRescheduleReason(reason, {
+          required: false,
+        });
+        if (reasonError) return { status: 400, body: { error: reasonError } };
+      }
+    }
+
+    if (scheduled_at) {
+      const windowError = validateScheduleWindow(scheduled_at);
+      if (windowError) return { status: 400, body: { error: windowError } };
+      updates.push('scheduled_at=?'); params.push(scheduled_at);
+      logParts.push(`reagendado para ${scheduled_at}`);
+    }
+
+    // Motivo obrigatório ao reagendar (salvo quando há default/paciente). A
+    // exigência real depende do horário mudar de fato; uma gravação no mesmo
+    // horário (salvar sem mudar) não precisa de justificativa.
+    const reagendando = Boolean(scheduled_at);
+    const motivoObrigatorio = opts.reasonRequired !== undefined
+      ? opts.reasonRequired
+      : !opts.autoReason && !opts.defaultReason;
+
+    // Coluna reschedule_reason: atualiza se motivo foi enviado ou há default.
+    if (temMotivo || (opts.defaultReason || opts.autoReason)) {
+      updates.push('reschedule_reason=?'); params.push(reason);
+      logParts.push(reason ? `motivo -> ${reason}` : 'motivo -> limpo');
+    }
+
+    if (!updates.length) return { status: 400, body: { error: 'Nada para atualizar.' } };
+
+    // Leitura/travamento do registro ATUAL antes da validação, para evitar
+    // corrida com outro reagendamento do mesmo item ou do mesmo utente.
+    const [[before]] = await c.query(
+      `SELECT id, status, scheduled_at, professional_id, unit_id, user_id,
+              ${meta.serviceColumn} AS service_name
+       FROM ${meta.table} WHERE id = ? FOR UPDATE`,
       [opts.id]
     );
-    if (record && record.professional_id && record.unit_id) {
-      const bookingError = await validateBooking(pool, {
-        tipo: meta.tipo,
-        unitId: record.unit_id,
-        professionalId: record.professional_id,
-        serviceName: record.service_name,
-        scheduledAt: scheduled_at,
-        excludeId: opts.id,
-      });
-      if (bookingError) return { status: 409, body: { error: bookingError } };
+    if (!before) return { status: 404, body: { error: 'Registro não encontrado.' } };
 
-      // Reagendar muda a grade, então muda a duração: um atendimento de 60 min
-      // levado para um turno de 30 min tem que ser reavaliado como 30. Sem
-      // isto, o registro carregaria a duração do horário antigo.
-      const duracao = await duracaoMinutos(pool, {
-        unitId: record.unit_id,
-        professionalId: record.professional_id,
-        scheduledAt: scheduled_at,
-      });
-      updates.push('duration_minutes=?'); params.push(duracao);
-      logParts.push(`duração -> ${duracao} min`);
+    const changedScheduled = Boolean(scheduled_at) && String(before.scheduled_at) !== String(scheduled_at);
+    if (changedScheduled && motivoObrigatorio && !motivoFoiInformado && !(opts.autoReason || opts.defaultReason)) {
+      return { status: 400, body: { error: 'Informe o motivo da remarcação.' } };
     }
-  }
+    if (changedScheduled && (temMotivo || opts.autoReason || opts.defaultReason || motivoFoiInformado)) {
+      const reasonError = validateRescheduleReason(reason, { required: true });
+      if (reasonError) return { status: 400, body: { error: reasonError } };
+    }
 
-  params.push(opts.id);
-  const [result] = await pool.query(
-    `UPDATE ${meta.table} SET ${updates.join(', ')} WHERE id=?`, params
-  );
-  if (result.affectedRows === 0) return { status: 404, body: { error: 'Registro não encontrado.' } };
+    await lockBookingActors(c, {
+      userId: before.user_id,
+      professionalId: before.professional_id,
+    });
 
-  return {
-    status: 200,
-    body: { id: opts.id },
-    audit: { entityType: meta.entityType, details: logParts.join('; ') },
+    // Se o registro tem profissional vinculado, revalida disponibilidade.
+    if (scheduled_at) {
+      if (before.professional_id && before.unit_id) {
+        const userPriority = await prioridadeDoUsuario(c, before.user_id);
+        const bookingError = await validateBooking(c, {
+          tipo: meta.tipo,
+          userId: before.user_id,
+          unitId: before.unit_id,
+          professionalId: before.professional_id,
+          serviceName: before.service_name,
+          scheduledAt: scheduled_at,
+          excludeId: opts.id,
+          userPriority,
+          currentScheduledAt: before.scheduled_at,
+        });
+        if (bookingError) return { status: 409, body: { error: bookingError } };
+
+        const duracao = await duracaoMinutos(c, {
+          unitId: before.unit_id,
+          professionalId: before.professional_id,
+          serviceName: before.service_name,
+          tipo: meta.tipo,
+          scheduledAt: scheduled_at,
+        });
+        updates.push('duration_minutes=?'); params.push(duracao);
+        logParts.push(`duracao -> ${duracao} min`);
+      }
+    }
+
+    const fromScheduled = before.scheduled_at;
+    const toScheduled = scheduled_at || before.scheduled_at;
+    const changedStatus = status !== undefined && status !== before.status;
+
+    params.push(opts.id);
+    const [result] = await c.query(
+      `UPDATE ${meta.table} SET ${updates.join(', ')} WHERE id=?`, params
+    );
+    if (result.affectedRows === 0) return { status: 404, body: { error: 'Registro não encontrado.' } };
+
+    // Eventos operacionais (append-only).
+    const actorUserId = opts.actorUserId || null;
+    try {
+      if (changedScheduled) {
+        await registrarEvento(c, {
+          kind: meta.kind,
+          bookingId: opts.id,
+          eventType: 'rescheduled',
+          fromScheduledAt: fromScheduled,
+          toScheduledAt: toScheduled,
+          fromProfessionalId: before.professional_id,
+          toProfessionalId: before.professional_id,
+          reason: reason || null,
+          actorUserId,
+        });
+      }
+      if (changedStatus) {
+        const eventType = status === 'cancelado' ? 'canceled' : 'status_changed';
+        await registrarEvento(c, {
+          kind: meta.kind,
+          bookingId: opts.id,
+          eventType,
+          fromScheduledAt: fromScheduled,
+          toScheduledAt: toScheduled,
+          fromProfessionalId: before.professional_id,
+          toProfessionalId: before.professional_id,
+          reason: reason || null,
+          actorUserId,
+        });
+      }
+    } catch (eventError) {
+      // Histórico não deve derrubar a atualização, salvo quando for best-effort.
+      if (opts.failOnEventError) throw eventError;
+    }
+
+    return {
+      status: 200,
+      body: { id: opts.id },
+      audit: { entityType: meta.entityType, details: logParts.join('; ') },
+    };
   };
+
+  try {
+    if (ownsConnection) await conn.beginTransaction();
+    const result = await run(conn);
+    if (ownsConnection) {
+      if (result.status === 200) await conn.commit();
+      else await conn.rollback();
+    }
+    return result;
+  } catch (err) {
+    if (ownsConnection) await conn.rollback().catch(() => {});
+    throw err;
+  } finally {
+    if (ownsConnection) conn.release();
+  }
 }
 
 module.exports = {
   KINDS,
   TIPOS,
+  MAX_DAYS_AHEAD,
+  AVAILABILITY_PAGE_DAYS,
+  resolveAvailabilityWindow,
+  PRIORITY_GROUPS,
+  PRIORITY_QUOTA_RATIO,
+  PRIORITY_RELEASE_HOURS,
+  PRIORITY_MESSAGE,
+  isPriorityUser,
+  prioridadeDoUsuario,
+  quotaPrioritaria,
+  gradeDoDia,
+  reservasDoDia,
+  slotReservado,
   BOOKING_STATUS,
   parseDateTime,
   toDateStr,
   validateScheduleWindow,
+  lockBookingActors,
+  validateUserOverlap,
   validateBooking,
+duracaoServico,
 duracaoMinutos,
 duracaoDe,
 DURACAO_PADRAO,

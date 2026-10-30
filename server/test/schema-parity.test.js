@@ -94,15 +94,30 @@ const COLUNAS = [
   ['work_schedules', 'start_time'],
   ['work_schedules', 'end_time'],
   ['work_schedules', 'slot_minutes'],
+  ['unit_offers', 'duration_minutes'],
   ['professional_offers', 'professional_id'],
   ['professional_offers', 'unit_id'],
   ['schedule_blocks', 'professional_id'],
   ['schedule_blocks', 'unit_id'],
+  // NV03 — lista de espera
+  ['waitlist', 'user_id'],
+  ['waitlist', 'status'],
+  ['waitlist', 'record_id'],
   // V3 — vínculos de agendamento
   ['appointments', 'unit_id'],
   ['appointments', 'professional_id'],
+  ['appointments', 'duration_minutes'],
+  ['appointments', 'outcome'],
+  ['appointments', 'reschedule_reason'],
   ['exams', 'unit_id'],
   ['exams', 'professional_id'],
+  ['exams', 'duration_minutes'],
+  ['exams', 'outcome'],
+  ['exams', 'reschedule_reason'],
+  ['booking_events', 'kind'],
+  ['booking_events', 'booking_id'],
+  ['booking_events', 'event_type'],
+  ['booking_events', 'actor_user_id'],
   // Auditoria encadeada
   ['audit_log', 'details'],
   ['audit_log', 'prev_hash'],
@@ -125,6 +140,8 @@ const TABELAS = [
   'professional_offers',
   'work_schedules',
   'schedule_blocks',
+  'waitlist',
+  'booking_events',
 ];
 
 let conn;

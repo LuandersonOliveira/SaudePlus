@@ -80,6 +80,10 @@
         </div>
       </div>
       <div class="card mt-4">
+        <h2>Agenda operacional</h2>
+        <div data-agenda></div>
+      </div>
+      <div class="card mt-4">
         <h2>Exames recentes</h2>
         <div id="recentExams">
           <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
@@ -446,6 +450,7 @@
   </div><!-- /app-shell -->
 
   <script src="assets/ui.js"></script>
+  <script defer src="assets/agenda.js"></script>
   <script>
     let SESSION;
     let pendingReagendar = null;
@@ -1565,6 +1570,8 @@ const notes = [];
           <input type="hidden" id="userFormId">
           <div class="field"><label for="userFormName">Nome completo *</label><input class="input" id="userFormName" required></div>
           <div class="field"><label for="userFormEmail">E-mail *</label><input class="input" id="userFormEmail" type="email" required></div>
+          <div class="field"><label for="userFormMobile">Celular</label><input class="input" id="userFormMobile" maxlength="30" inputmode="tel"></div>
+          <div class="field"><label for="userFormPhone">Telefone</label><input class="input" id="userFormPhone" maxlength="30" inputmode="tel"></div>
           <div class="field"><label for="userFormRole">Papel *</label>
             <select class="select" id="userFormRole" required>
               <option value="paciente">Paciente</option>
@@ -1915,7 +1922,9 @@ const notes = [];
         const role = document.getElementById('userFormRole').value;
         const adminWrap = document.getElementById('userFormAdminWrap');
         const profWrap = document.getElementById('userFormProfWrap');
-        if (adminWrap) adminWrap.style.display = role === 'admin' ? '' : 'none';
+        // Só quem tem 'admins' vê (e envia) o nível: gestor levava 403 ao
+        // salvar qualquer administrador por causa do campo oculto no payload.
+        if (adminWrap) adminWrap.style.display = (role === 'admin' && can('admins')) ? '' : 'none';
         if (profWrap) {
           profWrap.style.display = role === 'atendente' ? '' : 'none';
           loadProfessionalsForSelect(document.getElementById('userFormProf').value || '');
@@ -1929,6 +1938,8 @@ const notes = [];
         document.getElementById('userFormId').value = '';
         document.getElementById('userFormName').value = '';
         document.getElementById('userFormEmail').value = '';
+        document.getElementById('userFormMobile').value = '';
+        document.getElementById('userFormPhone').value = '';
         document.getElementById('userFormRole').value = 'paciente';
         document.getElementById('userFormStatus').value = 'ativo';
         document.getElementById('userFormJob').value = '';
@@ -1974,6 +1985,8 @@ const notes = [];
           await loadProfessionalsForSelect(u.professional_id || '');
           document.getElementById('userFormName').value = u.full_name || '';
           document.getElementById('userFormEmail').value = u.email || '';
+          document.getElementById('userFormMobile').value = u.mobile || '';
+          document.getElementById('userFormPhone').value = u.phone || '';
           document.getElementById('userFormRole').value = u.role || 'paciente';
           document.getElementById('userFormStatus').value = u.account_status || 'ativo';
           document.getElementById('userFormJob').value = u.job_role || '';
@@ -2015,7 +2028,7 @@ const notes = [];
             pid = found ? found.id : null;
           }
           if (!pid && u.role === 'atendente') {
-            await apiPut('/admin/users/' + encodeURIComponent(id), { role: 'atendente' });
+            await apiPatch('/admin/users/' + encodeURIComponent(id), { role: 'atendente' });
             const u2 = await apiGet('/admin/users/' + encodeURIComponent(id));
             pid = u2.professional_id;
             if (!pid) {
@@ -2030,7 +2043,7 @@ const notes = [];
             return;
           }
           const [allUnits, pdata] = await Promise.all([
-            apiGet('/admin/units').catch(()=>[]),
+            apiGet('/health-units/manage').catch(()=>[]),
             apiGet('/admin/professionals').catch(()=>({professionals:[],offers:[],schedules:[],blocks:[]}))
           ]);
           const profs = Array.isArray(pdata)?pdata:(pdata.professionals||[]);
@@ -2156,19 +2169,25 @@ const notes = [];
         const payload = {
           full_name: document.getElementById('userFormName').value.trim(),
           email: document.getElementById('userFormEmail').value.trim(),
+          mobile: document.getElementById('userFormMobile').value.trim() || null,
+          phone: document.getElementById('userFormPhone').value.trim() || null,
           role: document.getElementById('userFormRole').value,
           account_status: document.getElementById('userFormStatus').value,
           job_role: document.getElementById('userFormJob').value.trim() || null,
-          admin_level: document.getElementById('userFormAdminLevel').value,
           professional_id: document.getElementById('userFormProf').value || null
         };
+        // admin_level só vai no corpo quando o ator pode definir níveis. Gestor
+        // não tem 'admins' e recebia 403 mesmo sem tocar no campo.
+        if (payload.role === 'admin' && can('admins')) {
+          payload.admin_level = document.getElementById('userFormAdminLevel').value;
+        }
         const pass = document.getElementById('userFormPass').value;
         if (pass) payload.password = pass;
         const btn = this.querySelector('button[type=submit]');
         if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
         try {
           if (id) {
-            await apiPut('/admin/users/' + encodeURIComponent(id), payload);
+            await apiPatch('/admin/users/' + encodeURIComponent(id), payload);
             toast('Usuário atualizado', 'success');
           } else {
             if (!pass) return toast('Senha obrigatória para novo usuário', 'error');

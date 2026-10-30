@@ -4,9 +4,11 @@ const pool = require('../db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { requireCapability } = require('../middleware/capabilities');
 const { verifyChain } = require('../utils/audit');
-const { applyBookingChange } = require('../utils/booking');
+const { applyBookingChange, BOOKING_STATUS } = require('../utils/booking');
+const { liberarVagaAposCancelamento } = require('../services/waitlist');
 const { parsePagination } = require('../utils/validators');
 const { normalizeCounts } = require('../utils/stats');
+const { isValidDateOnly } = require('../utils/local-date');
 
 // Listagem paginável sem quebra: com ?page/?pageSize responde
 // envelope {data,page,pageSize,total}; sem query mantém o array legado.
@@ -19,6 +21,46 @@ async function pagedList(res, next, { baseSql, countSql, params, page, pageSize,
   } catch (err) {
     next(err);
   }
+}
+
+// RF17: os filtros da listagem precisam ir ao SQL. Filtrar no cliente só
+// enxerga a página carregada e faz o `total` mentir. O alias entra aqui e
+// nunca vem da query string, então não há superfície de injeção.
+function bookingFilters(query, alias) {
+  const where = [];
+  const params = [];
+  const status = String(query.status || '').trim();
+  const unitId = String(query.unit_id || '').trim();
+  const dateFrom = String(query.date_from || '').trim();
+  const dateTo = String(query.date_to || '').trim();
+
+  if (status) {
+    if (!BOOKING_STATUS.includes(status)) return { error: 'Status inválido.' };
+    where.push(`${alias}.status = ?`);
+    params.push(status);
+  }
+  if (unitId) {
+    where.push(`${alias}.unit_id = ?`);
+    params.push(unitId);
+  }
+  if (dateFrom) {
+    if (!isValidDateOnly(dateFrom)) return { error: 'Data inicial inválida. Use AAAA-MM-DD.' };
+    where.push(`${alias}.scheduled_at >= ?`);
+    params.push(`${dateFrom} 00:00:00`);
+  }
+  if (dateTo) {
+    if (!isValidDateOnly(dateTo)) return { error: 'Data final inválida. Use AAAA-MM-DD.' };
+    where.push(`${alias}.scheduled_at < DATE_ADD(?, INTERVAL 1 DAY)`);
+    params.push(dateTo);
+  }
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    return { error: 'Data inicial não pode ser posterior à data final.' };
+  }
+
+  return {
+    sql: where.length ? `WHERE ${where.join(' AND ')}` : '',
+    params,
+  };
 }
 
 const router = express.Router();
@@ -103,18 +145,21 @@ router.get('/export/summary.csv', requireCapability('reports'), async (req, res,
 
 router.get('/appointments', requireCapability('appointments'), async (req, res, next) => {
   const { wantsPaged, page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 20 });
+  const filtros = bookingFilters(req.query, 'a');
+  if (filtros.error) return res.status(400).json({ error: filtros.error });
   const legacyLimit = Math.min(parseInt(req.query.limit, 10) || pageSize, 100);
+  const from = 'FROM appointments a JOIN users u ON u.id = a.user_id';
   if (wantsPaged) {
     return pagedList(res, next, {
-      baseSql: 'SELECT a.*, u.full_name AS user_name, u.email AS user_email FROM appointments a JOIN users u ON u.id = a.user_id ORDER BY a.scheduled_at DESC',
-      countSql: 'SELECT COUNT(*) AS total FROM appointments',
-      params: [], page, pageSize, offset, wantsPaged,
+      baseSql: `SELECT a.*, u.full_name AS user_name, u.email AS user_email ${from} ${filtros.sql} ORDER BY a.scheduled_at DESC`,
+      countSql: `SELECT COUNT(*) AS total ${from} ${filtros.sql}`,
+      params: filtros.params, page, pageSize, offset, wantsPaged,
     });
   }
   try {
     const [rows] = await pool.query(
-      'SELECT a.*, u.full_name AS user_name, u.email AS user_email FROM appointments a JOIN users u ON u.id = a.user_id ORDER BY a.scheduled_at DESC LIMIT ?',
-      [legacyLimit]
+      `SELECT a.*, u.full_name AS user_name, u.email AS user_email ${from} ${filtros.sql} ORDER BY a.scheduled_at DESC LIMIT ?`,
+      [...filtros.params, legacyLimit]
     );
     res.json(rows);
   } catch (err) {
@@ -124,18 +169,21 @@ router.get('/appointments', requireCapability('appointments'), async (req, res, 
 
 router.get('/exams', requireCapability('appointments'), async (req, res, next) => {
   const { wantsPaged, page, pageSize, offset } = parsePagination(req.query, { defaultPageSize: 20 });
+  const filtros = bookingFilters(req.query, 'e');
+  if (filtros.error) return res.status(400).json({ error: filtros.error });
   const legacyLimit = Math.min(parseInt(req.query.limit, 10) || pageSize, 100);
+  const from = 'FROM exams e JOIN users u ON u.id = e.user_id';
   if (wantsPaged) {
     return pagedList(res, next, {
-      baseSql: 'SELECT e.*, u.full_name AS user_name, u.email AS user_email FROM exams e JOIN users u ON u.id = e.user_id ORDER BY e.scheduled_at DESC',
-      countSql: 'SELECT COUNT(*) AS total FROM exams',
-      params: [], page, pageSize, offset, wantsPaged,
+      baseSql: `SELECT e.*, u.full_name AS user_name, u.email AS user_email ${from} ${filtros.sql} ORDER BY e.scheduled_at DESC`,
+      countSql: `SELECT COUNT(*) AS total ${from} ${filtros.sql}`,
+      params: filtros.params, page, pageSize, offset, wantsPaged,
     });
   }
   try {
     const [rows] = await pool.query(
-      'SELECT e.*, u.full_name AS user_name, u.email AS user_email FROM exams e JOIN users u ON u.id = e.user_id ORDER BY e.scheduled_at DESC LIMIT ?',
-      [legacyLimit]
+      `SELECT e.*, u.full_name AS user_name, u.email AS user_email ${from} ${filtros.sql} ORDER BY e.scheduled_at DESC LIMIT ?`,
+      [...filtros.params, legacyLimit]
     );
     res.json(rows);
   } catch (err) {
@@ -238,6 +286,22 @@ router.delete('/diseases/:id', requireCapability('diseases'), async (req, res, n
   }
 });
 
+router.get('/waitlist', requireCapability('appointments'), async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT w.id, w.user_id, w.kind, w.service_name, w.unit_id, w.professional_id,
+              w.status, w.record_id, w.created_at, w.fulfilled_at,
+              u.full_name AS user_name, u.email AS user_email, u.priority
+       FROM waitlist w
+       JOIN users u ON u.id = w.user_id
+       WHERE w.status = 'aguardando' AND u.deleted_at IS NULL
+       ORDER BY CASE WHEN u.priority IN ('idoso', 'gestante', 'pcd', 'lactante') THEN 0 ELSE 1 END,
+                w.created_at ASC`
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
 // PATCH /admin/:kind/:id — confirmar, cancelar e/ou reagendar (admin pode agir
 // sobre o agendamento de QUALQUER usuário; diferente das rotas /me/*, que só
 // deixam cada usuário mexer no próprio registro).
@@ -250,8 +314,16 @@ router.patch('/:kind/:id', requireCapability('appointments'), async (req, res, n
       kindKey: req.params.kind,
       id: req.params.id,
       body: req.body || {},
+      actorUserId: req.user && req.user.id,
     });
     if (result.status !== 200) return res.status(result.status).json(result.body);
+    if ((req.body || {}).status === 'cancelado') {
+      try {
+        await liberarVagaAposCancelamento(pool, { kindKey: req.params.kind, id: req.params.id });
+      } catch (err) {
+        console.error(`Falha ao liberar a vaga cancelada ${req.params.id}: ${err.message}`);
+      }
+    }
     await req.audit('admin_update', result.audit.entityType, req.params.id, result.audit.details);
     res.json(result.body);
   } catch (err) {
@@ -314,6 +386,41 @@ router.get('/audit-log/verify', requireCapability('audit'), async (req, res, nex
   } catch (err) {
     next(err);
   }
+});
+
+// GET /admin/catalog-health — serviços ativos sem profissional ativo ou sem escala.
+router.get('/catalog-health', requireCapability('units'), async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT o.id, o.unit_id, u.name AS unit_name, o.kind, o.name,
+              (SELECT COUNT(*) FROM professional_offers po
+                 JOIN professionals p ON p.id = po.professional_id
+                WHERE po.unit_id = o.unit_id AND po.kind = o.kind
+                  AND po.name = o.name AND p.active = 1) AS active_professionals,
+              (SELECT COUNT(*) FROM work_schedules ws
+                 JOIN professional_offers po
+                   ON po.professional_id = ws.professional_id
+                  AND po.unit_id = ws.unit_id
+                WHERE po.unit_id = o.unit_id AND po.kind = o.kind
+                  AND po.name = o.name AND ws.active = 1) AS active_schedules
+       FROM unit_offers o
+       JOIN health_units u ON u.id = o.unit_id
+       WHERE o.active = 1 AND u.active = 1
+       HAVING active_professionals = 0 OR active_schedules = 0
+       ORDER BY u.name, o.kind, o.name`
+    );
+    const data = rows.map((row) => ({
+      id: row.id,
+      unit_id: row.unit_id,
+      unit_name: row.unit_name,
+      kind: row.kind,
+      name: row.name,
+      issue: Number(row.active_professionals) === 0 ? 'sem_profissional' : 'sem_escala',
+      active_professionals: Number(row.active_professionals),
+      active_schedules: Number(row.active_schedules),
+    }));
+    res.json({ data, total: data.length });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

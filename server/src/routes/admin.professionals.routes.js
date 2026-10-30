@@ -10,6 +10,8 @@ const crypto = require('crypto');
 const pool = require('../db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { requireCapability } = require('../middleware/capabilities');
+const { registrarEvento } = require('../services/booking-events');
+const mailer = require('../services/mailer');
 
 const router = express.Router();
 // P3: gestão de profissionais/agenda exige a permissão 'units'.
@@ -101,14 +103,14 @@ router.post('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// PATCH /admin/professionals/:id — editar, ativar/desativar
+// PATCH /admin/professionals/:id - editar, ativar/desativar
 router.patch('/:id', async (req, res, next) => {
-  try {
-    const { name, job_title: jobTitle, registry, active } = req.body || {};
-    const updates = [];
-    const params = [];
-    const details = [];
+  const { name, job_title: jobTitle, registry, active } = req.body || {};
+  const updates = [];
+  const params = [];
+  const details = [];
 
+  try {
     const [[current]] = await pool.query(
       'SELECT name, job_title, registry, active FROM professionals WHERE id = ?',
       [req.params.id]
@@ -128,6 +130,8 @@ router.patch('/:id', async (req, res, next) => {
       updates.push('registry=?'); params.push(registry || null);
       details.push(`registro -> ${registry || 'não informado'}`);
     }
+
+    const desativando = active !== undefined && !Number(active) && Number(current.active) === 1;
     if (active !== undefined) {
       const v = Number(active) ? 1 : 0;
       if (v !== Number(current.active)) {
@@ -137,13 +141,105 @@ router.patch('/:id', async (req, res, next) => {
     }
     if (!updates.length) return res.status(400).json({ error: 'Nada para atualizar.' });
 
-    params.push(req.params.id);
-    await pool.query(`UPDATE professionals SET ${updates.join(', ')} WHERE id=?`, params);
+    let affected = [];
+    let conn = null;
+    try {
+      if (desativando) {
+        conn = await pool.getConnection();
+        await conn.beginTransaction();
+      }
+      const exec = conn || pool;
+      params.push(req.params.id);
+      await exec.query(`UPDATE professionals SET ${updates.join(', ')} WHERE id=?`, params);
 
-    const reason = reasonOf(req);
-    await req.audit('admin_update_professional', 'professional', req.params.id,
-      `${details.join('; ')}${reason ? `; motivo: ${reason}` : ''}`);
-    res.json({ ok: true });
+      if (desativando) {
+        const [futureAppointments] = await exec.query(
+          `SELECT id, user_id, scheduled_at FROM appointments
+           WHERE professional_id = ? AND status IN ('pendente', 'confirmado')
+             AND scheduled_at >= NOW()`,
+          [req.params.id]
+        );
+        const [futureExams] = await exec.query(
+          `SELECT id, user_id, scheduled_at FROM exams
+           WHERE professional_id = ? AND status IN ('pendente', 'confirmado')
+             AND scheduled_at >= NOW()`,
+          [req.params.id]
+        );
+
+        for (const rec of futureAppointments) {
+          await exec.query(
+            `UPDATE appointments SET status = 'para_remarcar', reschedule_reason = 'profissional_inativado'
+             WHERE id = ?`,
+            [rec.id]
+          );
+          await registrarEvento(exec, {
+            kind: 'consulta',
+            bookingId: rec.id,
+            eventType: 'professional_deactivated',
+            fromScheduledAt: rec.scheduled_at,
+            toScheduledAt: rec.scheduled_at,
+            fromProfessionalId: req.params.id,
+            toProfessionalId: req.params.id,
+            reason: 'profissional_inativado',
+            actorUserId: req.user.id,
+          });
+        }
+        for (const rec of futureExams) {
+          await exec.query(
+            `UPDATE exams SET status = 'para_remarcar', reschedule_reason = 'profissional_inativado'
+             WHERE id = ?`,
+            [rec.id]
+          );
+          await registrarEvento(exec, {
+            kind: 'exame',
+            bookingId: rec.id,
+            eventType: 'professional_deactivated',
+            fromScheduledAt: rec.scheduled_at,
+            toScheduledAt: rec.scheduled_at,
+            fromProfessionalId: req.params.id,
+            toProfessionalId: req.params.id,
+            reason: 'profissional_inativado',
+            actorUserId: req.user.id,
+          });
+        }
+        affected = [...futureAppointments, ...futureExams];
+        details.push(`${affected.length} registro(s) movido(s) para remarcar`);
+        if (conn) {
+          await conn.commit();
+          conn.release();
+          conn = null;
+        }
+      }
+
+      const reason = reasonOf(req);
+      await req.audit('admin_update_professional', 'professional', req.params.id,
+        `${details.join('; ')}${reason ? `; motivo: ${reason}` : ''}`);
+
+      if (affected.length) {
+        const ids = [...new Set(affected.map((r) => r.user_id))];
+        const [users] = await pool.query(
+          `SELECT id, full_name, email FROM users WHERE id IN (?)`, [ids]
+        );
+        for (const u of users) {
+          if (!u.email) continue;
+          try {
+            await mailer.enviar({
+              para: u.email,
+              assunto: 'Profissional indisponível - reagendamento',
+              texto: `Olá ${u.full_name || ''}, seu atendimento foi movido para a fila de remarcação.`,
+            });
+          } catch (err) { /* best-effort */ }
+        }
+      }
+
+      res.json({ ok: true, moved: affected.length });
+    } catch (err) {
+      if (conn) {
+        await conn.rollback().catch(() => {});
+        conn.release();
+      }
+      next(err);
+    }
   } catch (err) { next(err); }
 });
 

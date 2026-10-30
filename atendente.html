@@ -6,6 +6,7 @@
 <title>Painel Atendente | Saúde+</title>
 <link rel="stylesheet" href="assets/styles.css">
 <script defer src="assets/api.js"></script>
+<script defer src="assets/agenda.js"></script>
 </head>
 <body>
 <a class="sr-only" href="#conteudo">Pular para o conteúdo</a>
@@ -44,6 +45,11 @@
   <section class="tabpanel" id="agendamentos" role="tabpanel" aria-labelledby="tab-agendamentos">
     <div class="card"><h2>Consultas recentes</h2><div id="allAppts"><div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div></div></div>
     <div class="card" style="margin-top:16px"><h2>Exames recentes</h2><div id="allExams"><div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div></div></div>
+  </section>
+
+  <!-- Agenda operacional -->
+  <section class="tabpanel" id="agenda-operacional" role="tabpanel" aria-labelledby="tab-agendamentos">
+    <div class="card"><h2>Agenda operacional</h2><div data-agenda></div></div>
   </section>
 
   <!-- Buscar paciente -->

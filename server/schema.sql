@@ -194,12 +194,21 @@ CREATE TABLE IF NOT EXISTS appointments (
         'pendente',
         'confirmado',
         'cancelado',
-        'concluido'
+        'concluido',
+        'para_remarcar'
     ) NOT NULL DEFAULT 'pendente',
+    -- Agenda operacional: desfecho e motivo ficam no próprio registro para
+    -- relatórios e para a fila "Para remarcar". `outcome` nunca substitui o
+    -- status; ele explica o que aconteceu.
+    outcome VARCHAR(40) NULL DEFAULT NULL,
+    reschedule_reason VARCHAR(255) NULL DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_appointments_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     INDEX idx_appointments_user (user_id),
-    INDEX idx_appointments_scheduled (scheduled_at)
+    INDEX idx_appointments_scheduled (scheduled_at),
+    INDEX idx_appointments_user_scheduled (user_id, scheduled_at),
+    INDEX idx_appointments_prof_scheduled (professional_id, scheduled_at),
+    INDEX idx_appointments_status_scheduled (status, scheduled_at)
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -263,12 +272,69 @@ CREATE TABLE IF NOT EXISTS exams (
         'pendente',
         'confirmado',
         'cancelado',
-        'concluido'
+        'concluido',
+        'para_remarcar'
     ) NOT NULL DEFAULT 'pendente',
+    outcome VARCHAR(40) NULL DEFAULT NULL,
+    reschedule_reason VARCHAR(255) NULL DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_exams_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     INDEX idx_exams_user (user_id),
-    INDEX idx_exams_scheduled (scheduled_at)
+    INDEX idx_exams_scheduled (scheduled_at),
+    INDEX idx_exams_user_scheduled (user_id, scheduled_at),
+    INDEX idx_exams_prof_scheduled (professional_id, scheduled_at),
+    INDEX idx_exams_status_scheduled (status, scheduled_at)
+) ENGINE = InnoDB;
+
+-- ---------------------------------------------------------------------
+-- Histórico operacional append-only da agenda. `audit_log` continua sendo a
+-- trilha administrativa inviolável; esta tabela é o que a recepção pode ler
+-- sem receber permissão de auditoria.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS booking_events (
+    id CHAR(36) NOT NULL PRIMARY KEY,
+    kind ENUM('consulta', 'exame') NOT NULL,
+    booking_id CHAR(36) NOT NULL,
+    event_type ENUM(
+        'created',
+        'status_changed',
+        'rescheduled',
+        'professional_deactivated',
+        'canceled'
+    ) NOT NULL,
+    from_scheduled_at DATETIME NULL,
+    to_scheduled_at DATETIME NULL,
+    from_professional_id CHAR(36) NULL,
+    to_professional_id CHAR(36) NULL,
+    reason VARCHAR(255) NULL,
+    actor_user_id CHAR(36) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_booking_events_booking (kind, booking_id, created_at),
+    CONSTRAINT fk_booking_events_actor
+        FOREIGN KEY (actor_user_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE = InnoDB;
+
+-- ---------------------------------------------------------------------
+-- NV03 — lista de espera. O paciente entra para um serviço (unidade e
+-- profissional opcionais = qualquer um) e, quando um agendamento daquele
+-- serviço é cancelado, a primeira pessoa elegível é marcada automaticamente.
+-- `record_id` guarda o agendamento/exame criado; `unit_id`/`professional_id`
+-- nulos funcionam como curinga na busca da fila.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS waitlist (
+    id CHAR(36) NOT NULL PRIMARY KEY,
+    user_id CHAR(36) NOT NULL,
+    kind ENUM('consulta', 'exame') NOT NULL,
+    service_name VARCHAR(120) NOT NULL,
+    unit_id CHAR(36) NULL,
+    professional_id CHAR(36) NULL,
+    status ENUM('aguardando', 'convertido', 'cancelado') NOT NULL DEFAULT 'aguardando',
+    record_id CHAR(36) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fulfilled_at DATETIME NULL DEFAULT NULL,
+    CONSTRAINT fk_waitlist_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    INDEX idx_waitlist_user (user_id),
+    INDEX idx_waitlist_queue (kind, service_name, status, created_at)
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -422,6 +488,9 @@ CREATE TABLE IF NOT EXISTS unit_offers (
     unit_id CHAR(36) NOT NULL,
     kind ENUM('consulta', 'exame') NOT NULL,
     name VARCHAR(120) NOT NULL,
+    -- NULL preserva o comportamento histórico: a duração continua vindo de
+    -- work_schedules.slot_minutes quando o serviço não define a própria.
+    duration_minutes INT NULL DEFAULT NULL,
     active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_unit_offers_unit FOREIGN KEY (unit_id) REFERENCES health_units (id) ON DELETE CASCADE,

@@ -9,7 +9,12 @@ const express = require('express');
 const crypto = require('crypto');
 const pool = require('../db');
 const { verifyToken } = require('../middleware/auth');
-const { TIPOS, validateBooking, duracaoMinutos, validateScheduleWindow } = require('../utils/booking');
+const { registrarEvento } = require('../services/booking-events');
+const {
+  TIPOS, validateBooking, duracaoMinutos, validateScheduleWindow,
+  prioridadeDoUsuario, lockBookingActors,
+} = require('../utils/booking');
+const { liberarVagaAposCancelamento } = require('../services/waitlist');
 
 const LABELS = {
   consulta: {
@@ -76,16 +81,19 @@ function createBookingRouter(tipo) {
       // transação e só então lê os ocupados — já com o primeiro registro.
       conn = await pool.getConnection();
       await conn.beginTransaction();
-      if (professional_id) {
-        await conn.query('SELECT id FROM professionals WHERE id = ? FOR UPDATE', [professional_id]);
-      }
+      await lockBookingActors(conn, {
+        userId: req.user.id,
+        professionalId: professional_id || null,
+      });
 
       const bookingError = await validateBooking(conn, {
         tipo,
+        userId: req.user.id,
         unitId: unit_id,
         professionalId: professional_id || null,
         serviceName,
         scheduledAt: scheduled_at,
+        userPriority: await prioridadeDoUsuario(conn, req.user.id),
       });
       if (bookingError) {
         await conn.rollback().catch(() => {});
@@ -113,6 +121,8 @@ function createBookingRouter(tipo) {
       const duracao = await duracaoMinutos(conn, {
         unitId: unit_id,
         professionalId: professional_id || null,
+        serviceName,
+        tipo,
         scheduledAt: scheduled_at,
       });
       columns.push('duration_minutes');
@@ -146,17 +156,31 @@ function createBookingRouter(tipo) {
       if (existing.status === 'concluido' || existing.status === 'cancelado') {
         return res.status(409).json({ error: msg.closed });
       }
-      await pool.query(
-        `UPDATE ${table} SET status = ? WHERE id = ? AND user_id = ?`,
+      const [cancelado] = await pool.query(
+        `UPDATE ${table} SET status = ? WHERE id = ? AND user_id = ?
+           AND status NOT IN ('concluido', 'cancelado')`,
         ['cancelado', req.params.id, req.user.id]
       );
+      if (cancelado.affectedRows === 0) {
+        return res.status(409).json({ error: msg.closed });
+      }
+      try {
+        await liberarVagaAposCancelamento(pool, { kindKey: table, id: req.params.id });
+      } catch (err) {
+        console.error(`Falha ao liberar a vaga cancelada ${req.params.id}: ${err.message}`);
+      }
       res.json({ ok: true });
     } catch (err) {
       next(err);
     }
   });
 
+  // PUT /:id — reagendamento. Mesma validação do POST, na MESMA transação:
+  // antes a checagem lia os ocupados e o UPDATE vinha depois, então um
+  // reagendamento concorrente com um novo agendamento podia ocupar o mesmo
+  // horário (o POST já usava lock; esta rota ficou para trás).
   router.put('/:id', async (req, res, next) => {
+    let conn = null;
     try {
       const body = req.body || {};
       const serviceName = hasDoctor ? body.specialty : body.exam_type;
@@ -164,36 +188,62 @@ function createBookingRouter(tipo) {
       if (!serviceName || !location || !scheduled_at) {
         return res.status(400).json({ error: msg.required });
       }
-      const [[existing]] = await pool.query(
-        `SELECT status, unit_id FROM ${table} WHERE id = ? AND user_id = ?`,
+      // Janela é regra de entrada, não conflito de agenda: 400. Sem esta
+      // checagem explícita, o erro vindo de `validateBooking` saía como 409.
+      const windowError = validateScheduleWindow(scheduled_at);
+      if (windowError) return res.status(400).json({ error: windowError });
+
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+
+      const falhar = async (status, payload) => {
+        await conn.rollback().catch(() => {});
+        conn.release();
+        conn = null;
+        return res.status(status).json(payload);
+      };
+
+      // FOR UPDATE no próprio registro: dois reagendamentos do mesmo item em
+      // abas diferentes serializam, e o segundo enxerga o status já gravado.
+      const [[existing]] = await conn.query(
+        `SELECT status, unit_id, professional_id, scheduled_at FROM ${table}
+         WHERE id = ? AND user_id = ? FOR UPDATE`,
         [req.params.id, req.user.id]
       );
-      if (!existing) return res.status(404).json({ error: msg.notFound });
+      if (!existing) return falhar(404, { error: msg.notFound });
       if (existing.status === 'concluido' || existing.status === 'cancelado') {
-        return res.status(409).json({ error: msg.editClosed });
+        return falhar(409, { error: msg.editClosed });
       }
+
+      // Mesma serialização do POST: sem o lock na linha do profissional, dois
+      // reagendamentos para o mesmo horário passavam na validação antes de
+      // qualquer um gravar.
+      await lockBookingActors(conn, {
+        userId: req.user.id,
+        professionalId: professional_id || existing.professional_id || null,
+      });
 
       // Agendamentos novos sempre têm unidade; registros antigos (sem unit_id)
       // continuam editáveis preservando o vínculo original.
       const effectiveUnitId = unit_id || existing.unit_id || null;
-      if (!effectiveUnitId) {
-        const windowError = validateScheduleWindow(scheduled_at);
-        if (windowError) return res.status(400).json({ error: windowError });
-      } else {
-        const bookingError = await validateBooking(pool, {
+      if (effectiveUnitId) {
+        const bookingError = await validateBooking(conn, {
           tipo,
+          userId: req.user.id,
           unitId: effectiveUnitId,
           professionalId: professional_id || null,
           serviceName,
           scheduledAt: scheduled_at,
           excludeId: req.params.id,
+          userPriority: await prioridadeDoUsuario(conn, req.user.id),
+          currentScheduledAt: existing.scheduled_at,
         });
-        if (bookingError) return res.status(409).json({ error: bookingError });
+        if (bookingError) return falhar(409, { error: bookingError });
       }
 
       let doctorName = hasDoctor ? (body.doctor || null) : null;
       if (hasDoctor && professional_id) {
-        const [[prof]] = await pool.query('SELECT name FROM professionals WHERE id = ?', [professional_id]);
+        const [[prof]] = await conn.query('SELECT name FROM professionals WHERE id = ?', [professional_id]);
         if (prof) doctorName = prof.name;
       }
 
@@ -203,12 +253,52 @@ function createBookingRouter(tipo) {
       setCols.push('location=?', 'unit_id=?', 'professional_id=?', 'scheduled_at=?', 'notes=?');
       setVals.push(location, effectiveUnitId, professional_id || null, scheduled_at, notes || null);
 
-      await pool.query(
+      // Reagendar muda a grade, então muda a duração: o registro não pode
+      // carregar a duração do horário antigo (mesmo defeito coberto pela rota
+      // administrativa). Sem profissional alocado, o padrão histórico é 30.
+      const duracao = await duracaoMinutos(conn, {
+        unitId: effectiveUnitId,
+        professionalId: professional_id || null,
+        serviceName,
+        tipo,
+        scheduledAt: scheduled_at,
+      });
+      setCols.push('duration_minutes=?');
+      setVals.push(duracao);
+
+      await conn.query(
         `UPDATE ${table} SET ${setCols.join(', ')} WHERE id=? AND user_id=?`,
         [...setVals, req.params.id, req.user.id]
       );
+
+      // Ao reagendar, a solicitação veio do paciente: motivo automático.
+      if (String(scheduled_at) !== String(existing.scheduled_at)) {
+        await registrarEvento(conn, {
+          kind: tipo,
+          bookingId: req.params.id,
+          eventType: 'rescheduled',
+          fromScheduledAt: existing.scheduled_at,
+          toScheduledAt: scheduled_at,
+          fromProfessionalId: existing.professional_id,
+          toProfessionalId: professional_id || null,
+          reason: 'solicitado_pelo_paciente',
+          actorUserId: req.user.id,
+        });
+        // A coluna reschedule_reason também fica preenchida, para a fila e os relatórios.
+        await conn.query(
+          `UPDATE ${table} SET reschedule_reason = ? WHERE id = ? AND user_id = ?`,
+          ['solicitado_pelo_paciente', req.params.id, req.user.id]
+        );
+      }
+      await conn.commit();
+      conn.release();
+      conn = null;
       res.json({ id: req.params.id });
     } catch (err) {
+      if (conn) {
+        await conn.rollback().catch(() => {});
+        conn.release();
+      }
       next(err);
     }
   });
