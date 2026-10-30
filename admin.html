@@ -465,9 +465,8 @@
 
       applyLevelGating();
       // Atalhos do Início respeitam o nível (sem permissão, sem botão).
-      document.getElementById('shortcutAgenda').style.display = can('appointments') ? '' : 'none';
-      document.getElementById('shortcutPessoas').style.display = can('users') ? '' : 'none';
-      document.getElementById('shortcutCSV').style.display = can('reports') ? '' : 'none';
+      const atalhoCsv = document.getElementById('shortcutCSV');
+      if (atalhoCsv) atalhoCsv.style.display = can('reports') ? '' : 'none';
 
       // Só abas principais (com data-tab) usam o switchTab; as sub-abas
       // (data-subtab) têm o próprio setSubTab. Um único listener para os dois
