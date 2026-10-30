@@ -15,10 +15,8 @@
   <aside class="app-rail">
     <a class="brand rail-brand" href="index.html"><span class="brand-dot"></span>Saúde+</a>
     <nav class="tabs sidebar" role="tablist" aria-label="Navegação administrativa">
-      <button class="tab active" data-tab="overview" role="tab" aria-selected="true" id="tab-overview"
-        aria-controls="overview" tabindex="0">Início</button>
-      <button class="tab" data-tab="atendimentos" role="tab" aria-selected="false" id="tab-atendimentos"
-        aria-controls="atendimentos" tabindex="-1">Atendimentos</button>
+      <button class="tab active" data-tab="atendimentos" role="tab" aria-selected="true" id="tab-atendimentos"
+        aria-controls="atendimentos" tabindex="0">Atendimentos</button>
       <button class="tab" data-tab="cadastros" role="tab" aria-selected="false" id="tab-cadastros"
         aria-controls="cadastros" tabindex="-1">Cadastros</button>
       <button class="tab" data-tab="auditoria" role="tab" aria-selected="false" id="tab-auditoria"
@@ -40,32 +38,7 @@
     <h1>Painel administrativo</h1>
     <p class="muted">Monitore atendimentos, usuários e alertas de saúde.</p>
 
-    <!-- ===== VISÃO GERAL ===== -->
-    <section class="tabpanel active" id="overview" role="tabpanel" aria-labelledby="tab-overview" tabindex="0">
-      <div class="stats-grid" id="stats" aria-live="polite"></div>
-      <div class="overview-main">
-        <div class="card overview-attention">
-          <h2>Precisa da sua atenção</h2>
-          <div id="attention">
-            <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
-          </div>
-        </div>
-        <div class="row mt-4 overview-actions">
-          <button class="btn btn-primary btn-sm" type="button" id="shortcutAgenda" onclick="gotoAtendimentos()">Ver atendimentos de hoje</button>
-          <button class="btn btn-outline btn-sm" type="button" id="shortcutPessoas" onclick="gotoPessoas('pendente')">Ver contas aguardando ativação</button>
-          <button class="btn btn-outline btn-sm" type="button" id="shortcutCSV" onclick="downloadSummaryReport(this)">Baixar resumo CSV</button>
-        </div>
-      </div>
-      <div class="card overview-activity">
-        <h2>Atividade recente</h2>
-        <div id="recentActivity">
-          <div class="skel-wrap" aria-hidden="true"><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===== ATENDIMENTOS (agenda de hoje + recentes) ===== -->
-    <section class="tabpanel" id="atendimentos" role="tabpanel" aria-labelledby="tab-atendimentos" tabindex="0">
+        <!-- ===== ATENDIMENTOS (agenda de hoje + recentes) ===== -->`n    <section class="tabpanel active" id="atendimentos" role="tabpanel" aria-labelledby="tab-atendimentos" tabindex="0">
       <div class="card">
         <h2>Agenda de hoje</h2>
         <p class="muted card-sub">Consultas e exames marcados para hoje — confirme, cancele ou reagende.</p>
@@ -615,7 +588,7 @@
       // Sem hash é o estado inicial (Início). Precisa ser aplicado também:
       // voltar do histórico para `/admin.html` sem hash tem que mostrar o
       // Início, senão a tela ficashowing uma aba que a URL não representa.
-      const alvo = (tab && document.querySelector(`.tab[data-tab="${tab}"]`)?.style.display !== 'none') ? tab : 'overview';
+      const alvo = (tab && document.querySelector(`.tab[data-tab="${tab}"]`)?.style.display !== 'none') ? tab : 'atendimentos';
       if (currentTab() !== alvo || !document.getElementById(alvo).classList.contains('active')) {
         switchTab(alvo, { silentUrl: true });
       }
@@ -697,7 +670,7 @@
       // Escopo: só abas principais — não apaga o destaque das sub-abas.
       // P3: barra navegação para seção oculta pelo nível (volta ao Início).
       const btn = document.querySelector(`.tab[data-tab="${name}"]`);
-      if (btn && btn.style.display === 'none') name = 'overview';
+      if (btn && btn.style.display === 'none') name = 'atendimentos';
       document.querySelectorAll('.tab[data-tab]').forEach(t => {
         const a = t.dataset.tab === name;
         t.classList.toggle('active', a);
