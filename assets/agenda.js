@@ -59,7 +59,7 @@
     };
 
     root.innerHTML = ""
-      + "<div class=\"agenda-shell\">"
+      + "<div class=\"agenda-shell\" role=\"region\" aria-label=\"Agenda operacional\" aria-live=\"polite\">"
       + "<div class=\"row\" style=\"align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px\">"
       + "<div class=\"tabs\" role=\"tablist\" aria-label=\"Abas da agenda\">"
       + "<button type=\"button\" class=\"tab active\" data-agenda-tab=\"dia\">Dia</button>"
@@ -225,6 +225,9 @@
     function abrirModalNovo() {
       var overlay = document.createElement("div");
       overlay.className = "modal-overlay";
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("aria-modal", "true");
+      overlay.setAttribute("aria-label", "Novo agendamento");
       overlay.innerHTML = ""
         + "<div class=\"modal-card modal-card-wide\">"
         + "<h2>Novo agendamento</h2>"
@@ -239,6 +242,8 @@
         + "<div class=\"modal-actions\"><button class=\"btn btn-outline\" type=\"button\" id=\"agCancel\">Cancelar</button><button class=\"btn btn-primary\" type=\"button\" id=\"agSave\">Salvar</button></div>"
         + "</div>";
       document.body.appendChild(overlay);
+      var first = overlay.querySelector("select, input, button");
+      if (first && first.focus) try { first.focus(); } catch (e) {}
 
       var kindEl = overlay.querySelector("#agKind");
       var qEl = overlay.querySelector("#agPatientQ");
