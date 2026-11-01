@@ -203,7 +203,7 @@ test('horário inválido é rejeitado na agenda do profissional', async () => {
 });
 
 test('cleanTime rejeita hora/minuto fora de faixa', () => {
-  const { cleanTime } = require('../src/routes/admin.professionals.routes');
+  const { cleanTime } = require('../src/schemas/adminProfessionals'); // passo 8c do A1: saiu da rota
   assert.equal(cleanTime('08:00'), '08:00:00');
   assert.equal(cleanTime('99:99'), null);
   assert.equal(cleanTime('24:00'), null);
