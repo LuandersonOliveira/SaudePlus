@@ -14,48 +14,23 @@ const {
   validateOutcome,
   validateRescheduleReason,
 } = require('./booking-status');
-const { localDateStr } = require('./local-date');
 const { registrarEvento } = require('../services/booking-events');
+const {
+  MAX_DAYS_AHEAD, AVAILABILITY_PAGE_DAYS, DURACAO_PADRAO, resolveAvailabilityWindow,
+  parseDateTime, toDateStr, toMinutes, overlaps, validateScheduleWindow, duracaoDe, schedulePara,
+} = require('./booking-time');
+const {
+  PRIORITY_GROUPS, PRIORITY_QUOTA_RATIO, PRIORITY_RELEASE_HOURS, PRIORITY_MESSAGE,
+  isPriorityUser, quotaPrioritaria, gradeDoDia, reservasDoDia, slotReservado,
+} = require('./booking-priority');
+const { gerarSlotsDoDia } = require('./booking-slots');
+
+// Desde o passo 7a do A1, o que é puro (tempo, duração, prioridade legal e a
+// geração dos horários livres de um dia) vive em booking-time/-priority/-slots;
+// este arquivo guarda o SQL e as regras que juntam as duas coisas, e reexporta
+// tudo para os chamadores de sempre.
 
 const KINDS = ['consulta', 'exame'];
-const MAX_DAYS_AHEAD = 366;
-
-// Janela devolvida por requisição nas rotas de disponibilidade. A agenda pode
-// ir até MAX_DAYS_AHEAD, mas o painel pagina de 30 em 30 dias: uma resposta
-// única de um ano inteiro multiplica consultas e slots sem uso real.
-const AVAILABILITY_PAGE_DAYS = 30;
-
-// NV02 — prioridade legal (Lei 10.048/2000). O campo `users.priority` já
-// existia, mas não alterava a oferta de vagas. Regra acordada: 10% das vagas
-// de cada dia/profissional (mínimo 1) ficam reservadas para idoso, gestante,
-// PCD e lactante. A reserva vale até 24 h antes do atendimento; depois disso
-// a vaga volta para todos, para não ficar ociosa.
-const PRIORITY_GROUPS = ['idoso', 'gestante', 'pcd', 'lactante'];
-const PRIORITY_QUOTA_RATIO = 0.10;
-const PRIORITY_RELEASE_HOURS = 24;
-const PRIORITY_LABEL = 'atendimento prioritário (Lei 10.048/2000)';
-const PRIORITY_MESSAGE =
-  `Este horário é reservado para ${PRIORITY_LABEL}. `
-  + 'Escolha outro horário ou tente novamente nas 24 horas anteriores.';
-
-/**
- * Normaliza a janela pedida pela rota: `days` nunca passa de 30 e `offsetDays`
- * nunca ultrapassa o fim da janela de 1 ano. É a única fonte de verdade para
- * catálogo e slot — antes cada rota repetia seu próprio `clamp` (30/60),
- * enquanto o agendamento aceitava 366 dias.
- */
-function resolveAvailabilityWindow({ days, offsetDays } = {}) {
-  const pedido = Number.parseInt(days, 10);
-  const span = Number.isFinite(pedido)
-    ? Math.min(Math.max(pedido, 1), AVAILABILITY_PAGE_DAYS)
-    : AVAILABILITY_PAGE_DAYS;
-  const maxOffset = Math.max(MAX_DAYS_AHEAD - span, 0);
-  const pedidoOffset = Number.parseInt(offsetDays, 10);
-  const offset = Number.isFinite(pedidoOffset)
-    ? Math.min(Math.max(pedidoOffset, 0), maxOffset)
-    : 0;
-  return { days: span, offsetDays: offset };
-}
 
 // Fase 1 (item 3): mapa único tipo -> tabela/colunas, para consultas e exames
 // compartilharem a mesma validação. Parâmetro `tipo` ('consulta'|'exame');
@@ -70,93 +45,10 @@ function resolveTipo(opts) {
   return TIPOS[t] ? t : null;
 }
 
-function parseDateTime(value) {
-  if (!value || typeof value !== 'string') return null;
-  if (!/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(value)) return null;
-  const d = new Date(value.trim().replace(' ', 'T'));
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function pad(n) { return String(n).padStart(2, '0'); }
-
-function toDateStr(d) {
-  return localDateStr(d);
-}
-
-function toMinutes(hhmm) {
-  // '08:00:00' ou '08:00' -> 480
-  const parts = String(hhmm || '').split(':');
-  if (parts.length < 2) return null;
-  return Number(parts[0]) * 60 + Number(parts[1]);
-}
-
-function isPriorityUser(priority) {
-  return PRIORITY_GROUPS.includes(String(priority || ''));
-}
-
 async function prioridadeDoUsuario(pool, userId) {
   if (!userId) return null;
   const [rows] = await pool.query('SELECT priority FROM users WHERE id = ?', [userId]);
   return rows.length ? rows[0].priority : null;
-}
-
-// Nº de vagas protegidas por dia/profissional. `ceil` garante o piso de 10% e
-// `max(1)` garante ao menos uma vaga mesmo em agendas curtas.
-function quotaPrioritaria(totalSlots) {
-  const total = Number(totalSlots) || 0;
-  if (total <= 0) return 0;
-  return Math.max(1, Math.ceil(total * PRIORITY_QUOTA_RATIO));
-}
-
-// Grade do dia: minutos de início únicos e ordenados. Duas agendas
-// sobrepostas não podem contar o mesmo horário duas vezes na cota.
-function gradeDoDia(rules) {
-  const minutos = new Set();
-  for (const rule of rules || []) {
-    const slot = Number(rule.slot || rule.slot_minutes) || DURACAO_PADRAO;
-    const start = Number(rule.start !== undefined ? rule.start : toMinutes(rule.start_time));
-    const end = Number(rule.end !== undefined ? rule.end : toMinutes(rule.end_time));
-    if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) continue;
-    for (let m = start; m + slot <= end; m += slot) minutos.add(m);
-  }
-  return [...minutos].sort((a, b) => a - b);
-}
-
-// As primeiras N vagas do dia são as reservadas.
-function reservasDoDia(rules) {
-  const grade = gradeDoDia(rules);
-  return new Set(grade.slice(0, quotaPrioritaria(grade.length)));
-}
-
-// A reserva vale só até 24 h antes do atendimento; depois, libera para todos.
-function slotReservado({ rules, minutesOfDay, slotStartMs, nowMs = Date.now() }) {
-  if (!reservasDoDia(rules).has(minutesOfDay)) return false;
-  return slotStartMs - nowMs > PRIORITY_RELEASE_HOURS * 3600 * 1000;
-}
-
-// Erro (string) ou null quando a data está dentro da janela permitida.
-function validateScheduleWindow(value) {
-  const d = parseDateTime(value);
-  if (!d) return 'Informe uma data e horário válidos.';
-  const now = Date.now();
-  if (d.getTime() <= now) return 'Não é permitido agendar em data passada.';
-  if (d.getTime() > now + MAX_DAYS_AHEAD * 24 * 3600 * 1000) {
-    return 'Não é permitido agendar com mais de 1 ano de antecedência.';
-  }
-  return null;
-}
-
-// Duração assumida para registro que não tem `duration_minutes` gravado
-// (agendamento anterior à migration 007, ou serviço sem profissional
-// alocado). Ignorar essas linhas seria pior: permitiria sobreposição.
-const DURACAO_PADRAO = 30;
-
-// Minutos ocupados por um registro, com a constante como reserva para o
-// legado. A duração é do AGENDAMENTO, não da agenda atual: se o admin mudar
-// o slot_minutes amanhã, o que foi marcado hoje não muda de significado.
-function duracaoDe(row) {
-  const d = Number(row.duration_minutes);
-  return Number.isFinite(d) && d > 0 ? d : DURACAO_PADRAO;
 }
 
 async function fetchBusyIntervals(pool, professionalId, fromStr, toStr, excludeId) {
@@ -225,10 +117,6 @@ async function fetchBusyIntervalsBulk(pool, professionalIds, fromStr, toStr, exc
   return byProf;
 }
 
-function overlaps(aStart, aEnd, bStart, bEnd) {
-  return aStart < bEnd && bStart < aEnd;
-}
-
 /*
  * Valida uma criação/edição de agendamento.
  * Retorna string de erro ou null quando liberado.
@@ -239,33 +127,6 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
  *   serviceName, scheduledAt, excludeId (registro em edição)
  * }
  */
-/**
- * Localiza o `work_schedules` que casa com o horário pedido e devolve a
- * duração do atendimento.
- *
- * Com DUAS agendas sobrepostas no mesmo dia, o horário pode ser candidato de
- * ambas; a primeira que casa define a duração. É a mesma regra que o
- * chamador usava — agora ela é uma função só, e é usada tanto para validar
- * o candidato quanto para gravar a duração no agendamento.
- *
- * @returns {{slot: number, start: number, end: number}|null}
- */
-function schedulePara(schedules, when, duracaoServico) {
-  const minutesOfDay = when.getHours() * 60 + when.getMinutes();
-  const duracao = Number(duracaoServico) > 0 ? Number(duracaoServico) : null;
-  for (const s of schedules) {
-    const start = toMinutes(s.start_time);
-    const end = toMinutes(s.end_time);
-    const slotMin = Number(s.slot_minutes) || 30;
-    const ocupacao = duracao || slotMin;
-    if (start === null || end === null) continue;
-    if (minutesOfDay >= start && minutesOfDay + ocupacao <= end && (minutesOfDay - start) % slotMin === 0) {
-      return { slot: slotMin, duration: ocupacao, start, end };
-    }
-  }
-  return null;
-}
-
 async function agendasDoDia(pool, professionalId, unitId, when) {
   const [rows] = await pool.query(
     `SELECT start_time, end_time, slot_minutes FROM work_schedules
@@ -276,9 +137,9 @@ async function agendasDoDia(pool, professionalId, unitId, when) {
 }
 
 /**
- * Dura��o declarada pelo servi�o na unidade. NULL significa "use o slot da
- * agenda" - o comportamento hist�rico. A duracao do servico tem prioridade
- * sobre o slot, mas o horario ainda precisa cair na grade.
+ * Duração declarada pelo serviço na unidade. NULL significa "use o slot da
+ * agenda" — o comportamento histórico. A duração do serviço tem prioridade
+ * sobre o slot, mas o horário ainda precisa cair na grade.
  */
 async function duracaoServico(pool, { unitId, serviceName, tipo }) {
   if (!unitId || !serviceName || !tipo) return null;
@@ -292,10 +153,10 @@ async function duracaoServico(pool, { unitId, serviceName, tipo }) {
 }
 
 /**
- * Dura��o, em minutos, do atendimento que seria marcado neste hor�rio.
+ * Duração, em minutos, do atendimento que seria marcado neste horário.
  *
- * Servi�o sem profissional alocado n�o tem agenda: a unidade decide depois, e
- * 30 min � o padr�o hist�rico. Servi�o com dura��o pr�pria vence o slot.
+ * Serviço sem profissional alocado não tem agenda: a unidade decide depois, e
+ * 30 min é o padrão histórico. Serviço com duração própria vence o slot.
  */
 async function duracaoMinutos(pool, { unitId, professionalId, serviceName, tipo, scheduledAt }) {
   if (!professionalId) return DURACAO_PADRAO;
@@ -501,28 +362,9 @@ async function getAvailability(pool, opts) {
     const rules = byWeekday[day.getDay()];
     if (!rules) continue;
 
-    const dateStr = toDateStr(day);
-    const isToday = dateStr === toDateStr(new Date());
-    const reservadas = prioritario ? new Set() : reservasDoDia(rules);
-    const slots = new Set();
-    for (const rule of rules) {
-      for (let m = rule.start; m + rule.slot <= rule.end; m += rule.slot) {
-        const slotDate = new Date(
-          day.getFullYear(), day.getMonth(), day.getDate(),
-          Math.floor(m / 60), m % 60, 0, 0
-        );
-        if (slotDate.getTime() <= nowMs) continue;
-        if (isToday && slotDate.getTime() < nowMs + 30 * 60000) continue;
-        if (reservadas.has(m)
-          && slotDate.getTime() - nowMs > PRIORITY_RELEASE_HOURS * 3600 * 1000) continue;
-        const ocupacao = servicoDuracao || rule.slot;
-        if (m + ocupacao > rule.end) continue;
-        const slotEnd = slotDate.getTime() + ocupacao * 60000;
-        const busy = intervals.some(iv => overlaps(slotDate.getTime(), slotEnd, iv.start, iv.end));
-        if (!busy) slots.add(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`);
-      }
-    }
-    if (slots.size) result.push({ date: dateStr, slots: Array.from(slots).sort() });
+    const livres = gerarSlotsDoDia({ day, rules, nowMs, prioritario, servicoDuracao, busy: intervals });
+    const slots = new Set(livres.map((s) => s.hora));
+    if (slots.size) result.push({ date: toDateStr(day), slots: Array.from(slots).sort() });
   }
 
   if (!result.length) {
@@ -665,7 +507,6 @@ async function findAvailabilityByService(pool, opts) {
 
   // 5) grade por unidade
   const nowMs = Date.now();
-  const todayStr = toDateStr(new Date());
   const unitDays = new Map();
   for (const { unitId, profId, byWd, prof } of pairs) {
     const busy = busyByProf.get(profId) || [];
@@ -675,58 +516,41 @@ async function findAvailabilityByService(pool, opts) {
       const rules = byWd[day.getDay()];
       if (!rules) continue;
       const dateStr = toDateStr(day);
-      const isToday = dateStr === todayStr;
-      const reservadas = prioritario ? new Set() : reservasDoDia(rules);
-      for (const rule of rules) {
-        for (let m = rule.start; m + rule.slot <= rule.end; m += rule.slot) {
-          const slotDate = new Date(
-            day.getFullYear(), day.getMonth(), day.getDate(),
-            Math.floor(m / 60), m % 60, 0, 0
-          );
-          if (slotDate.getTime() <= nowMs) continue;
-          if (isToday && slotDate.getTime() < nowMs + 30 * 60000) continue;
-          if (reservadas.has(m)
-            && slotDate.getTime() - nowMs > PRIORITY_RELEASE_HOURS * 3600 * 1000) continue;
-          const ocupacao = servicoDuracao || rule.slot;
-          if (m + ocupacao > rule.end) continue;
-          const slotEnd = slotDate.getTime() + ocupacao * 60000;
-          if (busy.some((iv) => iv.start < slotEnd && iv.end > slotDate.getTime())) continue;
-          const hora = `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
-          if (!unitDays.has(unitId)) unitDays.set(unitId, new Map());
-          const dayMap = unitDays.get(unitId);
-          if (!dayMap.has(dateStr)) dayMap.set(dateStr, new Map());
-          const slotMap = dayMap.get(dateStr);
+      for (const { hora } of gerarSlotsDoDia({ day, rules, nowMs, prioritario, servicoDuracao, busy })) {
+        if (!unitDays.has(unitId)) unitDays.set(unitId, new Map());
+        const dayMap = unitDays.get(unitId);
+        if (!dayMap.has(dateStr)) dayMap.set(dateStr, new Map());
+        const slotMap = dayMap.get(dateStr);
 
-          // TODOS os profissionais livres nesta hora entram na lista.
-          //
-          // A versão anterior guardava só o primeiro (ordem alfabética) e
-          // descartava os demais em silêncio. Como o front envia o
-          // `professional_id` que foi exibido, o cenário era: Ana e Beto
-          // livres às 09:00, aparece só a Ana; alguém ocupa a Ana; o POST
-          // valida a Ana e devolve 409 — mesmo com o Beto livre, que a tela
-          // nunca mostrou. O usuário ficava sem saída.
-          const disponivel = {
-            id: profId,
+        // TODOS os profissionais livres nesta hora entram na lista.
+        //
+        // A versão anterior guardava só o primeiro (ordem alfabética) e
+        // descartava os demais em silêncio. Como o front envia o
+        // `professional_id` que foi exibido, o cenário era: Ana e Beto
+        // livres às 09:00, aparece só a Ana; alguém ocupa a Ana; o POST
+        // valida a Ana e devolve 409 — mesmo com o Beto livre, que a tela
+        // nunca mostrou. O usuário ficava sem saída.
+        const disponivel = {
+          id: profId,
+          professional_id: profId,
+          name: prof.name,
+          professional_name: prof.name,
+          job_title: prof.job,
+        };
+
+        const jaExiste = slotMap.get(hora);
+        if (!jaExiste) {
+          // Primeiro profissional: preenche também os campos legados, que
+          // continuam sendo o que o front usa por padrão.
+          slotMap.set(hora, {
+            hora,
             professional_id: profId,
-            name: prof.name,
             professional_name: prof.name,
             job_title: prof.job,
-          };
-
-          const jaExiste = slotMap.get(hora);
-          if (!jaExiste) {
-            // Primeiro profissional: preenche também os campos legados, que
-            // continuam sendo o que o front usa por padrão.
-            slotMap.set(hora, {
-              hora,
-              professional_id: profId,
-              professional_name: prof.name,
-              job_title: prof.job,
-              professionals: [disponivel],
-            });
-          } else if (!jaExiste.professionals.some((p) => p.id === profId)) {
-            jaExiste.professionals.push(disponivel);
-          }
+            professionals: [disponivel],
+          });
+        } else if (!jaExiste.professionals.some((p) => p.id === profId)) {
+          jaExiste.professionals.push(disponivel);
         }
       }
     }
