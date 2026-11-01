@@ -273,9 +273,10 @@ test('a rota de níveis usa a capability, não um if solto no controller', () =>
   // Desde o passo 8a a regra mora em utils/adminHierarchy.js (testada em admin-hierarchy.test.js);
   // a rota só precisa calcular a capability 'admins' do ator e entregá-la à decisão de nível.
   assert.match(src, /podeAdmins = pode\('admins', req\.user\)/, "a capability 'admins' vem de pode(…)");
+  const servico = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'adminUsers.js'), 'utf8'); // passo 8b
   assert.match(
-    src,
-    /if \(admin_level !== undefined\) \{\s*\r?\n\s*const porNivel = H\.bloqueioDeNivel\(\{ actor: req\.user, novoNivel: admin_level, podeAdmins \}\)/,
+    servico,
+    /if \(adminLevel !== undefined\) \{\s*\r?\n\s*const porNivel = H\.bloqueioDeNivel\(\{ actor, novoNivel: adminLevel, podeAdmins \}\)/,
     'mudar admin_level deveria passar por bloqueioDeNivel com a capability admins'
   );
   assert.ok(
@@ -284,7 +285,7 @@ test('a rota de níveis usa a capability, não um if solto no controller', () =>
   );
   // E LEVEL_RANK não pode degradar para gestor (nem na rota, nem no módulo da hierarquia).
   const hierarquia = fs.readFileSync(path.join(__dirname, '..', 'src', 'utils', 'adminHierarchy.js'), 'utf8');
-  for (const fonte of [src, hierarquia]) {
+  for (const fonte of [src, servico, hierarquia]) {
     assert.ok(
       !/LEVEL_RANK\[[^\]]+\]\s*\?\?\s*LEVEL_RANK\.gestor/.test(fonte),
       'o nível ausente não pode virar gestor no cálculo de rank'

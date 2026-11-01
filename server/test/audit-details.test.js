@@ -198,8 +198,9 @@ test('o motivo aceito pelo admin é limitado a 1000 caracteres', () => {
   // Sem teto, o `reason` de um PATCH ia inteiro para o details — e o
   // sanitizeDetails corta em 1000 mesmo assim, jogando o resto fora.
   const fs = require('node:fs');
-  for (const arquivo of ['admin.users.routes.js', 'admin.professionals.routes.js']) {
-    const src = fs.readFileSync(path.join(SERVER, 'src', 'routes', arquivo), 'utf8');
+  // O PATCH de usuário vive em services/adminUsers.js desde o passo 8b do A1.
+  for (const arquivo of ['services/adminUsers.js', 'routes/admin.professionals.routes.js']) {
+    const src = fs.readFileSync(path.join(SERVER, 'src', arquivo), 'utf8');
     assert.match(
       src,
       /\.slice\(0,\s*1000\)/,

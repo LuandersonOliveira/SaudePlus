@@ -14,7 +14,11 @@ const path = require('node:path');
 const RAIZ = path.resolve(__dirname, '..', '..');
 const ler = (rel) => fs.readFileSync(path.join(RAIZ, rel), 'utf8');
 
+// Desde o passo 8b do A1, o SQL mora em repositories/usuarios.js e as regras em services/adminUsers.js;
+// a rota (USERS) só valida, chama o serviço e responde.
 const USERS = ler('server/src/routes/admin.users.routes.js');
+const USERS_SVC = ler('server/src/services/adminUsers.js');
+const USERS_REPO = ler('server/src/repositories/usuarios.js');
 const STAFF = ler('server/src/routes/staff.routes.js');
 const ADMIN = ler('server/src/routes/admin.routes.js');
 const DOCTOR = ler('scripts/doctor.js');
@@ -23,28 +27,35 @@ const CLEAN_SCRIPT = ler('server/scripts/clean-db-keep-admin.js');
 
 test('soft delete não reaparece na listagem nem na contagem do admin', () => {
   assert.match(
-    USERS,
+    USERS_REPO,
     /const filters = \['deleted_at IS NULL'\]/,
     'a listagem de /admin/users precisa começar filtrando deleted_at'
   );
   assert.match(
-    USERS,
-    /const whereClause = ' WHERE ' \+ filters\.join\(' AND '\)/,
+    USERS_REPO,
+    /const where = ` WHERE \$\{filters\.join\(' AND '\)\}`/,
     'o WHERE não pode desaparecer quando só existe o filtro de soft delete'
   );
+  assert.match(USERS_REPO, /SELECT COUNT\(\*\) AS total FROM users u\$\{where\}/, 'a contagem usa o MESMO where da listagem');
 });
 
 test('excluir, desativar, rebaixar ou trocar senha revoga sessão e reset pendente', () => {
-  assert.match(USERS, /async function revokeAccess\(userId\)/);
-  assert.match(USERS, /UPDATE refresh_tokens SET revoked = 1 WHERE user_id = \?/);
-  assert.match(USERS, /UPDATE password_reset_tokens SET used_at = NOW\(\) WHERE user_id = \?/);
-  assert.match(USERS, /const desativa = account_status !== undefined && account_status !== 'ativo'/);
-  assert.match(USERS, /const mudaPapel = role !== undefined && role !== currentUser\.role/);
-  assert.match(USERS, /const mudaSenha = password !== undefined && password !== ''/);
+  assert.match(USERS_REPO, /async function revogarAcesso\(db, userId\)/);
+  assert.match(USERS_REPO, /UPDATE refresh_tokens SET revoked = 1 WHERE user_id = \?/);
+  assert.match(USERS_REPO, /UPDATE password_reset_tokens SET used_at = NOW\(\) WHERE user_id = \?/);
+  assert.match(USERS_SVC, /const desativa = accountStatus !== undefined && accountStatus !== 'ativo'/);
+  assert.match(USERS_SVC, /const mudaPapel = role !== undefined && role !== atual\.role/);
+  assert.match(USERS_SVC, /const trocaSenha = password !== undefined && password !== ''/);
+  assert.match(USERS_SVC, /if \(desativa \|\| mudaPapel \|\| trocaSenha \|\| mudaEmail\) await usuarios\.revogarAcesso\(conn, id\)/);
+  assert.match(
+    USERS_SVC,
+    /await usuarios\.excluirLogicamente\(conn, id\);\s*\n\s*await usuarios\.revogarAcesso\(conn, id\);/,
+    'o soft delete precisa revogar o acesso na mesma transação'
+  );
   assert.match(
     USERS,
-    /await revokeAccess\(req\.params\.id\);\s*\n\s*await req\.audit\('admin_delete_user'/,
-    'o soft delete precisa revogar antes de registrar a exclusão'
+    /svc\.excluirUsuario[\s\S]*await req\.audit\('admin_delete_user'/,
+    'a exclusão só é auditada depois de o serviço concluir'
   );
 });
 
@@ -52,8 +63,8 @@ test('promover uma conta a admin exige a capability admins', () => {
   // A regra mora em utils/adminHierarchy.js (bloqueioDePapel, testada em admin-hierarchy.test.js);
   // a rota precisa entregar a capability do ator a ela.
   assert.match(
-    USERS,
-    /H\.bloqueioDePapel\(\{ actor: req\.user, alvo: currentUser, novoPapel: role, podeAdmins \}\)/,
+    USERS_SVC,
+    /H\.bloqueioDePapel\(\{ actor, alvo: atual, novoPapel: role, podeAdmins \}\)/,
     'sem este guard um gestor (que tem users) promovia qualquer conta a admin'
   );
   assert.match(
