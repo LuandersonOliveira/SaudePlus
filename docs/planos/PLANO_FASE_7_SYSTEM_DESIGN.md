@@ -114,7 +114,7 @@ Cada achado da 7.5 anota qual princípio viola ou cumpre. A refatoração só é
 - [x] 7.2 `SYSTEM_DESIGN.md`: contexto, contêineres, componentes, sequências, fluxo de dados pessoais (commit de referência `8f8f8f0`)
 - [x] 7.2 Análise por entidade (seção 8 do `SYSTEM_DESIGN.md`): 16 tabelas
 - [x] Critério de projeto definido: 4 pilares da POO e SOLID (seção 2.1)
-- [ ] 7.3 Consultas ao grafo: nós centrais, comunidades, violações de camada, código sem uso, duplicações
+- [ ] 7.3 Consultas ao grafo: nós centrais, comunidades, violações de camada, código sem uso, duplicações (parcial: entidades, código sem uso, camadas e duplicações em `SYSTEM_DESIGN_ACHADOS.md`; faltam nós centrais, comunidades e caminhos requisito → código)
 - [ ] 7.4 Matriz requisito × componente × evidência
 - [ ] 7.5 Registro de achados classificado (remover / editar / criar / manter)
 - [ ] 7.5 ADRs das decisões estruturais
