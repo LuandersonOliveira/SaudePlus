@@ -47,4 +47,12 @@ const confirmacaoDeSenha = (mensagem) => z.object({
 const mfaSetupBody = confirmacaoDeSenha('Confirme sua senha para ativar o segundo fator.');
 const excluirContaBody = confirmacaoDeSenha('Confirme sua senha para excluir a conta.');
 
-module.exports = { signupBody, loginBody, mfaVerifyBody, mfaSetupBody, excluirContaBody };
+const MSG_GOVBR = 'Autorização Gov.br ausente.';
+// GET /auth/govbr/callback?code=… (validate com { source: 'query' })
+const govbrCallbackQuery = z.object({
+  code: z.string({ error: MSG_GOVBR }).min(1, MSG_GOVBR),
+});
+
+module.exports = {
+  signupBody, loginBody, mfaVerifyBody, mfaSetupBody, excluirContaBody, govbrCallbackQuery,
+};

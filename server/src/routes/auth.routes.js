@@ -1,186 +1,50 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const pool = require('../db');
 const { verifyToken } = require('../middleware/auth');
-const {
-  digitsOnly, VALID_PRIORITIES, VALID_RACES,
-} = require('../utils/validators');
-const {
-  loginKey, loginBlockInfo, registerLoginFailure, registerLoginSuccess,
-} = require('../utils/loginThrottle');
-const { PRIVACY_VERSION } = require('../utils/privacy');
-const { govbrConfig, buildAuthorizeUrl, exchangeCode, fetchUserInfo } = require('../services/govbr');
-const { cpfIgual, hmacCpf, ehCpfDuplicado, MENSAGEM_CPF_DUPLICADO } = require('../utils/cpf');
 const { validate } = require('../middleware/validate');
-const { signupBody, loginBody, mfaVerifyBody, mfaSetupBody, excluirContaBody } = require('../schemas/auth');
+const { govbrConfig, buildAuthorizeUrl } = require('../services/govbr');
+const {
+  signupBody, loginBody, mfaVerifyBody, mfaSetupBody, excluirContaBody, govbrCallbackQuery,
+} = require('../schemas/auth');
 const {
   readRefreshRaw, setRefreshCookie, clearRefreshCookie,
-  iniciarSessao, encerrarSessao, rotacionarSessao, payloadDoUsuario,
+  iniciarSessao, encerrarSessao, rotacionarSessao,
 } = require('../services/session');
 const {
-  criarTicketMfa, verificarSegundoFator, iniciarCadastroMfa, ativarMfa, desativarMfa,
+  verificarSegundoFator, iniciarCadastroMfa, ativarMfa, desativarMfa,
 } = require('../services/mfa');
 const { solicitarRedefinicao, redefinirSenha, MENSAGEM_PEDIDO } = require('../services/passwordReset');
 const { obterPerfil, exportarDados, atualizarPerfil, excluirConta } = require('../services/profile');
+const { cadastrar, autenticar, entrarComGovbr } = require('../services/auth');
 
 const router = express.Router();
-
-const VALID_ROLES = ['paciente', 'atendente'];
-// As listas de ENUM e os validadores vivem em utils/validators.js (fonte
-// única, copiadas dos ENUMs do schema) para que signup e PUT /auth/me não
-// divirjam entre si.
-
-// --------------------------------------------------------------------------
-// Validações de dados essenciais (TAREFAS V3, item 6.2).
-// CPF/CNS/e-mail centralizados em utils/validators.js (Fase 0, item 0.4).
-// --------------------------------------------------------------------------
-// --------------------------------------------------------------------------
-// Proteção contra força bruta no login (TAREFAS V3, item 6.3).
-// A lógica mora em utils/loginThrottle.js, com o relógio injetado — assim é
-// testável sem esperar 5 minutos. Resumo do que mudou: a chave do Map passou
-// a ser `ip|e-mail` em vez de só `ip` (ver o arquivo para o porquê) e o Map
-// passou a ser varrido e limitado.
-// --------------------------------------------------------------------------
-const loginAttempts = new Map(); // "ip|email" -> { count, windowEndsAt, blockedUntil }
 
 function clientIp(req) {
   return req.ip || (req.socket && req.socket.remoteAddress) || 'desconhecido';
 }
 
+// Regras de cadastro, login e Gov.br em services/auth.js; validação em schemas/auth.js.
+// A rota valida, chama o serviço e traduz o resultado em sessão, auditoria e resposta.
+
+// POST /auth/signup
 router.post('/signup', validate(signupBody), async (req, res, next) => {
   try {
-    const {
-      email, password, full_name, role,
-      social_name: socialName, cns, priority, race, guardian_name: guardianName,
-      phone, mobile, birth_date: birthDate, gender, blood_type,
-      mother_name, father_name, cpf, rg,
-      cep, street, address_number, neighborhood, city, state,
-      zone, reference_point: referencePoint,
-      job_role,
-    } = req.body || {};
-
-    // Validação (e-mail, senha, nome, nascimento, CPF, CNS e regras de idade/prioridade/
-    // zona rural) feita por validate(signupBody) — ver schemas/auth.js.
-
-    const assignedRole = VALID_ROLES.includes(role) ? role : 'paciente';
-    // Atendente nasce pendente — precisa de ativação pelo admin antes de acessar dados de pacientes
-    const initialStatus = assignedRole === 'atendente' ? 'pendente' : 'ativo';
-    const normalizedEmail = String(email).toLowerCase().trim();
-
-    const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [normalizedEmail]);
-    if (existing.length) {
-      return res.status(409).json({ error: 'Este e-mail já está cadastrado.' });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const id = crypto.randomUUID();
-
-    // Fase 1 (LGPD): documentos cifrados em repouso (AES-256-GCM) + CPF
-    // normalizado para só dígitos + registro do consentimento (versão da
-    // política, momento e IP — prova da base legal).
-    await pool.query(
-      `INSERT INTO users
-        (id, full_name, social_name, email, password_hash, role, account_status,
-         cns, priority, race, guardian_name,
-         phone, mobile, birth_date, gender, blood_type,
-         mother_name, father_name, cpf, cpf_hmac, rg,
-         cep, street, address_number, neighborhood, city, state, zone, reference_point,
-         job_role, privacy_version, consent_at, consent_ip)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?)`,
-      [
-        id, full_name, socialName || null, normalizedEmail, passwordHash, assignedRole, initialStatus,
-        req.encryptDoc(cns ? digitsOnly(cns) : null),
-        priority && VALID_PRIORITIES.includes(priority) ? priority : null,
-        race && VALID_RACES.includes(race) ? race : null,
-        guardianName || null,
-        phone || null, mobile || null,
-        birthDate, gender || null, blood_type || null,
-        mother_name || null, father_name || null,
-        req.encryptDoc(digitsOnly(cpf) || null), hmacCpf(cpf), req.encryptDoc(rg ? String(rg).trim() : null),
-        cep || null, street || null, address_number || null,
-        neighborhood || null, city || null, state || null,
-        zone || null, referencePoint || null,
-        assignedRole === 'atendente' ? (job_role || null) : null,
-        PRIVACY_VERSION, clientIp(req),
-      ]
-    );
-
-    const msg = assignedRole === 'atendente'
-      ? 'Conta criada! Aguarde a ativação pelo administrador antes de fazer login.'
-      : null;
-    res.status(201).json({ id, message: msg });
+    const r = await cadastrar(req.body, { encrypt: req.encryptDoc, ip: clientIp(req) });
+    if (!r.ok) return res.status(r.status).json({ error: r.error });
+    res.status(201).json({ id: r.id, message: r.message });
   } catch (err) {
-    // A checagem de e-mail acima não é atômica: dois cadastros simultâneos passam por ela.
-    // O UNIQUE do banco é quem decide, e a resposta é a mesma do caso sequencial.
-    if (ehCpfDuplicado(err)) return res.status(409).json({ error: MENSAGEM_CPF_DUPLICADO });
-    if (err && err.code === 'ER_DUP_ENTRY' && /email/i.test(String(err.message))) {
-      return res.status(409).json({ error: 'Este e-mail já está cadastrado.' });
-    }
     next(err);
   }
 });
 
+// POST /auth/login — com MFA ativo devolve um ticket; a sessão só sai após o segundo fator.
 router.post('/login', validate(loginBody), async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const r = await autenticar({ email: req.body.email, password: req.body.password, ip: clientIp(req) });
+    if (!r.ok) return res.status(r.status).json({ error: r.error });
+    if (r.mfaRequired) return res.json({ mfa_required: true, mfa_ticket: r.ticket });
 
-    const normalizedEmail = String(email).toLowerCase().trim();
-    // Chave por conta E por IP: um ataque a uma conta não tranca as demais
-    // nem tranca quem está atrás do mesmo proxy.
-    const chave = loginKey(clientIp(req), normalizedEmail);
-
-    const blocked = loginBlockInfo(loginAttempts, chave);
-    if (blocked) {
-      const seconds = Math.ceil((blocked.blockedUntil - Date.now()) / 1000);
-      const minutes = Math.max(1, Math.ceil(seconds / 60));
-      return res.status(429).json({
-        error: `Muitas tentativas de login. Tente novamente em ${minutes} minuto(s).`,
-      });
-    }
-
-    const [rows] = await pool.query('SELECT * FROM users WHERE email = ? AND (deleted_at IS NULL)', [normalizedEmail]);
-    if (!rows.length) {
-      registerLoginFailure(loginAttempts, chave);
-      return res.status(401).json({ error: 'Credenciais inválidas.' });
-    }
-
-    const user = rows[0];
-
-    if (user.account_status !== 'ativo') {
-      // Status da conta não é erro de senha — não conta como tentativa de força bruta.
-      return res.status(403).json({
-        error: user.account_status === 'pendente'
-          ? 'Conta aguardando ativação. Entre em contato com a administração.'
-          : 'Conta desativada. Entre em contato com a administração.'
-      });
-    }
-
-    const ok = await bcrypt.compare(password, user.password_hash);
-    if (!ok) {
-      registerLoginFailure(loginAttempts, chave);
-      return res.status(401).json({ error: 'Credenciais inválidas.' });
-    }
-
-    registerLoginSuccess(loginAttempts, chave);
-
-    const payload = payloadDoUsuario(user);
-    try {
-      await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
-    } catch (updateError) {
-      if (updateError.code !== 'ER_BAD_FIELD_ERROR') throw updateError;
-      console.warn('Coluna last_login_at ausente; recrie o banco com `npm run db:setup -- --fresh <banco>` (ou rode o doctor).');
-    }
-    // MFA ativo: senha OK, mas a sessão só sai após o segundo fator (Aula 1:
-    // autenticidade — "algo que você sabe" + "algo que você tem").
-    if (user.totp_enabled) {
-      return res.json({ mfa_required: true, mfa_ticket: criarTicketMfa(user.id) });
-    }
-
-    const { token, refreshToken } = await iniciarSessao(res, payload, user.id);
-
-    res.json({ token, refreshToken, user: payload });
+    const { token, refreshToken } = await iniciarSessao(res, r.payload, r.userId);
+    res.json({ token, refreshToken, user: r.payload });
   } catch (err) {
     next(err);
   }
@@ -305,77 +169,22 @@ router.get('/govbr/login', (req, res, next) => {
   }
 });
 
-// GET /auth/govbr/callback — volta do Gov.br com ?code=. Vincula a conta
-// existente (por govbr_sub, e-mail ou CPF); NÃO cria usuário sozinho.
-// Sem vínculo: 404 + perfil para o front pré-preencher o cadastro normal.
-router.get('/govbr/callback', async (req, res, next) => {
+// GET /auth/govbr/callback — volta do Gov.br com ?code=. Vincula a conta existente
+// (por govbr_sub, e-mail ou CPF); NÃO cria usuário sozinho. Sem vínculo: 404 + perfil
+// para o front pré-preencher o cadastro normal.
+router.get('/govbr/callback', validate(govbrCallbackQuery, { source: 'query' }), async (req, res, next) => {
   try {
-    const { code } = req.query || {};
-    if (!code) return res.status(400).json({ error: 'Autorização Gov.br ausente.' });
-    const tokens = await exchangeCode(String(code));
-    const profile = await fetchUserInfo(tokens.access_token);
-    if (!profile.sub) return res.status(502).json({ error: 'Gov.br não retornou identificador.' });
-
-    let user = null;
-    const [[bySub]] = await pool.query('SELECT * FROM users WHERE govbr_sub = ?', [profile.sub]);
-    if (bySub) {
-      user = bySub;
-    } else {
-      if (profile.email) {
-        const [[byEmail]] = await pool.query('SELECT * FROM users WHERE email = ?', [profile.email]);
-        if (byEmail) user = byEmail;
-      }
-      if (!user && profile.cpf) {
-        // CPF está cifrado (IV aleatório), então a busca usa o índice cego `cpf_hmac`
-        // — UNIQUE, uma consulta por índice em vez de decifrar a base inteira.
-        // Só `id` e `cpf` saem do banco (nada de `SELECT *` com password_hash).
-        const h = hmacCpf(profile.cpf);
-        if (h) {
-          const [[achado]] = await pool.query('SELECT id, cpf FROM users WHERE cpf_hmac = ?', [h]);
-          // Confere o CPF de verdade no único candidato (tempo constante): o índice
-          // só aponta, quem decide é o dado cifrado — protege de linha com HMAC velho.
-          let confere = false;
-          if (achado) {
-            try { confere = cpfIgual(req.decryptDoc(achado.cpf), profile.cpf); } catch { confere = false; }
-          }
-          if (confere) user = achado;
-        }
-      }
+    const r = await entrarComGovbr({ code: req.query.code, decrypt: req.decryptDoc });
+    if (!r.ok) {
+      return res.status(r.status).json({ error: r.error, ...(r.govbr_profile ? { govbr_profile: r.govbr_profile } : {}) });
     }
-
-    if (!user) {
-      return res.status(404).json({
-        error: 'Conta Gov.br sem vínculo. Complete o cadastro com estes dados.',
-        govbr_profile: { nome: profile.nome, email: profile.email, cpf: profile.cpf, telefone: profile.telefone },
-      });
+    if (r.mfaRequired) {
+      await req.audit('govbr_login', 'user', r.userId, 'login via Gov.br (aguardando MFA)', r.userId);
+      return res.json({ mfa_required: true, mfa_ticket: r.ticket });
     }
-    // O vínculo por CPF devolveu só `id`/`cpf` (o mínimo para comparar sem
-    // arrastar a tabela). O resto do login precisa da linha completa — e
-    // agora que já temos o id, isso é um índice, não uma varredura.
-    if (!user.role) {
-      const [[completo]] = await pool.query('SELECT * FROM users WHERE id = ?', [user.id]);
-      user = completo || user;
-    }
-    if (user.account_status !== 'ativo') {
-      return res.status(403).json({ error: 'Conta desativada. Entre em contato com a administração.' });
-    }
-    if (!user.govbr_sub) {
-      await pool.query('UPDATE users SET govbr_sub = ? WHERE id = ?', [profile.sub, user.id]);
-    }
-    try {
-      await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
-    } catch (updateError) {
-      if (updateError.code !== 'ER_BAD_FIELD_ERROR') throw updateError;
-    }
-    const payload = payloadDoUsuario(user);
-    if (user.totp_enabled) {
-      const mfaTicket = jwt.sign({ id: user.id, purpose: 'mfa' }, process.env.JWT_SECRET, { expiresIn: '5m' });
-      await req.audit('govbr_login', 'user', user.id, 'login via Gov.br (aguardando MFA)', user.id);
-      return res.json({ mfa_required: true, mfa_ticket: mfaTicket });
-    }
-    const { token, refreshToken } = await iniciarSessao(res, payload, user.id);
-    await req.audit('govbr_login', 'user', user.id, 'login via Gov.br', user.id);
-    res.json({ token, refreshToken, user: payload });
+    const { token, refreshToken } = await iniciarSessao(res, r.payload, r.userId);
+    await req.audit('govbr_login', 'user', r.userId, 'login via Gov.br', r.userId);
+    res.json({ token, refreshToken, user: r.payload });
   } catch (err) {
     next(err);
   }

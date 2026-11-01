@@ -17,7 +17,15 @@ const pool = require('../db');
 const ACCESS_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 const REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '30d';
 const REFRESH_COOKIE = 'saude_refresh';
-const COOKIE_PATH = '/auth';
+// O cookie só deve voltar para as rotas de /auth, e o prefixo depende de onde a API está montada:
+// `/auth` (API sozinha) ou `/api/auth` (origem única, Express servindo o front). Um path fixo
+// '/auth' nunca era devolvido pelo navegador na origem única, então o cookie httpOnly não
+// valia nada. `req.baseUrl` é o ponto de montagem do roteador, e `res.req` é a requisição.
+const COOKIE_PATH_PADRAO = '/auth';
+function cookiePath(res) {
+  const base = res && res.req && res.req.baseUrl;
+  return base && /^\/[\w\-/]*$/.test(base) ? base : COOKIE_PATH_PADRAO;
+}
 
 function refreshTtlMs() {
   const m = String(REFRESH_EXPIRES_IN).trim().match(/^(\d+)\s*([smhd])$/i);
@@ -40,13 +48,13 @@ function setRefreshCookie(res, raw, ttlMs = refreshTtlMs()) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    path: COOKIE_PATH,
+    path: cookiePath(res),
     maxAge: ttlMs,
   });
 }
 
 function clearRefreshCookie(res) {
-  res.clearCookie(REFRESH_COOKIE, { path: COOKIE_PATH });
+  res.clearCookie(REFRESH_COOKIE, { path: cookiePath(res) });
 }
 
 /**
@@ -198,6 +206,7 @@ async function rotacionarSessao(raw) {
 
 module.exports = {
   REFRESH_COOKIE,
+  cookiePath,
   refreshTtlMs,
   hashRefreshToken,
   signAccessToken,

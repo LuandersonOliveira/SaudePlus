@@ -209,7 +209,8 @@ test('a rota de login usa a chave ip|e-mail, não só o IP', () => {
   // integração passa a falhar por um caminho que ele não explica.
   const fs = require('node:fs');
   const path = require('node:path');
-  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'routes', 'auth.routes.js'), 'utf8');
-  assert.match(src, /loginKey\(clientIp\(req\),\s*normalizedEmail\)/);
+  // A regra mora em services/auth.js desde o passo 6 do A1; a rota só passa o IP.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'auth.js'), 'utf8');
+  assert.match(src, /loginKey\(ip,\s*normalizedEmail\)/);
   assert.match(src, /registerLoginSuccess\(loginAttempts,\s*chave\)/);
 });
