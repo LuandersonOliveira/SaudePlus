@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Rascunho, em construção (7.3 parcial; 7.4 ainda não feita) |
+| **Status** | Rascunho para revisão (7.3 e 7.4 concluídas; falta a 7.5) |
 | **Criado em** | 2026-11-01 |
-| **Commit de referência** | `6428928` |
+| **Commit de referência** | `2459db0` |
 | **Régua** | 4 pilares da POO e SOLID (`PLANO_FASE_7_SYSTEM_DESIGN.md`, seção 2.1) |
 | **Regra** | Esta fase só analisa e propõe. **Nenhum item vira mudança de código sem aprovação item a item.** |
 
@@ -152,8 +152,90 @@ Vêm da seção 8 do `SYSTEM_DESIGN.md`. Aqui só a classificação.
 
 **Resposta à pergunta da 7.3:** a estrutura atual atende aos requisitos críticos de consistência, sessão, RBAC e auditoria, com prova por teste. Os requisitos **sem prova automática** são três: retenção LGPD, interoperabilidade e restauração de backup. As falhas de requisito (não só de estilo) estão em E-10, E-11, E-12, E-15 e E-21.
 
-## 10. Próximos passos da fase
+## 10. Matriz de atributos de qualidade (7.4)
 
-1. **7.3:** concluída (entidades, código sem uso, camadas, duplicações, comunidades, hubs e caminhos requisito → código). Falta apenas a aprovação deste registro.
-2. **7.4:** matriz de atributos de qualidade (consistência, segurança, contratos, desempenho, operação, observabilidade, testabilidade, evolução), incluindo a conferência contra `ROPA.md` e `RIPD.md`.
-3. **7.5:** fechar este registro, escrever os ADRs das decisões estruturais e entregar o plano de execução revisado para aprovação item a item.
+Nota: **Atende**, **Parcial**, **Não atende**, **Não medido** (sem evidência para afirmar). Cada linha aponta o achado.
+
+| Atributo | Aspecto | Nota | Evidência | Achado |
+|---|---|---|---|---|
+| **Consistência e concorrência** | Escrita de agenda passa pelas travas e validação | Atende | Todo caminho que grava atendimento (paciente, recepção, fila, `applyBookingChange`) chama `lockBookingActors` e `validateBooking` | M-04 |
+| | Atendimento sem profissional | Parcial | `UNIQUE` não vale com `professional_id` nulo; revalidação exige profissional e unidade | Seção 9 |
+| | Cancelamento do paciente e fila de espera | Parcial | Sem transação (E-19); duplicidade sem `UNIQUE` (E-18) | E-18, E-19 |
+| **Segurança e privacidade** | RBAC e hierarquia | Atende | `capabilities` falha fechada, `adminHierarchy`, testes | M-02 |
+| | Escopo do atendente | Parcial | Falta em `/staff/agenda/reports` e `/staff/booking-events` | 3B |
+| | Segredos em repouso | Atende | CPF, RG, CNS e `totp_secret` cifrados; senha em bcrypt; tokens só como hash | — |
+| | Dados pessoais fora dos 4 campos cifrados | Parcial | Nome, endereço, raça, filiação e `notes` em texto | Seção 8 do `SYSTEM_DESIGN.md` |
+| | Sessão no navegador | Não atende | JWT e refresh em `localStorage` (E-21) | E-21 |
+| | Segundo fator | Parcial | Opcional para todos; nada o exige de atendente ou admin | **E-24** |
+| | Auditoria completa | Parcial | Paciente, login por senha, cadastro e exportação não geram linha (E-12, E-26) | E-12, E-26 |
+| | Eliminação LGPD | Parcial | Campos que sobram (E-10), dois "apagar" (E-11), PII em `details` (E-15) | E-10, E-11, E-15 |
+| **Interfaces e contratos** | Formato de erro | Atende | `{ error }` em todas as rotas, `code` nas integrações; tratamento central em `app.js` | — |
+| | Validação por esquema | Parcial | Esquemas puros só em `auth`, `profile`, `adminUsers`, `adminProfessionals`; o resto inline | E-01 |
+| | Contrato documentado | Não atende | Nenhuma ocorrência de OpenAPI ou swagger; tipos do front escritos à mão | **C-05** |
+| | Versionamento | Parcial | Rota única `/api` sem versão; a raiz (`/auth`, `/admin`…) ainda responde sem `SERVE_WEB`; listagens com envelope de paginação só "com query" e array legado sem ela | **E-29** |
+| **Desempenho e escala** | Índices | Atende | `appointments` e `exams` têm 6 índices cada, cobrindo usuário, profissional, unidade, status e horário | B6 (2 redundantes) |
+| | Agregações | Não medido | Relatórios da recepção leem as linhas e contam em JavaScript (`staff.routes.js:493-510`) em vez de `GROUP BY`; o custo depende do intervalo | **E-28** |
+| | Paginação | Parcial | `staff` e `admin` paginam sob demanda; `GET /me/appointments`, `/me/exams` e `/diseases` devolvem tudo | E-28 |
+| | Busca textual | Não medido | `LIKE '%q%'` em pacientes e em `admin/users`, sem índice que ajude (limite de 20 só na recepção) | E-28 |
+| **Disponibilidade e operação** | Prontidão e partida | Atende | `/health`, `/ready`, recusa de subir sem chaves, `JWT_SECRET` curto ou coluna ausente | — |
+| | Réplicas | Parcial | Job com `GET_LOCK` ok; limitadores e contadores de login em memória por processo (E-05) | E-05 |
+| | Backup e restauração | Parcial | `backup.js` existe e gera SHA-256; sem agendamento no código, sem teste de restauração (o `TRILHA_AUDITORIA` prevê restore mensal) | C-01, C-06 |
+| | Configuração | Parcial | `process.env` em ~15 módulos, sem validação central (E-04) | E-04, C-02 |
+| **Observabilidade (A5)** | Request id, log estruturado, métricas | Não atende | Nenhuma ocorrência de `requestId`, `pino`, `winston`, `morgan` ou `prom-client`; 35 `console.*` em 15 arquivos; erro 500 vai a `console.error(err)` sem rota nem usuário | **C-04** |
+| **Testabilidade** | Regra testável sem HTTP | Atende | `booking-*`, `adminHierarchy`, `schemas/*` e serviços refatorados têm teste direto | M-07 |
+| | Cobertura dos fluxos críticos | Parcial | 75 arquivos em `server/test` mais 3 de corrida; sem teste para interop, retenção e restauração; e2e com 28 casos em 4 fluxos | C-06 |
+| | Rotas gordas | Parcial | `staff` e `admin` só se testam por HTTP com banco | E-01 |
+| **Evolução** | Nova capacidade ou nível | Atende | Uma linha em `LEVEL_PERMISSIONS` (mais o espelho do front, protegido por teste) | M-02 |
+| | Novo tipo de atendimento | Parcial | `TIPOS` ajuda, mas o `INSERT` está em 3 lugares (E-06) e a prioridade em 4 (E-07) | E-06, E-07 |
+| | Nova unidade | Atende | É dado (`health_units` e ofertas), sem código | — |
+| | Front por papel | Não medido | Coesão baixa nas pastas de feature no grafo (0,06 a 0,25); a olhar com leitura do código | — |
+
+### Achados novos da 7.4
+
+| ID | Classe | Achado | Princípio | Evidência | Sev. |
+|---|---|---|---|---|---|
+| E-24 | Editar | O segundo fator é opcional para todos: nenhum middleware o exige de `atendente` ou `admin`, embora o ROPA (§4) o descreva "(staff/admin)" e o RIPD o use como mitigação do roubo de sessão | **Abstração** (regra de negócio ausente do código) | `services/mfa.js` (`setup`/`enable` livres), `middleware/auth.js` (não consulta `totp_enabled`) | Alta |
+| E-26 | Editar | O login por senha não grava auditoria; por isso o kit do auditor ("MFA vs sem MFA") não consegue contar os logins **sem** MFA | **Abstração** | `routes/auth.routes.js:40-51` × `docs/governanca/TRILHA_AUDITORIA.md` §3 | Média |
+| E-28 | Editar | Relatórios agregam em JavaScript sobre todas as linhas do intervalo; listagens do paciente e de doenças sem paginação | Desempenho | `routes/staff.routes.js:493-510`, `routes/me.booking.routes.js:47`, `routes/diseases.routes.js` | Média |
+| E-29 | Editar | Contrato de listagem duplo (array legado sem query, envelope com query) e rota legada na raiz | **I**, versionamento | `routes/staff.routes.js:20-29`, `app.js:123-124` | Baixa |
+| C-04 | Criar | Observabilidade mínima: request id, log estruturado com rota, status e usuário, e erro 500 com contexto (item A5) | Operação | — | Alta |
+| C-05 | Criar | Contrato da API (OpenAPI gerado ou mantido) para o front e para a interoperabilidade | **I** | — | Média |
+| C-06 | Criar | Testes para retenção (`purge-retention`), restauração de backup e a camada de interoperabilidade | Testabilidade | — | Média |
+
+## 11. Conferência contra ROPA, RIPD e manual de auditoria (7.4)
+
+Documentos lidos inteiros: `ROPA.md`, `RIPD.md`, `TRILHA_AUDITORIA.md`.
+
+| Item | O documento diz | O código faz | Situação |
+|---|---|---|---|
+| ROPA T1 e T2: quem acessa | Atendente sem CPF/RG; documentos só para admin, com auditoria | Rotas de staff e listas não selecionam documentos; o detalhe do admin os decifra e é auditado (`admin_view_user_docs`) | **Confere**; falta citar que o titular os lê em `GET /auth/me` e que `POST /interop/rnds/send` os decifra (auditado) |
+| ROPA T2: `cpf_hmac` zerado na anonimização | Sim | `privacy.js:49` zera | **Confere** |
+| ROPA T2: segredo do MFA cifrado | Sim | Migration 0006 | **Confere** |
+| ROPA T8: consentimento visível ao admin | `privacy_version`, `consent_at`, `consent_ip` acessados pelo admin | Gravados no cadastro; **nenhuma rota do admin os lê**; só a exportação do titular os inclui | **Diverge** (E-25) |
+| ROPA §3: `password_reset_tokens` apagados 24 h depois | DELETE físico no expurgo | `purge-retention.js` só apaga `refresh_tokens` | **Diverge** (C-01) |
+| ROPA §3 e RIPD: expurgo "automático" de 5 anos | Anonimização automática | Script manual (`--apply`), sem agendador | **Diverge** (C-01) |
+| ROPA §3: consultas passadas "anonimizadas" | Mantidas anonimizadas | O vínculo some, mas `notes` e `doctor` ficam no registro | **Parcial** (seção 8 do `SYSTEM_DESIGN.md`) |
+| ROPA §3: backups com "restore testado" | Restore testado | Sem teste automático; não há evidência no repositório | **Sem evidência** (C-06) |
+| ROPA §4: MFA "(staff/admin)" | Aplicado a staff e admin | Opcional para todos | **Diverge** (E-24) |
+| ROPA §4: "14 tabelas" | 14 | 16 (`waitlist` e `booking_events` não contadas) | **Desatualizado** |
+| ROPA §1: inventário completo | T1 a T9 | **Faltam** `waitlist` (serviço que o titular espera), `booking_events` (motivo e ator), `professionals` (nome e registro profissional são dado pessoal), `health_units` (sem titular) | **Incompleto** (E-27) |
+| ROPA "Compartilha com" | RNDS, CNS | Também **SMTP** (nome e dados do atendimento em lembretes e avisos) e **ViaCEP** (o navegador envia o CEP) | **Incompleto** (E-27) |
+| ROPA T1: dado sensível | "perfil saúde" | `race` (origem racial) é dado sensível pela LGPD, art. 5º, II, e `priority` revela condição de saúde | **A explicitar** (E-27) |
+| ROPA/RIPD: eliminação | Tudo que identifica o titular é removido | `govbr_sub`, `consent_ip`, `totp_secret` permanecem (E-10) | **Diverge** |
+| RIPD: acesso indevido por staff | Documentos ocultos e visualização auditada | Confere, e o histórico do paciente por staff também é auditado (`staff_view_history`) | **Confere** |
+| RIPD: roubo de sessão, risco residual "Baixo" | Medidas: 15 min, refresh rotativo, logout revogatório, MFA | Os dois tokens ficam em `localStorage`, e o MFA é opcional | **Residual subestimado** (E-21, E-24) |
+| RIPD: força bruta | Bloqueio 5 tentativas em 5 min | `loginThrottle`: `MAX_TENTATIVAS = 5`, `JANELA_MS = 5 min`, em memória | **Confere** (por processo, E-05) |
+| RIPD: perda de trilha | Append-only, hash encadeado, verificação | Triggers e `verifyChain` | **Confere** (ressalva: PII em `details`, E-15) |
+| TRILHA §3: ações citadas | `admin_view_user_docs`, `admin_update_user`, `mfa_login`, `govbr_login` | Todas existem no código | **Confere** |
+| TRILHA §3: "logins sem MFA" | Contar logins sem MFA | Login por senha não gera linha | **Não mensurável** (E-26) |
+| TRILHA §5: restore mensal | Backup restore-teste | Sem ferramenta no repositório | **Sem evidência** (C-06) |
+
+| ID | Classe | Achado | Evidência | Sev. |
+|---|---|---|---|---|
+| E-25 | Editar | Não há como o admin ver o consentimento (T8): ou se cria a consulta, ou o ROPA deixa de dizer que o admin acessa | `repositories/usuarios.js:46-62` (`detalhe` não seleciona as colunas) | Baixa |
+| E-27 | Editar (documentos) | Atualizar o ROPA e o RIPD: tabelas faltantes, SMTP e ViaCEP, `race` e `priority` como dado sensível, campos que a eliminação não zera, número de tabelas, MFA, risco residual da sessão | Linhas da tabela acima | Média |
+
+## 12. Próximos passos da fase
+
+1. **7.3 e 7.4:** concluídas. Falta a aprovação deste registro.
+2. **7.5:** priorizar os achados (hoje 29 `Editar`, 6 `Criar`, 7 `Remover` e 7 `Manter`), fechar este registro, escrever os ADRs das decisões estruturais e entregar o plano de execução revisado para aprovação item a item.

@@ -115,7 +115,7 @@ Cada achado da 7.5 anota qual princípio viola ou cumpre. A refatoração só é
 - [x] 7.2 Análise por entidade (seção 8 do `SYSTEM_DESIGN.md`): 16 tabelas
 - [x] Critério de projeto definido: 4 pilares da POO e SOLID (seção 2.1)
 - [x] 7.3 Consultas ao grafo: nós centrais, comunidades, violações de camada, código sem uso, duplicações, caminhos requisito → código (`SYSTEM_DESIGN_ACHADOS.md`, seções 3 a 9)
-- [ ] 7.4 Matriz requisito × componente × evidência
+- [x] 7.4 Matriz requisito × componente × evidência (`SYSTEM_DESIGN_ACHADOS.md`, seções 10 e 11)
 - [ ] 7.5 Registro de achados classificado (remover / editar / criar / manter)
 - [ ] 7.5 ADRs das decisões estruturais
 - [ ] Plano revisado entregue para aprovação item a item
