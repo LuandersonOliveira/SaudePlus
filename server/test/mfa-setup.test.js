@@ -112,19 +112,20 @@ test('mfa/setup com a senha certa devolve o segredo e persiste', async () => {
   const r = await rota('/auth/mfa/setup', u, { password: SENHA });
   assert.equal(r.status, 200, JSON.stringify(r.body));
 
-  // randomSecret() = 20 bytes em base64url → 160 bits de entropia, 27
-  // caracteres sem padding.
+  // randomSecret() = 20 bytes em BASE32 → 160 bits de entropia, 32 caracteres
+  // A-Z2-7 sem padding: o único formato que Google/Microsoft Authenticator aceitam.
   assert.match(
     r.body.secret,
-    /^[A-Za-z0-9_-]{27}$/,
+    /^[A-Z2-7]{32}$/,
     `segredo fora do formato esperado: ${r.body.secret}`
   );
   assert.equal(
-    Buffer.from(r.body.secret.replace(/-/g, '+').replace(/_/g, '/'), 'base64').length,
+    require('../src/utils/totp').base32Decode(r.body.secret).length,
     20,
     'o segredo precisa ter 20 bytes (160 bits), não menos'
   );
   assert.match(r.body.otpauth_url, /^otpauth:\/\/totp\//);
+  assert.ok(r.body.otpauth_url.includes(`secret=${r.body.secret}`), 'o app lê o mesmo segredo base32');
 
   const row = await lerMfa(u.id);
   assert.equal(row.totp_secret, r.body.secret);

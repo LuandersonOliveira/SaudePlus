@@ -87,7 +87,7 @@ CPF/RG/CNS usam AES-256-GCM (correto), mas sem um *blind index* (HMAC do CPF). E
 - Front: `npm audit` = 0.
 - **Feito (Fase 5):** o link do e-mail de redefinição apontava para `/auth.html`, que não existe no front React; agora usa `/auth?tab=reset&token=…` (teste cobre).
 - Achados registrados nas fases anteriores (ainda abertos):
-  1. **MFA:** `utils/totp.js` gera o segredo em base64url; apps autenticadores (Google/Microsoft Authenticator) exigem base32, então o segredo provavelmente não é cadastrável em app real (o legado tem o mesmo defeito). Corrigir exige migrar os segredos já gravados (decifrar → recodificar → recifrar) e manter compatibilidade durante a troca.
+  1. ~~**MFA:** segredo em base64url, não cadastrável em app autenticador.~~ **FEITO em 2026-11-01:** `randomSecret()` gera base32 (32 caracteres, 20 bytes); `migrate:mfa:base32` recodifica os segredos já gravados mantendo os mesmos bytes (códigos não mudam, ninguém perde o 2º fator); o servidor aceita os dois formatos até a migração rodar. Testes: `totp-base32.test.js` (vetor oficial RFC 6238, equivalência legado/novo, migração). Pendente à parte: o `totp_secret` ainda é gravado sem cifra em coluna (risco menor; avaliar cifrar com `DATA_ENCRYPTION_KEY`) e o painel admin ainda não tem o cartão de MFA (o do paciente serve de base).
   2. `GET /auth/me` devolve CPF/CNS/RG sem máscara ao próprio titular; menos exposição se devolver mascarado e expor o completo só em "Minha conta" sob demanda.
   3. `seed:demo` cria agendamentos para outro usuário, não para o paciente de teste (atrapalha demonstração).
   4. Servidor rejeita agendar sem profissional (409) quando há profissionais para o serviço; o React já exige a escolha, o legado não.
@@ -98,7 +98,7 @@ CPF/RG/CNS usam AES-256-GCM (correto), mas sem um *blind index* (HMAC do CPF). E
 |---|---|---|---|
 | 1 | ~~B1 FKs + índice em `unit_id`~~ **feito** | S | integridade de dados clínicos |
 | 2 | ~~B3 `cpf_hmac` único + busca indexada~~ **feito** | M | duplicidade de pacientes + varredura O(N) |
-| 3 | MFA base32 com migração de segredos | M | 2º fator inutilizável em app real |
+| 3 | ~~MFA base32 com migração de segredos~~ **feito** | M | 2º fator inutilizável em app real |
 | 4 | A4 trava no job de lembretes | S | duplicação de e-mails/SMS ao escalar |
 | 5 | A3 migrations numeradas | M | habilita todas as mudanças de banco acima com segurança |
 | 6 | A1/A2 serviços + validação Zod, começando por `auth` | L | manutenção; faça junto de cada mudança, não como projeto à parte |

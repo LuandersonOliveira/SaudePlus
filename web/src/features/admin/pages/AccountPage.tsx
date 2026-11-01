@@ -5,8 +5,9 @@ import { ProfileCard } from '@/features/staff/pages/AccountPage'
 
 /**
  * Minha conta do administrador: o mesmo perfil da equipe (sem cargo), LGPD, privacidade e DPO.
- * Sem cartão de MFA — o legado também não tinha, e o segredo gerado pelo servidor (base64url) não é
- * compatível com apps autenticadores; ver achados da Fase 6.
+ * Sem cartão de MFA por enquanto — o legado também não tinha. O impedimento técnico (segredo em
+ * base64url, incompatível com apps autenticadores) acabou: o servidor agora gera base32. O cartão
+ * do paciente (patient/account/MfaCard) pode ser reaproveitado aqui.
  */
 export function AdminAccountPage() {
   return (
