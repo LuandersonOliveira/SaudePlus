@@ -46,7 +46,7 @@ if (!pool || typeof pool.getConnection !== 'function') {
       `UPDATE users SET
        full_name = 'Titular removido', social_name = NULL,
        email = ?, password_hash = ?,
-       phone = NULL, mobile = NULL, cpf = NULL, rg = NULL, cns = NULL,
+       phone = NULL, mobile = NULL, cpf = NULL, cpf_hmac = NULL, rg = NULL, cns = NULL,
        birth_date = NULL, gender = NULL, priority = NULL, race = NULL,
        blood_type = NULL, mother_name = NULL, father_name = NULL,
        guardian_name = NULL,

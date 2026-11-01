@@ -9,7 +9,7 @@
 | # | Dados | Onde | Finalidade | Base legal (LGPD) | Quem acessa | Compartilha com |
 |---|---|---|---|---|---|---|
 | T1 | Conta + perfil (nome, e-mail, senha-hash, endereço, perfil saúde) | `users` | Identificar o cidadão e organizar o atendimento | art. 11, II, f (tutela da saúde) + art. 11, II, b / art. 23 (política pública SUS, Lei 8.080/90) | titular; atendente (sem CPF/RG); admin | RNDS/e-SUS (Fase 2, com ato formal) |
-| T2 | Documentos (CPF, RG, CNS) | `users` (cifrados AES-256-GCM) | Unicidade do prontuário + interoperabilidade SUS | idem T1 (mínimo necessário) | só admin (logado em auditoria) | CNS WebService p/ validação (Fase 2) |
+| T2 | Documentos (CPF, RG, CNS) | `users` (cifrados AES-256-GCM; `cpf_hmac` = HMAC-SHA256 do CPF com chave própria, só para unicidade e busca, zerado na anonimização) | Unicidade do prontuário + interoperabilidade SUS | idem T1 (mínimo necessário) | só admin (logado em auditoria) | CNS WebService p/ validação (Fase 2) |
 | T3 | Consultas/exames agendados | `appointments`, `exams` | Prestação do serviço de saúde | idem T1 | titular; staff; admin | RNDS (RAC/REL, Fase 2) |
 | T4 | Lembretes | `reminders` | Continuidade do cuidado | idem T1 | titular | — |
 | T5 | Alertas epidemiológicos | `diseases` | Saúde pública (dado agregado, sem titular) | art. 11, II, b | todos logados | painel público futuro (agregado) |

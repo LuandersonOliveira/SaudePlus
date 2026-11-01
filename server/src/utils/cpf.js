@@ -70,4 +70,73 @@ function acharPorCpf(linhas, cpfInformado, decrypt) {
   return achado;
 }
 
-module.exports = { digitosCpf, cpfIgual, acharPorCpf, TAMANHO_CPF };
+// --------------------------------------------------------------------------
+// Índice cego (RFC-0001 / ADR-0006, B3)
+//
+// `users.cpf` é cifrado com IV aleatório: o mesmo CPF vira textos diferentes, então
+// o banco não consegue procurar nem garantir unicidade por ele. `cpf_hmac` é uma
+// impressão determinística (HMAC-SHA256 com chave própria) usada só para isso:
+// `UNIQUE (cpf_hmac)` impede dois usuários com o mesmo CPF, e a busca do Gov.br
+// vira uma consulta por índice em vez de decifrar a base inteira.
+//
+// A chave é DIFERENTE da de cifra (CPF_HMAC_KEY): quem vazar uma não ganha a
+// outra. Sem a chave, um dump do banco não permite testar CPFs candidatos (o
+// espaço de CPFs é pequeno; um hash simples seria revertido por força bruta).
+// --------------------------------------------------------------------------
+let avisouChaveDev = false;
+
+function chaveHmacConfigurada() {
+  const hex = String(process.env.CPF_HMAC_KEY || '').trim();
+  return /^[0-9a-fA-F]{64}$/.test(hex) ? Buffer.from(hex, 'hex') : null;
+}
+
+/**
+ * Chave do HMAC. Falha FECHADA como a de cifra: sem CPF_HMAC_KEY o app não sobe.
+ * Só com ALLOW_PLAINTEXT_DEV=1 (npm run dev) ela é derivada, com aviso, para o
+ * clone novo funcionar — a unicidade vale, mas o valor não serve em produção.
+ */
+function chaveHmac() {
+  const chave = chaveHmacConfigurada();
+  if (chave) return chave;
+  if (process.env.ALLOW_PLAINTEXT_DEV === '1') {
+    if (!avisouChaveDev) {
+      avisouChaveDev = true;
+      console.warn('CPF_HMAC_KEY ausente: usando chave derivada, SÓ para desenvolvimento.');
+    }
+    const base = String(process.env.DATA_ENCRYPTION_KEY || 'saude-dev');
+    return crypto.createHash('sha256').update(`cpf-hmac-dev:${base}`).digest();
+  }
+  throw new Error(
+    'CPF_HMAC_KEY ausente ou inválida (64 caracteres hex) — o índice de unicidade do CPF não funciona sem ela.\n' +
+    'Gere com: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"\n' +
+    'e coloque CPF_HMAC_KEY no server/.env (use um valor DIFERENTE de DATA_ENCRYPTION_KEY).'
+  );
+}
+
+/** Para o boot: lança se a chave faltar fora do modo dev. */
+function assertCpfHmacConfigured() {
+  chaveHmac();
+  return true;
+}
+
+/**
+ * HMAC-SHA256 (hex, 64 caracteres) dos 11 dígitos do CPF; `null` para vazio ou
+ * com outro tamanho. Pontuação não muda o resultado.
+ */
+function hmacCpf(cpf) {
+  const digitos = digitosCpf(cpf);
+  if (digitos.length !== TAMANHO_CPF) return null;
+  return crypto.createHmac('sha256', chaveHmac()).update(digitos).digest('hex');
+}
+
+/** O erro é a violação do UNIQUE do CPF (e não de outra chave única)? */
+function ehCpfDuplicado(err) {
+  return Boolean(err) && (err.code === 'ER_DUP_ENTRY' || err.errno === 1062) && /uq_users_cpf_hmac/.test(String(err.message));
+}
+
+const MENSAGEM_CPF_DUPLICADO = 'CPF já cadastrado. Entre na conta existente ou recupere a senha.';
+
+module.exports = {
+  digitosCpf, cpfIgual, acharPorCpf, TAMANHO_CPF,
+  hmacCpf, assertCpfHmacConfigured, chaveHmacConfigurada, ehCpfDuplicado, MENSAGEM_CPF_DUPLICADO,
+};

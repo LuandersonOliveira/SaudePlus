@@ -32,6 +32,20 @@ const bcrypt = require(require.resolve('bcryptjs', { paths: [SERVER] }));
 const SENHA = 'senha-de-teste-123';
 const CRIADOS = [];
 
+// CPF válido e ÚNICO por chamada. Desde o B3 (`UNIQUE cpf_hmac`) dois usuários não
+// dividem o mesmo CPF, então os testes não podem reusar um número fixo.
+function cpfUnico() {
+  const dig = (n) => {
+    const r = (n.reduce((acc, d, i) => acc + d * (n.length + 1 - i), 0) * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  const n = [...String(crypto.randomInt(100000000, 999999999))].map(Number);
+  n.push(dig(n));
+  n.push(dig(n));
+  const s = n.join('');
+  return { puro: s, mascarado: `${s.slice(0, 3)}.${s.slice(3, 6)}.${s.slice(6, 9)}-${s.slice(9)}` };
+}
+
 async function criarUsuario(extra = {}) {
   const id = crypto.randomUUID();
   const email = `parcial+${id.slice(0, 8)}@test.local`;
@@ -189,12 +203,13 @@ test('prioridade e raça fora da lista são recusadas', async () => {
 
 test('CPF válido é cifrado e continua legível por decryptField', async () => {
   const u = await criarUsuario();
-  const r = await put(u.id, { full_name: 'Fulano de Teste', cpf: '529.982.247-25' });
+  const cpf = cpfUnico();
+  const r = await put(u.id, { full_name: 'Fulano de Teste', cpf: cpf.mascarado });
   assert.equal(r.status, 200, JSON.stringify(r.body));
 
   const [[row]] = await pool.query('SELECT cpf FROM users WHERE id = ?', [u.id]);
   assert.ok(String(row.cpf).startsWith('enc:v1:'), 'o CPF precisa ficar cifrado em repouso');
-  assert.notEqual(String(row.cpf).includes('52998224725'), true, 'o CPF não pode ficar em claro');
+  assert.notEqual(String(row.cpf).includes(cpf.puro), true, 'o CPF não pode ficar em claro');
 });
 
 test('CPF inválido devolve 400 e não grava', async () => {
@@ -211,7 +226,7 @@ test('CPF salvo sobrevive a um PUT sem cpf no corpo (o campo não é preenchido)
   // Se mandassem cpf:'' a cada gravação, todo documento salvo seria apagado —
   // foi exatamente o que o `|| undefined` antigo evitava, e vale manter.
   const u = await criarUsuario();
-  await put(u.id, { full_name: 'Fulano de Teste', cpf: '529.982.247-25' });
+  await put(u.id, { full_name: 'Fulano de Teste', cpf: cpfUnico().mascarado });
   const [[antes]] = await pool.query('SELECT cpf FROM users WHERE id = ?', [u.id]);
   assert.ok(String(antes.cpf).startsWith('enc:v1:'), 'arranque gravando um CPF');
 
@@ -222,7 +237,7 @@ test('CPF salvo sobrevive a um PUT sem cpf no corpo (o campo não é preenchido)
 
 test('cpf: "" explícito limpa — quando o usuário realmente quer apagar', async () => {
   const u = await criarUsuario();
-  await put(u.id, { full_name: 'Fulano de Teste', cpf: '529.982.247-25' });
+  await put(u.id, { full_name: 'Fulano de Teste', cpf: cpfUnico().mascarado });
   const r = await put(u.id, { full_name: 'Fulano de Teste', cpf: '' });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   const [[row]] = await pool.query('SELECT cpf FROM users WHERE id = ?', [u.id]);

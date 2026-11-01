@@ -27,15 +27,29 @@ test('secretsProblems aceita o .env de desenvolvimento', () => {
   const env = {
     JWT_SECRET: 'a'.repeat(128),
     DATA_ENCRYPTION_KEY: 'f0'.repeat(32),
+    CPF_HMAC_KEY: '0f'.repeat(32),
     ADMIN_PASSWORD: '123456789',
   };
   assert.deepEqual(secretsProblems(env), []);
+});
+
+test('secretsProblems exige CPF_HMAC_KEY válida e distinta da chave de cifra', () => {
+  const base = { JWT_SECRET: 'a'.repeat(64), DATA_ENCRYPTION_KEY: 'f0'.repeat(32), ADMIN_PASSWORD: '123456789' };
+  const ausente = secretsProblems(base);
+  assert.deepEqual(ausente.map((p) => p.name), ['CPF_HMAC_KEY']);
+  const curta = secretsProblems({ ...base, CPF_HMAC_KEY: 'abc' });
+  assert.deepEqual(curta.map((p) => p.name), ['CPF_HMAC_KEY']);
+  assert.ok(!curta[0].detail.includes('abc'), 'o valor da chave não pode aparecer no detalhe');
+  const igual = secretsProblems({ ...base, CPF_HMAC_KEY: base.DATA_ENCRYPTION_KEY });
+  assert.deepEqual(igual.map((p) => p.name), ['CPF_HMAC_KEY']);
+  assert.match(igual[0].detail, /independentes/);
 });
 
 test('secretsProblems aponta cada segredo fraco sem expor o valor', () => {
   const problemas = secretsProblems({
     JWT_SECRET: 'curto',
     DATA_ENCRYPTION_KEY: 'a'.repeat(63), // 63 em vez de 64
+    CPF_HMAC_KEY: 'b'.repeat(64),
     ADMIN_PASSWORD: '123',
   });
   const nomes = problemas.map((p) => p.name);
@@ -51,7 +65,7 @@ test('secretsProblems aponta cada segredo fraco sem expor o valor', () => {
 test('secretsProblems aceita DATA_ENCRYPTION_KEY vazia em dev sem quebrar o setup', () => {
   // Chave vazia não impede o dev local (crypto degrada com warning), mas
   // precisa aparecer no relatório para não passar despercebida.
-  const problemas = secretsProblems({ JWT_SECRET: 'b'.repeat(64), ADMIN_PASSWORD: 'senha1234' });
+  const problemas = secretsProblems({ JWT_SECRET: 'b'.repeat(64), CPF_HMAC_KEY: 'c'.repeat(64), ADMIN_PASSWORD: 'senha1234' });
   assert.deepEqual(problemas.map((p) => p.name), ['DATA_ENCRYPTION_KEY']);
 });
 

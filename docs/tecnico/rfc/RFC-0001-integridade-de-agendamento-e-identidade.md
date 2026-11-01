@@ -66,9 +66,9 @@ Coluna `cpf_hmac CHAR(64)` com `UNIQUE`, calculada com HMAC-SHA256 sobre os 11 d
 
 ## 7. Perguntas abertas (para os revisores)
 
-1. Duplicatas de CPF encontradas devem ser **mescladas** ou apenas sinalizadas ao atendimento?
-2. Dependentes e menores podem usar o CPF do responsável? Se sim, o `UNIQUE` quebra esse caso — ver como `guardian_name` é usado hoje.
-3. Onde fica a chave HMAC em produção (variável de ambiente, cofre do provedor)?
+1. ~~Duplicatas de CPF: mesclar ou sinalizar?~~ **Decidido (2026-11-01):** só relatar; a migração para e lista os ids, sem mesclar contas.
+2. Dependentes e menores podem usar o CPF do responsável? Se sim, o `UNIQUE` quebra esse caso — ver como `guardian_name` é usado hoje. **Aberta:** hoje o cadastro exige CPF próprio e `guardian_name` é texto; o `UNIQUE` bloqueia quem tentar usar o CPF do responsável.
+3. ~~Onde fica a chave HMAC?~~ **Decidido (2026-11-01):** variável `CPF_HMAC_KEY`, separada da de cifra, exigida no boot; em produção, injetada pelo cofre/provedor (nunca no repositório nem nos backups do banco).
 4. Aceitamos que `ON DELETE SET NULL` deixe agendamentos antigos sem unidade, ou preferimos gravar também `unit_name` como texto (já existe `location`)?
 
 ## 8. Plano e critérios de aceite
@@ -78,5 +78,7 @@ Coluna `cpf_hmac CHAR(64)` com `UNIQUE`, calculada com HMAC-SHA256 sobre os 11 d
 3. Aceite: suíte do servidor verde; novos testes de FK, de horário único (inclui corrida) e de CPF duplicado; `npm run doctor` conhece as novas colunas; relatório de órfãos/duplicatas zerado em produção antes do `UNIQUE`/FK.
 
 ## 9. Histórico de comentários
+
+- 2026-11-01 — B1 implementado (`2b51368`). Perguntas 1 e 3 decididas com o responsável do projeto; B3 implementado (ADR-0006 aceita). B2 (horário único) segue pendente.
 
 _(registrar aqui data, autor e decisão a cada rodada)_

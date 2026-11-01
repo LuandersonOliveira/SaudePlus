@@ -14,7 +14,7 @@ const {
 const { PRIVACY_VERSION, anonymizeUser } = require('../utils/privacy');
 const { govbrConfig, buildAuthorizeUrl, exchangeCode, fetchUserInfo } = require('../services/govbr');
 const { randomSecret, verifyTotp, matchStep, replayBloqueia, otpauthUrl } = require('../utils/totp');
-const { acharPorCpf } = require('../utils/cpf');
+const { cpfIgual, hmacCpf, ehCpfDuplicado, MENSAGEM_CPF_DUPLICADO } = require('../utils/cpf');
 const mailer = require('../services/mailer');
 const {
   mfaAttempts,
@@ -195,10 +195,10 @@ router.post('/signup', async (req, res, next) => {
         (id, full_name, social_name, email, password_hash, role, account_status,
          cns, priority, race, guardian_name,
          phone, mobile, birth_date, gender, blood_type,
-         mother_name, father_name, cpf, rg,
+         mother_name, father_name, cpf, cpf_hmac, rg,
          cep, street, address_number, neighborhood, city, state, zone, reference_point,
          job_role, privacy_version, consent_at, consent_ip)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?)`,
       [
         id, full_name, socialName || null, normalizedEmail, passwordHash, assignedRole, initialStatus,
         req.encryptDoc(cns ? digitsOnly(cns) : null),
@@ -208,7 +208,7 @@ router.post('/signup', async (req, res, next) => {
         phone || null, mobile || null,
         birthDate, gender || null, blood_type || null,
         mother_name || null, father_name || null,
-        req.encryptDoc(digitsOnly(cpf) || null), req.encryptDoc(rg ? String(rg).trim() : null),
+        req.encryptDoc(digitsOnly(cpf) || null), hmacCpf(cpf), req.encryptDoc(rg ? String(rg).trim() : null),
         cep || null, street || null, address_number || null,
         neighborhood || null, city || null, state || null,
         zone || null, referencePoint || null,
@@ -222,6 +222,12 @@ router.post('/signup', async (req, res, next) => {
       : null;
     res.status(201).json({ id, message: msg });
   } catch (err) {
+    // A checagem de e-mail acima não é atômica: dois cadastros simultâneos passam por ela.
+    // O UNIQUE do banco é quem decide, e a resposta é a mesma do caso sequencial.
+    if (ehCpfDuplicado(err)) return res.status(409).json({ error: MENSAGEM_CPF_DUPLICADO });
+    if (err && err.code === 'ER_DUP_ENTRY' && /email/i.test(String(err.message))) {
+      return res.status(409).json({ error: 'Este e-mail já está cadastrado.' });
+    }
     next(err);
   }
 });
@@ -739,11 +745,20 @@ router.get('/govbr/callback', async (req, res, next) => {
         if (byEmail) user = byEmail;
       }
       if (!user && profile.cpf) {
-        // CPF está cifrado: compara decifrando (troca pontual, só no vínculo).
-        // Só `id` e `cpf` saem do banco — o `SELECT *` anterior trazia a
-        // tabela inteira, `password_hash` incluído, a cada tentativa.
-        const [cpfs] = await pool.query('SELECT id, cpf FROM users WHERE cpf IS NOT NULL');
-        user = acharPorCpf(cpfs, profile.cpf, (cifrado) => req.decryptDoc(cifrado));
+        // CPF está cifrado (IV aleatório), então a busca usa o índice cego `cpf_hmac`
+        // — UNIQUE, uma consulta por índice em vez de decifrar a base inteira.
+        // Só `id` e `cpf` saem do banco (nada de `SELECT *` com password_hash).
+        const h = hmacCpf(profile.cpf);
+        if (h) {
+          const [[achado]] = await pool.query('SELECT id, cpf FROM users WHERE cpf_hmac = ?', [h]);
+          // Confere o CPF de verdade no único candidato (tempo constante): o índice
+          // só aponta, quem decide é o dado cifrado — protege de linha com HMAC velho.
+          let confere = false;
+          if (achado) {
+            try { confere = cpfIgual(req.decryptDoc(achado.cpf), profile.cpf); } catch { confere = false; }
+          }
+          if (confere) user = achado;
+        }
       }
     }
 
@@ -959,8 +974,8 @@ router.put('/me', verifyToken, async (req, res, next) => {
     const docParams = [];
     const blank = (v) => v === null || String(v).trim() === '' || digitsOnly(v) === '';
     if (temChave('cpf')) {
-      docSets.push('cpf=?');
-      docParams.push(blank(cpf) ? null : req.encryptDoc(digitsOnly(cpf)));
+      docSets.push('cpf=?', 'cpf_hmac=?');
+      docParams.push(blank(cpf) ? null : req.encryptDoc(digitsOnly(cpf)), blank(cpf) ? null : hmacCpf(cpf));
     }
     if (temChave('rg')) {
       docSets.push('rg=?');
@@ -1044,6 +1059,7 @@ router.put('/me', verifyToken, async (req, res, next) => {
     if (err && err.status === 400) {
       return res.status(400).json({ error: err.message });
     }
+    if (ehCpfDuplicado(err)) return res.status(409).json({ error: MENSAGEM_CPF_DUPLICADO });
     next(err);
   }
 });

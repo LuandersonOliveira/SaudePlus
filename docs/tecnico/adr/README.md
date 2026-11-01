@@ -11,7 +11,7 @@ Status possíveis: **Proposta** → **Aceita** → (**Substituída por ADR-NNNN*
 | [0003](ADR-0003-aposentar-front-html-legado.md) | Aposentar o front HTML legado | Aceita | 2026-11-01 |
 | [0004](ADR-0004-e2e-sessao-por-api.md) | E2E com sessão criada por API e conta de atendente efêmera | Aceita | 2026-11-01 |
 | [0005](ADR-0005-credenciais-de-admin-so-superadmin.md) | E-mail e senha de conta admin só mudam por `superadmin` | Aceita | 2026-10 |
-| [0006](ADR-0006-indice-cego-hmac-para-cpf.md) | Índice cego (HMAC) para CPF cifrado | **Proposta** | 2026-11-01 |
+| [0006](ADR-0006-indice-cego-hmac-para-cpf.md) | Índice cego (HMAC) para CPF cifrado | **Aceita e implementada** | 2026-11-01 |
 | [0007](ADR-0007-integridade-no-banco-fk-e-horario-unico.md) | Integridade no banco: FKs e horário único por coluna gerada | **Proposta** | 2026-11-01 |
 | [0008](ADR-0008-migrations-numeradas-com-controle.md) | Migrations numeradas com tabela de controle | **Proposta** | 2026-11-01 |
 

@@ -34,6 +34,8 @@ const COLUNAS_ESPERADAS = [
   ['users', 'consent_ip'],
   ['users', 'deleted_at'],
   ['users', 'cns'],
+  // RFC-0001 B3: sem ela o cadastro dá 500 e "um CPF, uma conta" não vale.
+  ['users', 'cpf_hmac'],
   ['users', 'job_role'],
   // Fase 5, migration 007: o INSERT do agendamento e o cálculo de conflito
   // referenciam estas duas; sem elas, agendar dá 500.
@@ -98,6 +100,20 @@ function secretsProblems(env) {
       name: 'DATA_ENCRYPTION_KEY',
       detail: key ? `formato inválido (${key.length} caracteres); esperado 64 hex` : 'vazia — CPF/RG/CNS serão gravados em texto puro',
       fix: 'node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
+    });
+  }
+  const hmac = String(env.CPF_HMAC_KEY || '').trim();
+  if (!/^[0-9a-fA-F]{64}$/.test(hmac)) {
+    problemas.push({
+      name: 'CPF_HMAC_KEY',
+      detail: hmac ? `formato inválido (${hmac.length} caracteres); esperado 64 hex` : 'vazia — o app não sobe fora do `npm run dev`',
+      fix: 'node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"  (valor diferente da DATA_ENCRYPTION_KEY)',
+    });
+  } else if (hmac.toLowerCase() === key.toLowerCase()) {
+    problemas.push({
+      name: 'CPF_HMAC_KEY',
+      detail: 'igual à DATA_ENCRYPTION_KEY; as duas chaves devem ser independentes',
+      fix: 'gere outra chave aleatória e rode `npm run migrate:cpf:hmac -- --rehash`',
     });
   }
   const pass = String(env.ADMIN_PASSWORD || '');
@@ -286,7 +302,7 @@ async function main() {
   // 4) Segredos
   if (temEnv) {
     const problemas = secretsProblems(env);
-    if (problemas.length === 0) ok('segredos', 'JWT_SECRET, DATA_ENCRYPTION_KEY e ADMIN_PASSWORD ok');
+    if (problemas.length === 0) ok('segredos', 'JWT_SECRET, DATA_ENCRYPTION_KEY, CPF_HMAC_KEY e ADMIN_PASSWORD ok');
     else {
       for (const p of problemas) { falha(`segredo ${p.name}`, p.detail); adicionarFix(p.fix); }
     }

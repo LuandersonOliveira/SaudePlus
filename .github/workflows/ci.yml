@@ -79,6 +79,7 @@ jobs:
       # Valores de teste, versionados de propósito. Fora daqui não servem.
       JWT_SECRET: ci-jwt-secret-nao-usar-em-producao-0000000000000000
       DATA_ENCRYPTION_KEY: ci-chave-de-teste-nao-usar-em-producao-000000
+      CPF_HMAC_KEY: 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
       ADMIN_EMAIL: admin@saude.app
       ADMIN_PASSWORD: SenhaDeTesteCI!2026
       # Sem SMTP, de propósito: o job de lembretes e a recuperação de senha

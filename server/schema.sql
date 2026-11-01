@@ -53,6 +53,11 @@ CREATE TABLE IF NOT EXISTS users (
     rg TEXT NULL,
     -- Cartão Nacional de Saúde — opcional, 15 dígitos (cifrado em repouso)
     cns TEXT NULL,
+    -- Índice cego do CPF (RFC-0001 B3): HMAC-SHA256 dos 11 dígitos com a chave
+    -- CPF_HMAC_KEY. O `cpf` acima é cifrado com IV aleatório e não dá para
+    -- procurar nem tornar único; este é o que o UNIQUE e a busca do Gov.br usam.
+    -- NULL = sem CPF (vários permitidos). Criada por migrate:cpf:hmac.
+    cpf_hmac CHAR(64) NULL,
     -- Perfil pessoal
     birth_date DATE NULL,
     gender ENUM(
@@ -125,7 +130,8 @@ CREATE TABLE IF NOT EXISTS users (
     -- código abria sessão quantas vezes quisesse dentro da janela de 90s.
     -- Numérico, não datetime — um passo é um contador, não um instante, e é
     -- isso que sobrevive ao `dateStrings: true` do pool.
-    totp_last_step BIGINT NULL DEFAULT NULL
+    totp_last_step BIGINT NULL DEFAULT NULL,
+    UNIQUE KEY uq_users_cpf_hmac (cpf_hmac)
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------

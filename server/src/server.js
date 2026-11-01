@@ -1,6 +1,7 @@
 const app = require('./app');
 const { startReminderJob } = require('./jobs/reminders');
 const { assertCryptoConfigured } = require('./utils/crypto');
+const { assertCpfHmacConfigured } = require('./utils/cpf');
 
 const PORT = process.env.PORT || 4000;
 
@@ -19,6 +20,8 @@ const PORT = process.env.PORT || 4000;
 const COLUNAS_OBRIGATORIAS = [
   ['appointments', 'duration_minutes'],
   ['exams', 'duration_minutes'],
+  // B3: o cadastro e o PUT /auth/me gravam o índice cego do CPF.
+  ['users', 'cpf_hmac'],
 ];
 
 /**
@@ -44,6 +47,7 @@ async function conferirColunas(pool) {
 // --------------------------------------------------------------------------
 function validarConfiguracao() {
   assertCryptoConfigured();
+  assertCpfHmacConfigured();
 
   const jwt = String(process.env.JWT_SECRET || '');
   if (jwt.length < 32) {

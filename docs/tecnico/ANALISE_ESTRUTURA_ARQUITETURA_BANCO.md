@@ -61,7 +61,9 @@ Resumo do modelo: `users` (40 colunas) concentra perfil, credenciais, MFA, conse
 Não há restrição no banco contra dois agendamentos no mesmo (profissional, horário); a garantia vem de `SELECT … FOR UPDATE` dentro de transação (`utils/booking.js:321/849/950`) e dos testes de corrida. Funciona e está testado, mas depende de todo novo caminho de escrita lembrar do padrão.
 **Ação:** rede de proteção no banco: coluna gerada `active_slot = IF(status IN ('pendente','confirmado'), scheduled_at, NULL)` + `UNIQUE (professional_id, active_slot)`. Cobre o caso exato; sobreposição por duração continua na aplicação.
 
-### B3 — CPF cifrado sem índice cego: duplicidade e busca O(N) (média)
+### B3 — CPF cifrado sem índice cego: duplicidade e busca O(N) (média) — **FEITO em 2026-11-01**
+**Implementado:** `users.cpf_hmac CHAR(64)` + `UNIQUE uq_users_cpf_hmac` (HMAC-SHA256 com `CPF_HMAC_KEY`, chave separada e exigida no boot); `migrate:cpf:hmac` (backfill idempotente; com CPF duplicado PARA e lista só ids; `--rehash` após trocar a chave); cadastro e `PUT /auth/me` gravam o índice e devolvem 409 em duplicata; Gov.br busca por `cpf_hmac` e confere o dado cifrado; anonimização zera o índice; `doctor` confere coluna e chave. Testes: `server/test/cpf-hmac.test.js` (21, inclui 5 cadastros simultâneos → 1 vence). No banco de desenvolvimento: 1 CPF indexado, 0 duplicatas. Texto original do achado abaixo.
+
 CPF/RG/CNS usam AES-256-GCM (correto), mas sem um *blind index* (HMAC do CPF). Efeitos verificados: o vínculo Gov.br faz `SELECT id, cpf FROM users WHERE cpf IS NOT NULL` e decifra tudo na aplicação (`auth.routes.js:745`); **o cadastro não checa CPF repetido** (só o e-mail é `UNIQUE`), então a mesma pessoa pode ter duas contas, com fila e histórico divididos.
 **Ação:** coluna `cpf_hmac CHAR(64)` (HMAC-SHA256 com chave separada da de cifra) + `UNIQUE`; preencher por migração (decifra uma vez); trocar a varredura por `WHERE cpf_hmac = ?`. Mantém a comparação em tempo constante já implementada em `utils/cpf.js`.
 
@@ -94,8 +96,8 @@ CPF/RG/CNS usam AES-256-GCM (correto), mas sem um *blind index* (HMAC do CPF). E
 
 | Prioridade | Item | Esforço | Por quê primeiro |
 |---|---|---|---|
-| 1 | B1 FKs + índice em `unit_id` (após auditoria de órfãos) | S | integridade de dados clínicos |
-| 2 | B3 `cpf_hmac` único + busca indexada | M | duplicidade de pacientes + varredura O(N) |
+| 1 | ~~B1 FKs + índice em `unit_id`~~ **feito** | S | integridade de dados clínicos |
+| 2 | ~~B3 `cpf_hmac` único + busca indexada~~ **feito** | M | duplicidade de pacientes + varredura O(N) |
 | 3 | MFA base32 com migração de segredos | M | 2º fator inutilizável em app real |
 | 4 | A4 trava no job de lembretes | S | duplicação de e-mails/SMS ao escalar |
 | 5 | A3 migrations numeradas | M | habilita todas as mudanças de banco acima com segurança |

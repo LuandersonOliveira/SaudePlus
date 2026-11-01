@@ -31,13 +31,14 @@ test('base completa: o boot segue', async () => {
   const r = await conferirColunas(poolCom([
     'appointments.duration_minutes',
     'exams.duration_minutes',
+    'users.cpf_hmac',
   ]));
   assert.equal(r.ok, true);
   assert.deepEqual(r.faltando, []);
 });
 
 test('base sem duration_minutes: o boot é recusado com a lista do que falta', async () => {
-  const r = await conferirColunas(poolCom(['exams.duration_minutes']));
+  const r = await conferirColunas(poolCom(['exams.duration_minutes', 'users.cpf_hmac']));
   assert.equal(r.ok, false, 'faltando uma coluna, o app não pode subir');
   assert.deepEqual(r.faltando, ['appointments.duration_minutes']);
 });
