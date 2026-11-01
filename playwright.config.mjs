@@ -20,7 +20,7 @@ dotenv.config({ path: path.join(ROOT, 'server', '.env') });
  * no script da página, o `onclick` apontando para função que foi renomeada,
  * o painel que carrega mas trava na hora de renderizar a lista.
  *
- * Os testes rodam contra `npm run dev` (API em 4000 + front em 8080), que é
+ * Os testes rodam contra `npm run dev` (API em 4000 + front React em 8080), que é
  * a forma como o projeto é usado. `webServer` sobe e derruba o processo,
  * então não depende de alguém lembrar de deixar o dev rodando.
  *
@@ -59,9 +59,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    // Front legado (HTML) até cada página ser migrada para React: o e2e atual
-    // cobre atendente/dashboard/admin, que o `npm run dev` (React) não serve.
-    command: 'npm run dev:legacy',
+    // React (Vite em 8080) + API (4000), como o projeto é usado no dia a dia.
+    command: 'npm run dev',
     url: FRONT,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

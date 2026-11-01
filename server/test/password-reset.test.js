@@ -145,6 +145,11 @@ test('o e-mail traz um link com o token, e só para quem pediu', async () => {
   assert.equal(enviados.length, 1, 'não se envia e-mail para conta inexistente');
   assert.equal(enviados[0].para, 'alvo@test.local');
 
+  // O link aponta para a rota do front React (/auth), não para o auth.html aposentado:
+  // com a rota errada o e-mail chegaria e o clique cairia numa página que não existe.
+  assert.match(enviados[0].texto, /\/auth\?tab=reset&token=/);
+  assert.doesNotMatch(enviados[0].texto, /auth\.html/);
+
   // O token do link é o bruto; o banco tem o hash dele.
   const m = enviados[0].texto.match(/token=([a-f0-9]+)/);
   assert.ok(m, `o link precisa trazer o token; texto: ${enviados[0].texto}`);

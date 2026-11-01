@@ -563,7 +563,8 @@ router.post('/password/forgot', async (req, res, next) => {
       [crypto.randomUUID(), user.id, hashRefreshToken(raw), expiresAt]
     );
 
-    const link = `${baseDoApp()}/auth.html?tab=reset&token=${raw}`;
+    // /auth é a rota do front React (o auth.html legado foi aposentado).
+    const link = `${baseDoApp()}/auth?tab=reset&token=${raw}`;
     const envio = await mailer.enviar({
       para: user.email,
       assunto: 'Redefinição de senha — Saúde+',

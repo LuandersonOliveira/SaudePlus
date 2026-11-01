@@ -347,6 +347,25 @@
 
   Se mudar a porta, ajuste as duas pontas: `WEB_PORT` e `CORS_ORIGIN`.
 
+  #### Produção: uma origem só (front React + API no Express)
+
+  Em produção não há segundo servidor nem CORS: o Express entrega o build do
+  React (`web/dist`) e a API passa a responder **só em `/api`**.
+
+  ```bash
+  npm run build:web          # gera web/dist
+  # server/.env: SERVE_WEB=1  e  APP_BASE_URL=https://seu-dominio
+  npm run start:api          # um processo: site em / e API em /api
+  ```
+
+  `SERVE_WEB` — `1` liga, `0` desliga, vazio liga só com `NODE_ENV=production` e
+  build presente. Sem build, o servidor avisa e segue só com a API. Ligado, a
+  raiz é do React (`/auth` e `/admin` são páginas dele); `/health` e `/ready`
+  continuam na raiz. `assets/` do build cacheia por 1 ano (nome com hash) e o
+  `index.html` nunca. O CSP do helmet libera só o próprio site e o ViaCEP
+  (consulta de CEP no cadastro). `APP_BASE_URL` é o endereço público usado no
+  link do e-mail de redefinição de senha (`/auth?tab=reset&token=…`).
+
   ### Rota antiga sem extensão
 
   O navegador pode ter `localhost:8080/admin` salvo no histórico (a URL antiga,

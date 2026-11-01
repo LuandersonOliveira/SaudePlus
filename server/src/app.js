@@ -22,8 +22,11 @@ const catalogRoutes = require('./routes/catalog.routes');
 const adminProfessionalsRoutes = require('./routes/admin.professionals.routes');
 const publicRoutes = require('./routes/public.routes');
 const interopRoutes = require('./routes/interop.routes');
+const { webEnabled, mountWeb, cspDirectives } = require('./web');
 
 const app = express();
+// Front React servido por este processo (produção): a API passa a viver só em /api. Ver ./web.js.
+const serveWeb = webEnabled();
 
 // --------------------------------------------------------------------------
 // trust proxy — precisa vir ANTES de qualquer middleware que leia req.ip.
@@ -38,7 +41,7 @@ const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS) || 0;
 if (trustProxyHops > 0) app.set('trust proxy', trustProxyHops);
 
 // Segurança HTTP básica (Fase 0): headers via helmet + JSON com limite.
-app.use(helmet());
+app.use(serveWeb ? helmet({ contentSecurityPolicy: { useDefaults: true, directives: cspDirectives() } }) : helmet());
 app.use(cookieParser());
 
 // CORS fechado: lista explícita em CORS_ORIGIN (vírgula = múltiplas origens).
@@ -95,23 +98,29 @@ app.use(globalLimiter);
 app.use(attachAudit);
 app.use(attachDocs);
 
-app.use('/auth', authLimiter, authRoutes);
-app.use('/me/appointments', appointmentsRoutes);
-app.use('/me/exams', examsRoutes);
-app.use('/me/reminders', remindersRoutes);
-app.use('/me/waitlist', waitlistRoutes);
-app.use('/diseases', diseasesRoutes);
-app.use('/health-units', unitsRoutes);
-app.use('/staff', staffRoutes);
-app.use('/catalog', catalogRoutes);
-app.use('/admin/users', adminUsersRoutes);
+// Todas as rotas da API num roteador só: montado em /api (sempre) e, sem o front React embutido, também
+// na raiz — o front legado e o dev:legacy chamam /auth, /admin etc. direto.
+const api = express.Router();
+api.use('/auth', authLimiter, authRoutes);
+api.use('/me/appointments', appointmentsRoutes);
+api.use('/me/exams', examsRoutes);
+api.use('/me/reminders', remindersRoutes);
+api.use('/me/waitlist', waitlistRoutes);
+api.use('/diseases', diseasesRoutes);
+api.use('/health-units', unitsRoutes);
+api.use('/staff', staffRoutes);
+api.use('/catalog', catalogRoutes);
+api.use('/admin/users', adminUsersRoutes);
 // Antes de /admin: o router genérico tem PATCH /:kind/:id que casaria com
 // /admin/professionals/:id e devolveria 404.
-app.use('/admin/professionals', adminProfessionalsRoutes);
-app.use('/admin', adminRoutes);
-app.use('/public', publicRoutes);
-app.use('/interop', interopRoutes);
+api.use('/admin/professionals', adminProfessionalsRoutes);
+api.use('/admin', adminRoutes);
+api.use('/public', publicRoutes);
+api.use('/interop', interopRoutes);
 
+app.use('/api', api);
+if (serveWeb) mountWeb(app);
+else app.use(api);
 app.use((req, res) => {
   res.status(404).json({ error: 'Rota não encontrada.' });
 });
