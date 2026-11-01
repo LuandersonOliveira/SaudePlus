@@ -171,8 +171,8 @@ test('a rota grava o passo na MESMA instrução que o confere', () => {
   // server/test/race/mfa-replay-race.test.js, com duas requisições de verdade.
   const fs = require('node:fs');
   const path = require('node:path');
-  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'routes', 'auth.routes.js'), 'utf8');
-  const bloco = src.slice(src.indexOf("router.post('/mfa/verify'"), src.indexOf("router.post('/mfa/setup'"));
+  // A regra mora em services/mfa.js desde o passo 3 do A1; a rota só a chama.
+  const bloco = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'mfa.js'), 'utf8');
 
   assert.match(
     bloco,

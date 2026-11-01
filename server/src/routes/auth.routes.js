@@ -13,21 +13,17 @@ const {
 } = require('../utils/loginThrottle');
 const { PRIVACY_VERSION, anonymizeUser } = require('../utils/privacy');
 const { govbrConfig, buildAuthorizeUrl, exchangeCode, fetchUserInfo } = require('../services/govbr');
-const { randomSecret, verifyTotp, matchStep, replayBloqueia, otpauthUrl } = require('../utils/totp');
 const { cpfIgual, hmacCpf, ehCpfDuplicado, MENSAGEM_CPF_DUPLICADO } = require('../utils/cpf');
 const mailer = require('../services/mailer');
 const { validate } = require('../middleware/validate');
 const { signupBody, loginBody, mfaVerifyBody, mfaSetupBody, excluirContaBody } = require('../schemas/auth');
 const {
   hashRefreshToken, readRefreshRaw, setRefreshCookie, clearRefreshCookie,
-  iniciarSessao, encerrarSessao, rotacionarSessao,
+  iniciarSessao, encerrarSessao, rotacionarSessao, payloadDoUsuario,
 } = require('../services/session');
 const {
-  mfaAttempts,
-  bloqueioMfa,
-  registrarFalhaMfa,
-  registrarSucessoMfa,
-} = require('../utils/mfaAttempts');
+  criarTicketMfa, verificarSegundoFator, iniciarCadastroMfa, ativarMfa, desativarMfa,
+} = require('../services/mfa');
 
 const router = express.Router();
 
@@ -169,11 +165,7 @@ router.post('/login', validate(loginBody), async (req, res, next) => {
 
     registerLoginSuccess(loginAttempts, chave);
 
-    const payload = {
-      id: user.id, email: user.email,
-      role: user.role, admin_level: user.admin_level || null, full_name: user.full_name,
-      job_role: user.job_role || null,
-    };
+    const payload = payloadDoUsuario(user);
     try {
       await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
     } catch (updateError) {
@@ -183,8 +175,7 @@ router.post('/login', validate(loginBody), async (req, res, next) => {
     // MFA ativo: senha OK, mas a sessão só sai após o segundo fator (Aula 1:
     // autenticidade — "algo que você sabe" + "algo que você tem").
     if (user.totp_enabled) {
-      const mfaTicket = jwt.sign({ id: user.id, purpose: 'mfa' }, process.env.JWT_SECRET, { expiresIn: '5m' });
-      return res.json({ mfa_required: true, mfa_ticket: mfaTicket });
+      return res.json({ mfa_required: true, mfa_ticket: criarTicketMfa(user.id) });
     }
 
     const { token, refreshToken } = await iniciarSessao(res, payload, user.id);
@@ -196,156 +187,27 @@ router.post('/login', validate(loginBody), async (req, res, next) => {
 });
 
 // POST /auth/mfa/verify — troca ticket MFA + código TOTP pela sessão completa.
+// Regras (ticket, tentativas, replay do passo) em services/mfa.js.
 router.post('/mfa/verify', validate(mfaVerifyBody), async (req, res, next) => {
   try {
-    const { ticket, code } = req.body;
-    let claim;
-    try {
-      claim = jwt.verify(ticket, process.env.JWT_SECRET);
-    } catch {
-      return res.status(401).json({ error: 'Sessão MFA expirada. Entre novamente.' });
-    }
-    if (!claim || claim.purpose !== 'mfa' || !claim.id) {
-      return res.status(401).json({ error: 'Ticket inválido.' });
-    }
-    const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [claim.id]);
-    const user = rows[0];
-    if (!user || user.account_status !== 'ativo' || !user.totp_enabled || !user.totp_secret) {
-      return res.status(401).json({ error: 'Verificação indisponível.' });
-    }
-
-    // Teto de tentativas no segundo fator. O limite de senha protege o
-    // primeiro fator; sem este, a rota virava uma porta sem trinco — 6 dígitos
-    // testados indefinidamente, inclusive fora da janela de 30s.
-    const bloqueio = bloqueioMfa(mfaAttempts, user.id);
-    if (bloqueio) {
-      const min = Math.ceil(bloqueio.segundosRestantes / 60);
-      return res.status(429).json({
-        error: `Muitas tentativas de verificação. Tente de novo em ${min} min.`,
-      });
-    }
-
-    // Replay: o passo precisa ser estritamente maior que o último aceito.
-    // Com WINDOW = ±1, o mesmo código vale por 90s; sem isto, um código
-    // capturado (foto do app, log, alguém olhando por cima do ombro) abria
-    // sessão nova quantas vezes quisesse dentro dessa janela.
-    const casou = matchStep(user.totp_secret, code);
-    const ultimoPasso = user.totp_last_step === null || user.totp_last_step === undefined
-      ? null
-      : Number(user.totp_last_step);
-
-    // Código ERRADO é o que a força bruta ataca. Código de REPLAY é outra
-    // coisa: o código estava certo, já foi usado, e a única coisa que a pessoa
-    // fez foi clicar duas vezes. Contar replay como falha trancava o titular
-    // por 5 minutos por um duplo clique — e ainda abria uma brecha contrária:
-    // o atacante que captura um código e o reapresenta várias vezes seria
-    // "beneficiado" pelo bloqueio, que só protege o titular de si mesmo.
-    if (!casou.ok) {
-      registrarFalhaMfa(mfaAttempts, user.id);
-      // Mesma regra do lockout de senha: o erro que completa a cota responde
-      // 429, dizendo já quando pode tentar de novo. Quem descobre o bloqueio
-      // só na tentativa seguinte é quem fica cinco minutos apertando F5.
-      const travou = bloqueioMfa(mfaAttempts, user.id);
-      if (travou) {
-        return res.status(429).json({
-          error: `Muitas tentativas de verificação. Tente de novo em ${Math.ceil(travou.segundosRestantes / 60)} min.`,
-        });
-      }
-      return res.status(401).json({ error: 'Código inválido.' });
-    }
-
-    if (replayBloqueia(ultimoPasso, casou.step)) {
-      // Sem contar como tentativa: foi o mesmo código, duas vezes.
-      return res.status(401).json({ error: 'Código já utilizado. Aguarde o próximo.' });
-    }
-
-    // Consome o passo do código na MESMA instrução que o grava.
-    //
-    // A versão anterior lia `totp_last_step`, comparava em JS e depois gravava
-    // — e essa janela é o defeito: duas requisições simultâneas com o mesmo
-    // ticket e o mesmo código liam o mesmo valor, as duas passavam na
-    // comparação e as duas emitiam sessão. Bastava F5 duas vezes dentro da
-    // janela de 30s. O booking já sabia disso e trava o profissional com
-    // SELECT … FOR UPDATE; aqui a defesa é mais barata — o próprio UPDATE só
-    // acontece para quem tem o passo estritamente maior.
-    //
-    // affectedRows === 0 significa que outro request consumiu este passo
-    // entre a leitura e agora: é replay, e o login é recusado.
-    try {
-      const [gravou] = await pool.query(
-        `UPDATE users SET totp_last_step = ?, last_login_at = CURRENT_TIMESTAMP
-         WHERE id = ? AND (totp_last_step IS NULL OR totp_last_step < ?)`,
-        [casou.step, user.id, casou.step]
-      );
-      if (!gravou || gravou.affectedRows !== 1) {
-        // Replay, não erro: outra requisição consumiu este passo entre a
-        // leitura e agora. Não entra no contador de tentativas (ver acima).
-        return res.status(401).json({ error: 'Código já utilizado. Aguarde o próximo.' });
-      }
-    } catch (updateError) {
-      // Banco sem a coluna (migration não rodada): o login funciona, mas o
-      // replay volta. Sinalizado no console — não é motivo para negar o
-      // segundo fator a quem já tem MFA funcionando.
-      if (updateError.code === 'ER_BAD_FIELD_ERROR') {
-        console.warn('mfa: coluna users.totp_last_step ausente — rode npm run db:migrate (replay do TOTP fica desprotegido)');
-        await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id])
-          .catch((e) => { if (e.code !== 'ER_BAD_FIELD_ERROR') throw e; });
-      } else {
-        throw updateError;
-      }
-    }
-    registrarSucessoMfa(mfaAttempts, user.id);
-    const payload = {
-      id: user.id, email: user.email,
-      role: user.role, admin_level: user.admin_level || null, full_name: user.full_name,
-      job_role: user.job_role || null,
-    };
-    const { token, refreshToken } = await iniciarSessao(res, payload, user.id);
-    await req.audit('mfa_login', 'user', user.id, 'login com segundo fator', user.id);
-    res.json({ token, refreshToken, user: payload });
+    const r = await verificarSegundoFator(req.body);
+    if (!r.ok) return res.status(r.status).json({ error: r.error });
+    const { token, refreshToken } = await iniciarSessao(res, r.payload, r.user.id);
+    await req.audit('mfa_login', 'user', r.user.id, 'login com segundo fator', r.user.id);
+    res.json({ token, refreshToken, user: r.payload });
   } catch (err) {
     next(err);
   }
 });
 
 // POST /auth/mfa/setup — gera o segredo (ainda não ativo) e devolve o QR.
-//
-// Exige a SENHA do titular, não só o token. Um Bearer válido já pode ser
-// consequência de XSS, log de JWT ou máquina compartilhada — e quem tivesse
-// um token poderia ler o segredo gerado, ativar o MFA com um código próprio e
-// passar a controlar o segundo fator do usuário. Com a senha, só o titular
-// re-enrola.
-//
-// Quem já tem MFA ativo precisa usar mfa/disable (também exige senha) antes:
-// esta rota nunca devolve o segredo vigente.
+// Exige a SENHA do titular (ver services/mfa.js).
 router.post('/mfa/setup', verifyToken, validate(mfaSetupBody), async (req, res, next) => {
   try {
-    const { password } = req.body;
-
-    const [[user]] = await pool.query(
-      'SELECT password_hash, totp_enabled FROM users WHERE id = ?',
-      [req.user.id]
-    );
-    if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
-    if (user.totp_enabled) {
-      return res.status(400).json({
-        error: 'O segundo fator já está ativo. Desative-o antes de gerar um novo.',
-      });
-    }
-
-    // bcrypt.compare não deve virar 500 se o hash estiver corrompido no banco.
-    const senhaConfere = await bcrypt
-      .compare(String(password), user.password_hash || '')
-      .catch(() => false);
-    if (!senhaConfere) return res.status(401).json({ error: 'Senha incorreta.' });
-
-    const secret = randomSecret();
-    await pool.query('UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?', [
-      secret,
-      req.user.id,
-    ]);
+    const r = await iniciarCadastroMfa({ userId: req.user.id, email: req.user.email, password: req.body.password });
+    if (!r.ok) return res.status(r.status).json({ error: r.error });
     await req.audit('mfa_setup', 'user', req.user.id, 'segredo do segundo fator gerado');
-    res.json({ secret, otpauth_url: otpauthUrl({ secret, email: req.user.email }) });
+    res.json({ secret: r.secret, otpauth_url: r.otpauthUrl });
   } catch (err) {
     next(err);
   }
@@ -354,11 +216,8 @@ router.post('/mfa/setup', verifyToken, validate(mfaSetupBody), async (req, res, 
 // POST /auth/mfa/enable — confirma o código e ativa.
 router.post('/mfa/enable', verifyToken, async (req, res, next) => {
   try {
-    const { code } = req.body || {};
-    const [[user]] = await pool.query('SELECT totp_secret, totp_enabled FROM users WHERE id = ?', [req.user.id]);
-    if (!user || !user.totp_secret) return res.status(400).json({ error: 'Gere o segredo primeiro.' });
-    if (!verifyTotp(user.totp_secret, code)) return res.status(401).json({ error: 'Código inválido.' });
-    await pool.query('UPDATE users SET totp_enabled = 1 WHERE id = ?', [req.user.id]);
+    const r = await ativarMfa({ userId: req.user.id, code: (req.body || {}).code });
+    if (!r.ok) return res.status(r.status).json({ error: r.error });
     await req.audit('mfa_enable', 'user', req.user.id, 'segundo fator ativado');
     res.json({ ok: true });
   } catch (err) {
@@ -369,12 +228,8 @@ router.post('/mfa/enable', verifyToken, async (req, res, next) => {
 // POST /auth/mfa/disable — desativa (exige a senha).
 router.post('/mfa/disable', verifyToken, async (req, res, next) => {
   try {
-    const { password } = req.body || {};
-    const [[user]] = await pool.query('SELECT password_hash FROM users WHERE id = ?', [req.user.id]);
-    if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
-    const ok = await bcrypt.compare(password || '', user.password_hash);
-    if (!ok) return res.status(401).json({ error: 'Senha incorreta.' });
-    await pool.query('UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?', [req.user.id]);
+    const r = await desativarMfa({ userId: req.user.id, password: (req.body || {}).password });
+    if (!r.ok) return res.status(r.status).json({ error: r.error });
     await req.audit('mfa_disable', 'user', req.user.id, 'segundo fator desativado');
     res.json({ ok: true });
   } catch (err) {
@@ -625,11 +480,7 @@ router.get('/govbr/callback', async (req, res, next) => {
     } catch (updateError) {
       if (updateError.code !== 'ER_BAD_FIELD_ERROR') throw updateError;
     }
-    const payload = {
-      id: user.id, email: user.email,
-      role: user.role, admin_level: user.admin_level || null, full_name: user.full_name,
-      job_role: user.job_role || null,
-    };
+    const payload = payloadDoUsuario(user);
     if (user.totp_enabled) {
       const mfaTicket = jwt.sign({ id: user.id, purpose: 'mfa' }, process.env.JWT_SECRET, { expiresIn: '5m' });
       await req.audit('govbr_login', 'user', user.id, 'login via Gov.br (aguardando MFA)', user.id);

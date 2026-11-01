@@ -90,6 +90,15 @@ function readRefreshRaw(req) {
   return (req.body && req.body.refreshToken) || (req.cookies && req.cookies[REFRESH_COOKIE]) || null;
 }
 
+/** Conteúdo do access token (e do `user` devolvido no login) a partir da linha de `users`. */
+function payloadDoUsuario(user) {
+  return {
+    id: user.id, email: user.email,
+    role: user.role, admin_level: user.admin_level || null, full_name: user.full_name,
+    job_role: user.job_role || null,
+  };
+}
+
 /** Revoga todos os tokens de uma família (suspeita de roubo, conta desativada). */
 async function revogarFamilia(family) {
   await pool.query('UPDATE refresh_tokens SET revoked = 1 WHERE family = ?', [family]);
@@ -177,11 +186,7 @@ async function rotacionarSessao(raw) {
     await revogarFamilia(stored.family);
     return { ok: false, status: 403, error: CONTA_DESATIVADA };
   }
-  const payload = {
-    id: user.id, email: user.email,
-    role: user.role, admin_level: user.admin_level || null, full_name: user.full_name,
-    job_role: user.job_role || null,
-  };
+  const payload = payloadDoUsuario(user);
   return {
     ok: true,
     token: signAccessToken(payload),
@@ -202,6 +207,7 @@ module.exports = {
   restanteDaFamilia,
   issueRefreshToken,
   readRefreshRaw,
+  payloadDoUsuario,
   revogarFamilia,
   iniciarSessao,
   encerrarSessao,
