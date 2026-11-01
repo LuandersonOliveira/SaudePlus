@@ -34,6 +34,8 @@ Entregue em `docs/tecnico/SYSTEM_DESIGN.md`, com diagramas Mermaid:
 6. **Fluxo de dados pessoais:** onde o dado nasce, é cifrado (AES-256-GCM), indexado (HMAC), auditado, exportado e anonimizado — conferido contra `ROPA.md` e `RIPD.md`.
 
 ### 7.3 Analisar com o grafo (evidência, não opinião)
+**Primeira análise: por entidade.** Antes das consultas ao grafo, cada tabela e suas colunas são examinadas quanto a quem escreve, quem lê, o que valida, o que o banco garante, o que é auditado e como o dado sai (rascunho em `SYSTEM_DESIGN.md`, seção 8). O grafo entra depois para confirmar, com `explain` por entidade.
+
 Consultas ao grafo (`/graphify query`, `path`, `explain`) para responder, cada uma com a evidência anexada:
 - **Nós centrais (god nodes):** quais módulos concentram dependências? São os que deveriam?
 - **Comunidades:** os agrupamentos que o grafo encontra coincidem com os módulos pretendidos? Onde há comunidades que misturam domínios (ex.: staff × admin × booking)?
@@ -67,6 +69,24 @@ Cada achado entra num **registro de achados** com severidade, evidência (consul
 
 Decisões estruturais viram **ADR** novo (`docs/tecnico/adr/`). O backlog resultante substitui, reordena ou cancela os itens pendentes da Fase 6 (3B, `admin.routes.js`, A5, B4…).
 
+### 2.1 Critério de projeto: 4 pilares da POO e SOLID
+
+Decidido em 2026-11-01: toda análise (7.3, 7.4) e toda proposta (7.5) usa os **4 pilares da POO** e os **princípios SOLID** como régua de boas práticas. O backend é feito de módulos e funções, não de classes. Os princípios valem do mesmo jeito: o "objeto" é o módulo (rota, serviço, repositório, util) e a "interface" é o que ele exporta.
+
+| Princípio | Como se lê neste código | Sinal de violação (o que procurar) |
+|---|---|---|
+| **Encapsulamento** | O módulo esconde SQL, segredos e estado, e expõe poucas funções. Exemplo bom: `services/profile` recebe `{encrypt, decrypt}` e não conhece a chave. | Rota com SQL (`staff`, `admin`, `catalog`, `units`); `process.env` lido em ~15 módulos; estado em memória (`loginAttempts`) acessado de fora. |
+| **Abstração** | A regra de negócio tem nome e vive separada de HTTP e de SQL. Exemplo bom: `validateBooking`, `adminHierarchy`. | O mesmo `INSERT` de agendamento em três lugares; regra de prioridade repetida em listagens. |
+| **Herança** (em JS: reuso por composição) | Comportamento comum entra uma vez e é composto. Exemplo bom: `createBookingRouter(tipo)`. | Código copiado entre `appointments` e `exams`, entre rota do paciente e da recepção. |
+| **Polimorfismo** | O mesmo contrato atende variantes sem `if` espalhado. Exemplo bom: `TIPOS` (consulta/exame), `mailer` com e sem SMTP. | `if (tipo === ...)` repetido em vários arquivos; integrações chamadas de forma diferente entre si. |
+| **S**: responsabilidade única | Um módulo, um motivo para mudar. | `staff.routes.js` (590 linhas: agenda, relatórios, criação, listagens, pacientes); `admin.routes.js`. |
+| **O**: aberto/fechado | Novo tipo, papel ou capacidade entra sem editar vários arquivos. Exemplo bom: mapa de `capabilities`. | Adicionar um tipo de atendimento exige mexer em rota, serviço e SQL. |
+| **L**: substituição de Liskov | Onde se espera um `db`, serve o pool ou a conexão da transação. Exemplo bom: `repositories/*` recebem `db` primeiro. | Função que só funciona com `pool` (usa `getConnection` sem avisar) ou com conexão. |
+| **I**: segregação de interfaces | O módulo recebe só o que usa. | Serviço que recebe `req` inteiro; `utils/booking.js` exportando tudo para todos. |
+| **D**: inversão de dependência | Regra depende de uma abstração (`db`, `{encrypt, decrypt}`), não de um módulo concreto. | `require('../db')` direto dentro de serviços e rotas; util apontando para serviço (`utils/booking.js` → `services/`). |
+
+Cada achado da 7.5 anota qual princípio viola ou cumpre. A refatoração só é proposta quando o ganho é concreto (menos código repetido, regra testável sem HTTP, risco menor), não para "ficar bonito": SOLID é régua, não meta.
+
 ## 3. Entregáveis
 1. `graphify-out/` atualizado, com data, commit e custo registrados.
 2. `docs/tecnico/SYSTEM_DESIGN.md`: visão do sistema, diagramas e fluxos.
@@ -91,7 +111,9 @@ Decisões estruturais viram **ADR** novo (`docs/tecnico/adr/`). O backlog result
 - [x] 7.1 Escopo do grafo definido; `.claude/` e dependências fora
 - [x] 7.1 `graphify` atualizado; cobertura dos arquivos novos conferida
 - [x] 7.1 Destino de `graphify-out/` decidido
-- [ ] 7.2 `SYSTEM_DESIGN.md`: contexto, contêineres, componentes, sequências, fluxo de dados pessoais
+- [x] 7.2 `SYSTEM_DESIGN.md`: contexto, contêineres, componentes, sequências, fluxo de dados pessoais (commit de referência `8f8f8f0`)
+- [x] 7.2 Análise por entidade (seção 8 do `SYSTEM_DESIGN.md`): 16 tabelas
+- [x] Critério de projeto definido: 4 pilares da POO e SOLID (seção 2.1)
 - [ ] 7.3 Consultas ao grafo: nós centrais, comunidades, violações de camada, código sem uso, duplicações
 - [ ] 7.4 Matriz requisito × componente × evidência
 - [ ] 7.5 Registro de achados classificado (remover / editar / criar / manter)
