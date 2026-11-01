@@ -14,7 +14,7 @@ Adicionar `users.cpf_hmac CHAR(64)` com `UNIQUE`, igual a `HMAC-SHA256(CPF_HMAC_
 - Cadastro e `PUT /auth/me` gravam o índice junto do CPF; violação do `UNIQUE` vira 409 "CPF já cadastrado. Entre na conta existente ou recupere a senha." (não revela e-mail nem nome).
 - Gov.br: `WHERE cpf_hmac = ?` e, no único candidato, `cpfIgual` sobre o CPF decifrado (o índice aponta; o dado cifrado decide).
 - Anonimização LGPD zera `cpf_hmac`, liberando o CPF.
-- Troca de chave: `npm run migrate:cpf:hmac -- --rehash`.
+- Troca de chave: `npm --prefix server run migrate:cpf:rehash`.
 - Menores: não usam o CPF do responsável. Menor de 18 pode se cadastrar sem CPF (então o CNS é obrigatório); `cpf_hmac` fica `NULL`, que não colide no `UNIQUE`. O responsável legal é registrado só pelo nome.
 
 ## Alternativas

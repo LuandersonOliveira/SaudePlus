@@ -10,6 +10,9 @@
 2. Coluna gerada `active_slot = IF(status IN ('pendente','confirmado'), scheduled_at, NULL)` e `UNIQUE (professional_id, active_slot)`.
 3. O `FOR UPDATE` e a validação de duração permanecem na aplicação; o banco é a segunda barreira, não a única.
 
+## Operação
+- Unidades e profissionais **não se apagam pela API**: inativa-se (`active = 0`). O `ON DELETE SET NULL` existe só como rede de segurança para exclusão manual no banco; o histórico preserva o texto `location`/`doctor`.
+
 ## Alternativas
 - **Só aplicação (status quo)** — sem rede de proteção.
 - **`UNIQUE (professional_id, scheduled_at)` simples** — cancelados e remarcados ocupariam o horário para sempre.
