@@ -1,7 +1,7 @@
 /* ==========================================================================
    Saúde+ — Migração (idempotente): segredo do MFA em base32
 
-   Roda: npm run migrate:mfa:base32  (entra no migrate:all, depois de mfa:replay)
+   Roda: npm run db:migrate  (migration 0003)
 
    Por que: o segredo TOTP era gravado em base64url, que Google/Microsoft
    Authenticator não aceitam (só base32). Esta migração recodifica os segredos
@@ -32,7 +32,7 @@ async function main() {
       "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'totp_secret'"
     );
     if (!Number(tem.n)) {
-      console.log('  - users.totp_secret ainda não existe (rode migrate:audit antes)');
+      console.log('  - users.totp_secret ainda não existe (banco fora do baseline: recrie com db:setup --fresh)');
       return;
     }
     const [rows] = await conn.query('SELECT id, totp_secret FROM users WHERE totp_secret IS NOT NULL');

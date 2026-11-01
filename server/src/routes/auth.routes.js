@@ -287,7 +287,7 @@ router.post('/login', async (req, res, next) => {
       await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
     } catch (updateError) {
       if (updateError.code !== 'ER_BAD_FIELD_ERROR') throw updateError;
-      console.warn('Coluna last_login_at ausente; execute server/migration_001.sql para habilitar o registro de acesso.');
+      console.warn('Coluna last_login_at ausente; recrie o banco com `npm run db:setup -- --fresh <banco>` (ou rode o doctor).');
     }
     // MFA ativo: senha OK, mas a sessão só sai após o segundo fator (Aula 1:
     // autenticidade — "algo que você sabe" + "algo que você tem").

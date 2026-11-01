@@ -12,8 +12,8 @@ Status possíveis: **Proposta** → **Aceita** → (**Substituída por ADR-NNNN*
 | [0004](ADR-0004-e2e-sessao-por-api.md) | E2E com sessão criada por API e conta de atendente efêmera | Aceita | 2026-11-01 |
 | [0005](ADR-0005-credenciais-de-admin-so-superadmin.md) | E-mail e senha de conta admin só mudam por `superadmin` | Aceita | 2026-10 |
 | [0006](ADR-0006-indice-cego-hmac-para-cpf.md) | Índice cego (HMAC) para CPF cifrado | **Aceita e implementada** | 2026-11-01 |
-| [0007](ADR-0007-integridade-no-banco-fk-e-horario-unico.md) | Integridade no banco: FKs e horário único por coluna gerada | **Proposta** | 2026-11-01 |
-| [0008](ADR-0008-migrations-numeradas-com-controle.md) | Migrations numeradas com tabela de controle | **Proposta** | 2026-11-01 |
+| [0007](ADR-0007-integridade-no-banco-fk-e-horario-unico.md) | Integridade no banco: FKs e horário único por coluna gerada | **Parcialmente implementada** (B1) | 2026-11-01 |
+| [0008](ADR-0008-migrations-numeradas-com-controle.md) | Migrations numeradas com tabela de controle | **Aceita e implementada** | 2026-11-01 |
 
 Relacionados: `../rfc/RFC-0001-…`, `../especificacao/ESPEC-001-…`, `../poc/POC-001-…`, `../PROS_E_CONTRAS.md`.
 

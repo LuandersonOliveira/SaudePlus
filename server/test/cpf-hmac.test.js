@@ -299,7 +299,7 @@ const cfg = () => ({
 });
 
 const migrar = (envExtra = {}, ...args) =>
-  spawnSync(process.execPath, [path.join(SERVER, 'scripts', 'migrate-cpf-hmac.js'), ...args], {
+  spawnSync(process.execPath, [path.join(SERVER, 'migrations', '0002_cpf_hmac.js'), ...args], {
     cwd: SERVER,
     env: { ...process.env, DB_NAME: DB_MIG, CPF_HMAC_KEY: CHAVE_A, ...envExtra },
     encoding: 'utf8',
@@ -401,10 +401,4 @@ test('migração: preenche, trata casos ruins, para em duplicata e cria o UNIQUE
     assert.match(r.stderr, /CPF_HMAC_KEY/);
     assert.equal(await hmacDe(u1), null);
   });
-});
-
-test('migrate:all executa cpf:hmac depois do privacy (que cifra o CPF) e antes do interop', () => {
-  const pkg = require('../package.json');
-  assert.ok(pkg.scripts['migrate:cpf:hmac']);
-  assert.match(pkg.scripts['migrate:all'], /migrate:privacy && npm run migrate:cpf:hmac && npm run migrate:interop/);
 });

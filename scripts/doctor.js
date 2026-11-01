@@ -51,7 +51,7 @@ const COLUNAS_ESPERADAS = [
   ['waitlist', 'status'],
   ['waitlist', 'record_id'],
 ];
-// Chaves estrangeiras que a migrate:booking:refs cria (RFC-0001, B1). Sem elas o banco volta a
+// Chaves estrangeiras de agendamentos/exames (RFC-0001, B1; vêm do schema.sql). Sem elas o banco volta a
 // aceitar unit_id/professional_id inexistentes e nada no app reclama.
 const FKS_ESPERADAS = [
   ['appointments', 'fk_appointments_unit'],
@@ -113,7 +113,7 @@ function secretsProblems(env) {
     problemas.push({
       name: 'CPF_HMAC_KEY',
       detail: 'igual à DATA_ENCRYPTION_KEY; as duas chaves devem ser independentes',
-      fix: 'gere outra chave aleatória e rode `npm run migrate:cpf:hmac -- --rehash`',
+      fix: 'gere outra chave aleatória e rode `npm --prefix server run migrate:cpf:rehash`',
     });
   }
   const pass = String(env.ADMIN_PASSWORD || '');
@@ -342,8 +342,25 @@ async function main() {
         if (faltando.length === 0) ok('migrations', 'todas as colunas e tabelas esperadas existem');
         else {
           falha('migrations', `faltam ${faltando.length}: ${faltando.join(', ')}`);
-          console.log(`      ${DIM}Sem migrate:interop o MFA fica silenciosamente desligado.${RESET}`);
-          adicionarFix('npm run db:migrate');
+          console.log(`      ${DIM}Banco criado por versão antiga (o schema.sql é a fonte da estrutura). Sem as colunas de MFA, por exemplo, o segundo fator fica desligado em silêncio.${RESET}`);
+          adicionarFix('faça backup (npm --prefix server run backup) e recrie: npm run db:setup -- --fresh <nome do banco>');
+        }
+        // Migrations numeradas pendentes (dados a transformar em banco existente).
+        try {
+          const [[tem]] = await pool.query(
+            "SELECT COUNT(*) n FROM information_schema.tables WHERE table_schema = ? AND table_name = 'schema_migrations'",
+            [dbName]
+          );
+          const feitas = Number(tem.n) ? (await pool.query('SELECT version FROM schema_migrations'))[0].map((r) => r.version) : [];
+          const todas = fs.readdirSync(path.join(SERVER_DIR, 'migrations')).filter((f) => /^\d{4}_.+\.js$/.test(f)).map((f) => f.slice(0, 4));
+          const pend = todas.filter((v) => !feitas.includes(v));
+          if (pend.length === 0) ok('migrations numeradas', `${todas.length} aplicada(s)`);
+          else {
+            aviso('migrations numeradas', `${pend.length} pendente(s): ${pend.join(', ')}`);
+            adicionarFix('npm run db:migrate');
+          }
+        } catch (err) {
+          aviso('migrations numeradas', `não deu para conferir (${err.code || err.message})`);
         }
       } else {
         falha('banco', `${dbName} não existe`);

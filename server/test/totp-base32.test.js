@@ -107,7 +107,7 @@ test('migrate:mfa:base32 recodifica os segredos antigos, é idempotente e não i
   const uSem = await mk(null, 0);
   const lerSecret = async (id) => (await conn.query('SELECT totp_secret FROM users WHERE id = ?', [id]))[0][0].totp_secret;
 
-  const rodar = () => spawnSync(process.execPath, [path.join(SERVER, 'scripts', 'migrate-mfa-base32.js')], {
+  const rodar = () => spawnSync(process.execPath, [path.join(SERVER, 'migrations', '0003_mfa_base32.js')], {
     cwd: SERVER, env: { ...process.env, DB_NAME: DB }, encoding: 'utf8',
   });
 
@@ -122,10 +122,4 @@ test('migrate:mfa:base32 recodifica os segredos antigos, é idempotente e não i
   const r2 = rodar();
   assert.equal(r2.status, 0, r2.stderr);
   assert.match(r2.stdout, /0 convertido\(s\), 2 já em base32/);
-});
-
-test('migrate:all executa mfa:base32 depois do mfa:replay', () => {
-  const pkg = require('../package.json');
-  assert.ok(pkg.scripts['migrate:mfa:base32']);
-  assert.match(pkg.scripts['migrate:all'], /migrate:mfa:replay && npm run migrate:mfa:base32 && npm run migrate:booking:duration/);
 });

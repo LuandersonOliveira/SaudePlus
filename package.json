@@ -1,8 +1,8 @@
-{
+﻿{
   "name": "saude-plus",
   "version": "1.0.0",
   "private": true,
-  "description": "Saúde+ — cuidado integrado Lagoa de Itaenga. Orquestra a API (server/) e o front React (web/).",
+  "description": "SaÃºde+ â€” cuidado integrado Lagoa de Itaenga. Orquestra a API (server/) e o front React (web/).",
   "scripts": {
     "setup": "npm install && npm --prefix server install && npm --prefix web install && npm run db:setup",
     "dev": "concurrently -k -n api,web -c green,cyan \"npm:dev:api\" \"npm:dev:web\"",
@@ -11,7 +11,7 @@
     "start": "npm run dev",
     "start:api": "node server/src/server.js",
     "db:setup": "node scripts/db-setup.js",
-    "db:migrate": "npm --prefix server run migrate:all",
+    "db:migrate": "npm --prefix server run migrate",
     "db:seed": "npm --prefix server run seed:admin && npm --prefix server run seed:demo",
     "db:clean:keep-admin": "node server/scripts/clean-db-keep-admin.js",
     "test": "npm --prefix server test",

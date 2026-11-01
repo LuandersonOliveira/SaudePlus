@@ -99,7 +99,7 @@
   ├── docs/               # governanca/ (LGPD/ISO 27001), planos/, tecnico/, referencia/ (ver "Documentação extra")
   └── server/
       ├── schema.sql           # schema canônico (instalação do zero)
-      ├── migration_001.sql    # migração p/ bancos antigos (perfil estendido)
+      ├── migrations/          # migrations numeradas (NNNN_*.js) — só dados de bancos existentes
       ├── package.json
       ├── .env.example
       ├── src/
@@ -119,8 +119,7 @@
       └── scripts/
           ├── seed-admin.js      # cria/promove admin via .env
           ├── seed-v3-demo.js    # massa de demonstração V3
-          ├── migrate-v3.js      # migração idempotente p/ agenda inteligente
-          ├── migrate-supabase.js# migração opcional a partir do Supabase
+          ├── migrate.js         # runner das migrations numeradas (schema_migrations)
           ├── smoke-test.js      # health + 401 em rotas protegidas
           ├── diagnose-db.js     # diagnóstico de conexão/schema
           └── build-pdf.js       # gera PDFs de docs/
@@ -247,8 +246,9 @@
   > com `mysql < schema.sql`. Para outro nome de banco, use `npm run db:setup`,
   > que reescreve essas duas linhas para o `DB_NAME` em uso.
 
-  Banco já existente de versão anterior: `npm run db:migrate` (aplica todas as
-  migrations na ordem correta; todas idempotentes).
+  Banco já existente: `npm run db:migrate` aplica as migrations pendentes (`server/migrations/NNNN_*.js`),
+  em ordem, e registra cada uma em `schema_migrations`; `npm --prefix server run migrate:status` lista aplicadas e pendentes.
+  Banco criado por versão antiga (anterior ao baseline atual): faça backup e recrie com `npm run db:setup -- --fresh <banco>`.
 
   ### 2) API
 
@@ -257,21 +257,17 @@
   copy .env.example .env   # Windows (cmd) — no Git Bash/WSL use: cp .env.example .env
   # edite o .env com suas credenciais MySQL, um JWT_SECRET forte e a DATA_ENCRYPTION_KEY
   npm install
-  npm run migrate:all                 # todas as migrations, na ordem correta
+  npm run migrate                     # migrations pendentes, em ordem (registradas em schema_migrations)
   npm run seed:admin                  # cria o admin definido no .env
   npm start
   ```
 
-> **Ordem importa:** `migrate:all` roda `v3` → `professional-user` → `security`
-> → `privacy` → `cpf:hmac` → `interop` → `audit` → `audit:details` → `mfa:replay`
-> → `booking:duration` → `reminder:delivery` → `password:reset` →
-> `waitlist` → `agenda`, nessa ordem. Pular o
-> `migrate:privacy` causa `Unknown column 'privacy_version'` no signup.
-  >
-  > **Pular o `migrate:interop` não dá erro visível — apenas desliga o MFA
-  > silenciosamente.** Sem `users.totp_enabled`, o `if (user.totp_enabled)` da
-  > rota de login lê `undefined`, que é falso, e o segundo fator nunca é pedido.
-  > Nenhum aviso, nenhuma exceção. Rode `npm run doctor` para conferir.
+> **Estrutura × migrations:** o `schema.sql` é a fonte da ESTRUTURA (tabelas, colunas, índices, FKs e os
+> triggers append-only do `audit_log`). `server/migrations/` guarda só o que precisa mexer em DADOS de um banco
+> existente: `0001` cifra/normaliza documentos legados, `0002` cria o índice cego do CPF (`cpf_hmac`, para se há
+> CPF duplicado), `0003` recodifica o segredo do MFA para base32 e `0004` confere órfãos antes das FKs de agendamento.
+> Mudou a estrutura? Atualize o `schema.sql` **e** crie a migration seguinte (`0005_…js`). `npm run doctor` avisa
+> se houver migration pendente ou coluna esperada ausente.
 
   `.env` (ver `server/.env.example`):
 
@@ -285,7 +281,7 @@
   | `JWT_EXPIRES_IN` | `15m` | Validade do access token (curto, padrão RNDS; o front renova sozinho via refresh) |
   | `JWT_REFRESH_EXPIRES_IN` | `30d` | Validade do refresh token (rotativo, revogável via `POST /auth/logout`) |
   | `DATA_ENCRYPTION_KEY` | hex 64 chars | Chave AES-256 da cripto em coluna (CPF/RG/CNS). **Sem ela o app não sobe** — ver "Gravar em texto puro" abaixo |
-  | `CPF_HMAC_KEY` | hex 64 chars | Chave do índice cego do CPF (garante "um CPF, uma conta" e busca sem decifrar). **Diferente** da `DATA_ENCRYPTION_KEY`; sem ela o app não sobe (em `npm run dev` é derivada, com aviso). Trocar a chave exige `migrate:cpf:hmac --rehash` |
+  | `CPF_HMAC_KEY` | hex 64 chars | Chave do índice cego do CPF (garante "um CPF, uma conta" e busca sem decifrar). **Diferente** da `DATA_ENCRYPTION_KEY`; sem ela o app não sobe (em `npm run dev` é derivada, com aviso). Trocar a chave exige `npm --prefix server run migrate:cpf:rehash` |
   | `DPO_NAME` / `DPO_EMAIL` | `...` | Encarregado LGPD exibido em `/privacy` via `GET /public/dpo` |
   | `RETENTION_INACTIVE_YEARS` | `5` | Anos sem login até anonimização (`purge:retention`) |
   | `CNES_MUNICIPIO_CODE` / `INFODENGUE_GEOCODE` | `260850` / `2608503` | Município IBGE (syncs; sem credencial) |
@@ -428,20 +424,9 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   | `dev`              | `nodemon src/server.js`                             | Dev com auto-reload                                                                                                                                                        |
   | `seed:admin`       | `node scripts/seed-admin.js`                        | Cria (ou promove a `superadmin`) o admin do `.env` com `bcryptjs`                                                                                                          |
   | `seed:demo` | `node scripts/seed-v3-demo.js [--reset]` | Popula agenda demo em 4 unidades (serviços, 6 profissionais, horários + 3 vagas ocupadas p/ testar conflito; idempotente) |
-| `migrate:all` | roda todas em ordem | `v3` → `professional-user` → `security` → `privacy` → `cpf:hmac` → `interop` → `audit` → `audit:details` → `mfa:replay` → `mfa:base32` → `booking:duration` → `reminder:delivery` → `password:reset` → `waitlist` → `agenda` → `booking:refs`. Idempotente. **É o que o `setup` usa.** |
-| `migrate` | importa `migration_001.sql` | Só para bancos muito antigos (perfil estendido). O `schema.sql` já é a união de tudo, então banco novo não precisa. |
-  | `migrate:v3` | `node scripts/migrate-v3.js` | Cria `social_name/cns/priority/guardian`, `unit_id/professional_id` e tabelas `professionals/unit_offers/professional_offers/work_schedules/schedule_blocks` (idempotente) |
-  | `migrate:professional-user` | `node scripts/migrate-professional-user-link.js` | Adiciona `professionals.user_id` e o índice único que vincula a agenda ao atendente (idempotente; deve rodar antes de `migrate:security`) |
-  | `migrate:security` | `node scripts/migrate-security.js` | **Fase 0:** cria `refresh_tokens` + triggers append-only em `audit_log` (idempotente; rode após `migrate:professional-user`) |
-  | `migrate:privacy` | `node scripts/migrate-privacy.js` | **Fase 1:** consentimento (`privacy_version`, `consent_at/ip`, `deleted_at`) + `cpf/rg/cns` → TEXT + normaliza CPF + cifra legado (exige `DATA_ENCRYPTION_KEY`) |
-  | `migrate:mfa:base32` | `node scripts/migrate-mfa-base32.js` | Recodifica o segredo TOTP de base64url para base32 (formato exigido por Google/Microsoft Authenticator). Mesmos bytes: os códigos não mudam e ninguém perde o 2º fator |
-  | `migrate:cpf:hmac` | `node scripts/migrate-cpf-hmac.js [--rehash]` | **RFC-0001 B3:** `users.cpf_hmac` (HMAC-SHA256 do CPF com `CPF_HMAC_KEY`) + preenchimento + `UNIQUE`. Se houver CPF duplicado, PARA e lista os ids (sem alterar contas). `--rehash` recalcula tudo após trocar a chave |
-  | `migrate:interop` | `node scripts/migrate-interop.js` | **Fase 2:** `health_units.cnes_code/phone/address`, `users.govbr_sub`, `diseases.source/external_ref` |
-  | `migrate:audit` | `node scripts/migrate-audit.js` | **Aulas 1/6:** hash encadeado (`prev_hash`/`entry_hash`/`seq`) + MFA (`totp_*`) + FK do log `CASCADE→RESTRICT` |
-  | `migrate:reminder:delivery` | `node scripts/migrate-reminder-delivery.js` | **Fase 7:** `reminders.sent_at/send_channel/send_error` — o job passou a enviar e-mail, e sem essas colunas um envio recusado seria indistinguível de um enviado |
-| `migrate:password:reset` | `node scripts/migrate-password-reset.js` | **Fase 7:** tabela `password_reset_tokens` (só o SHA-256 do token, `used_at` para uso único, `ON DELETE CASCADE` para respeitar a anonimização LGPD) |
-| `migrate:waitlist` | `node scripts/migrate-waitlist.js` | **NV03:** tabela `waitlist` (fila por serviço, prioridade legal primeiro, `record_id` do agendamento convertido; idempotente) |
-| `migrate:agenda` | `node scripts/migrate-agenda.js` | **Agenda operacional:** `para_remarcar`, `outcome`, `reschedule_reason`, duração por serviço, índices e `booking_events` (idempotente) |
+| `migrate` | `node scripts/migrate.js` | Aplica as migrations pendentes de `server/migrations/`, em ordem numérica, e registra em `schema_migrations` (com checksum). Para na primeira que falhar. **É o que `db:setup`/`db:migrate` usam.** |
+| `migrate:status` | `node scripts/migrate.js --status` | Lista cada migration como aplicada `[x]` ou pendente `[ ]` |
+| `migrate:cpf:rehash` | `node migrations/0002_cpf_hmac.js --rehash` | Recalcula todos os `cpf_hmac` após trocar a `CPF_HMAC_KEY` (recria o `UNIQUE` ao fim) |
   | `backup` | `node scripts/backup.js [--dir] [--keep=7]` | **Aulas 1/6:** dump `mysqldump` → gzip → SHA-256 + manifesto, com retenção |
   | `purge:retention` | `node scripts/purge-retention.js [--apply]` | **Fase 1:** sem `--apply` só lista contas inativas +5 anos; com `--apply` anonimiza + limpa refresh tokens +90 dias |
   | `sync:cnes` | `node scripts/sync-cnes.js [--apply]` | **Fase 2:** CNES → `health_units` (dry-run default; `CNES_MUNICIPIO_CODE=260850`) |
@@ -449,7 +434,6 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   | `test:rnds` | `node scripts/test-rnds.js` | **Fase 2:** builders/validador FHIR offline (sem rede) |
   | `smoke-test`       | `node scripts/smoke-test.js`                        | Verificação curta: `GET /health 200`, headers do helmet, CORS, os 4×401 sem token e a matriz RBAC de `rbac-matrix.js` (mesma que a suíte roda) |
   | `test`             | `node --test "test/*.test.js"`                      | Suíte completa: contratos HTTP, RBAC, auditoria encadeada, cripto fail-closed, front e banco. O teste de corrida fica fora (precisa de 2 conexões) — use `test:race`. |
-  | `migrate:supabase` | `node scripts/migrate-supabase.js`                  | Migração opcional a partir do Supabase                                                                                                                                     |
   | (avulsos)          | `diagnose-db.js`, `build-pdf.js` | Diagnóstico de DB, geração de PDFs de `docs/` |
 
   Engines: `node >= 18`. Deps: `express`, `cors`, `dotenv`, `jsonwebtoken`, `mysql2`, `bcryptjs`,
@@ -566,7 +550,7 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
 
   - **Sem libs externas por padrão no front:** a fonte Inter é autohospedada em `assets/fonts/` (sem Google Fonts); mapas, SMS/WhatsApp ficam como próximo passo deliberado, não dependência do dia 1.
   - **Validação de agenda no servidor** (`booking.js`), não só no `<select>`: impede agendar no passado, fora da grade, em slot ocupado ou bloqueado — front sozinho não protege nada.
-  - **Validação de documentos padronizada (Fase 0, `utils/validators.js` + `zod`):** CPF com dígito verificador e CNS com checksum oficial DEF-CNS (antes só checava 15 dígitos); `audit_log` sanitizado (CPF/senha/token viram `[redigido]`) e append-only via triggers da `migration_002`; listagens admin/staff aceitam `?page=&pageSize=` com envelope `{data,page,pageSize,total}` (sem query, mantêm o array legado).
+  - **Validação de documentos padronizada (Fase 0, `utils/validators.js` + `zod`):** CPF com dígito verificador e CNS com checksum oficial DEF-CNS (antes só checava 15 dígitos); `audit_log` sanitizado (CPF/senha/token viram `[redigido]`) e append-only via triggers do `schema.sql`; listagens admin/staff aceitam `?page=&pageSize=` com envelope `{data,page,pageSize,total}` (sem query, mantêm o array legado).
   - **Ordem de montagem no `app.js`** é intencional: `/admin/professionals` antes do `PATCH /admin/:kind/:id` genérico, senão o genérico captura a rota e devolve 404.
   - **`PUT /me/:id` vs `PATCH /:id/cancel`:** `PUT` reagenda (revalida disponibilidade, com `excludeId` do próprio registro); `PATCH …/cancel` só troca status — ambos auditados quando via staff/admin.
   - **Datas como string** (`dateStrings: true` no pool) + `fmtDate()` no front para `pt-BR` consistente.
@@ -597,7 +581,7 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
 | Login dá **"Failed to fetch"**     | A URL do front não bate com `CORS_ORIGIN`: abra em `http://localhost:8080` (não `127.0.0.1:8080`). `npm run doctor` compara as duas e diz qual está errada |
 | Página abre mas fica vazia         | Mesma causa do item acima — o 403 do CORS não aparece no terminal. Confira `npm run doctor` → linha `cors` |
 | Abro `/admin` e dá "Rota não encontrada" | Em produção, falta ligar `SERVE_WEB=1` (e rodar `npm run build:web`): sem isso o Express só serve a API e as páginas do React não existem. Em dev, use `npm run dev` e abra `http://localhost:8080` |
-| Login não pede o segundo fator    | `migrate:interop` não rodou (sem `users.totp_enabled`, o MFA desliga em silêncio). Rode `npm run db:migrate` |
+| Login não pede o segundo fator    | Banco criado por versão antiga, sem `users.totp_enabled` (o MFA desliga em silêncio). Rode `npm run doctor` e, se faltar coluna, recrie com `npm run db:setup -- --fresh <banco>` |
 | "Muitos intentos de login"        | Lockout por conta: 5 tentativas por `ip|email` travam por 15 min. Espere ou ajuste `TRUST_PROXY_HOPS` se está atrás de proxy |
 | `Token inválido ou expirado`      | Access expira em 15 min — o front renova sozinho; se persistir, logar de novo                         |
 | Erro ao instalar deps             | Confirme `bcryptjs` (não `bcrypt`) — já vem assim no `package.json`                                     |

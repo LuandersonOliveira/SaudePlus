@@ -25,7 +25,9 @@ Pontos fortes (preservar): auditoria encadeada por hash; documentos (CPF/RG/CNS)
 Zod aparece em um arquivo (`utils/validators.js`); o resto valida à mão em cada rota (`if (!name…)`). Mensagens e limites divergem entre rotas; o front React valida com Zod, o servidor não compartilha o contrato.
 **Ação:** esquemas Zod por rota (ou por domínio) com um `validate(schema)` de middleware; devolver o mesmo formato de erro. Beneficia o front (tipos gerados dos mesmos esquemas se um dia o servidor virar TypeScript).
 
-### A3 — Migrations sem versionamento (média)
+### A3 — Migrations sem versionamento (média) — **FEITO em 2026-11-01**
+**Implementado (ADR-0008):** auditoria provou que `schema.sql` já era a união de tudo (só faltavam os 2 triggers de `audit_log`, agora nele); as 13 migrations de estrutura, `migration_001/002.sql` e `migrate-supabase.js` foram removidos; ficaram 4 migrations de DADOS em `server/migrations/NNNN_*.js`, aplicadas por `scripts/migrate.js` com registro em `schema_migrations` (checksum, para na falha). `doctor` avisa pendências. Testes: `migrate-runner.test.js` (7). Texto original abaixo.
+
 14 scripts idempotentes rodam todos, em ordem fixa, a cada `db:setup`; `schema.sql` é a "união". Não há tabela de controle (`schema_migrations`), então não se sabe qual versão um banco já está nem se pode reverter. A paridade é guardada por teste (`schema-parity`), o que reduz o risco, mas só enquanto alguém lembra de atualizar os dois lados.
 **Ação:** migrations numeradas (`001_…sql`) + tabela de controle (ferramenta pronta, ex. `umzug`/`node-pg-migrate` equivalente MySQL, ou um runner de 50 linhas). Migrar os 14 scripts para a numeração sem mudar o resultado; manter o teste de paridade.
 
@@ -100,7 +102,7 @@ CPF/RG/CNS usam AES-256-GCM (correto), mas sem um *blind index* (HMAC do CPF). E
 | 2 | ~~B3 `cpf_hmac` único + busca indexada~~ **feito** | M | duplicidade de pacientes + varredura O(N) |
 | 3 | ~~MFA base32 com migração de segredos~~ **feito** | M | 2º fator inutilizável em app real |
 | 4 | ~~A4 trava no job de lembretes~~ **feito** (`utils/jobLock.js`, `GET_LOCK`; `job-lock.test.js`, 7) | S | duplicação de e-mails/SMS ao escalar |
-| 5 | A3 migrations numeradas | M | habilita todas as mudanças de banco acima com segurança |
+| 5 | ~~A3 migrations numeradas~~ **feito** (ADR-0008; 13 migrations de estrutura removidas, 4 de dados numeradas) | M | habilita todas as mudanças de banco acima com segurança |
 | 6 | A1/A2 serviços + validação Zod, começando por `auth` | L | manutenção; faça junto de cada mudança, não como projeto à parte |
 | 7 | A7 aposentar legado, A6 higiene, A8 bundle | S–M | redução de superfície |
 | 8 | B2 índice único de horário, A5 request id/logs | S | defesa em profundidade e operação |

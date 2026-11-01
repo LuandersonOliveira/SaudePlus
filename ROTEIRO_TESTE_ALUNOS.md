@@ -84,7 +84,7 @@ promessa da interface — é uma regra do servidor.
 | "Failed to fetch" no console                           | API não está rodando, ou `CORS_ORIGIN` no `.env` não bate com a porta do front — rode `npm run doctor` |
 | `GET /server/.env` devolve 404                         | **Isso está certo.** O front é servido por allowlist; `server/` nunca é exposto             |
 | "Muitos intentos de login"                             | Lockout por conta: 5 tentativas travam por 15 min. Espere, ou ajuste `TRUST_PROXY_HOPS` se há proxy |
-| Login não pede o segundo fator                         | `migrate:interop` não rodou (o MFA desliga em silêncio). Rode `npm run db:migrate`            |
+| Login não pede o segundo fator                         | Banco de versão antiga, sem `users.totp_enabled` (o MFA desliga em silêncio). Rode `npm run doctor` e recrie com `npm run db:setup -- --fresh <banco>`            |
 | "Token inválido ou expirado"                           | O access token expira em 15 min e o front renova sozinho; se persistir, logar de novo         |
 | Erro ao instalar dependências                          | Confirme que está usando `bcryptjs` (não `bcrypt`) — já vem assim no `package.json` entregue |
 | Porta 4000 ocupada                                     | Mude `PORT` no `.env` **e** `window.API_BASE` no front antes de carregar `assets/api.js`     |

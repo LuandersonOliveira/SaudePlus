@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS users (
     -- atendente). São TEXT, não VARCHAR: o app guarda o AES-256-GCM em
     -- formato "enc:v1:<iv>:<ct>:<tag>", ~70 caracteres. Com o VARCHAR(14)
     -- original, uma instalação limpa dava ERROR 1406 já no primeiro
-    -- cadastro com CPF. Mesma conversão feita por migrate:privacy.
+    -- cadastro com CPF.
     cpf TEXT NULL,
     rg TEXT NULL,
     -- Cartão Nacional de Saúde — opcional, 15 dígitos (cifrado em repouso)
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS users (
     -- Índice cego do CPF (RFC-0001 B3): HMAC-SHA256 dos 11 dígitos com a chave
     -- CPF_HMAC_KEY. O `cpf` acima é cifrado com IV aleatório e não dá para
     -- procurar nem tornar único; este é o que o UNIQUE e a busca do Gov.br usam.
-    -- NULL = sem CPF (vários permitidos). Criada por migrate:cpf:hmac.
+    -- NULL = sem CPF (vários permitidos). Preenchida pela migration 0002 em bancos existentes.
     cpf_hmac CHAR(64) NULL,
     -- Perfil pessoal
     birth_date DATE NULL,
@@ -110,22 +110,21 @@ CREATE TABLE IF NOT EXISTS users (
     job_role VARCHAR(100) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at DATETIME NULL,
-    -- Fase 1 (LGPD): consentimento e apagamento. Criadas por migrate-privacy,
+    -- Fase 1 (LGPD): consentimento e apagamento. Colunas de consentimento,
     -- replicadas aqui para que a instalação limpa não quebre no primeiro
     -- signup com "Unknown column 'privacy_version'".
     privacy_version VARCHAR(20) NULL,
     consent_at DATETIME NULL,
     consent_ip VARCHAR(45) NULL,
     deleted_at DATETIME NULL,
-    -- Fase 2: vínculo com o Login Único Gov.br (migrate-interop).
+    -- Fase 2: vínculo com o Login Único Gov.br (Gov.br).
     govbr_sub VARCHAR(64) NULL,
-    -- Aulas 1/6: segundo fator TOTP (migrate-audit).
+    -- Aulas 1/6: segundo fator TOTP (MFA).
     -- totp_enabled ausente = `if (user.totp_enabled)` lê undefined e o login
-    -- NUNCA pede o segundo fator, sem erro em lugar nenhum. É o motivo de
-    -- migrate:interop estar na sequência do README.
+    -- NUNCA pede o segundo fator, sem erro em lugar nenhum. Banco sem esta coluna é detectado pelo `npm run doctor`.
     totp_secret TEXT NULL,
     totp_enabled TINYINT(1) NOT NULL DEFAULT 0,
-    -- Fase 5: último passo TOTP aceito (migrate-mfa-replay).
+    -- Fase 5: último passo TOTP aceito (anti-replay).
     -- Um código só vale se o passo for MAIOR que este: sem isso o mesmo
     -- código abria sessão quantas vezes quisesse dentro da janela de 90s.
     -- Numérico, não datetime — um passo é um contador, não um instante, e é
@@ -137,7 +136,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- ---------------------------------------------------------------------
 -- Refresh tokens rotativos (Fase 0, item 0.3) — guarda-se só o SHA-256.
 -- Detecta roubo por reuso: apresentar um token já rotacionado revoga a
--- família inteira. Criada por migrate-security.
+-- família inteira. Refresh tokens.
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id CHAR(36) NOT NULL PRIMARY KEY,
@@ -183,7 +182,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 -- ---------------------------------------------------------------------
 -- appointments e exams referenciam health_units e professionals, criadas mais abaixo.
 -- Com a checagem desligada o MySQL aceita a FK antes de o pai existir; ela volta
--- a ser ligada logo depois de professionals (RFC-0001 / migrate:booking:refs).
+-- a ser ligada logo depois de professionals (RFC-0001).
 SET @fk_checks_antes = @@FOREIGN_KEY_CHECKS;
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -197,7 +196,7 @@ CREATE TABLE IF NOT EXISTS appointments (
     professional_id CHAR(36) NULL,
     scheduled_at DATETIME NOT NULL,
     notes TEXT NULL,
-    -- Fase 5: duração do atendimento marcado (migrate-booking-duration).
+    -- Fase 5: duração do atendimento marcado (duração por serviço).
     -- Sem ela, o cálculo de conflito tratava TUDO como 30 min, e um
     -- atendimento de 60 min não bloqueava o horário seguinte da grade de 30.
     -- NULL = registro anterior à coluna (o cálculo usa COALESCE com 30).
@@ -259,7 +258,7 @@ CREATE TABLE IF NOT EXISTS diseases (
     region VARCHAR(150) NULL,
     alert_level ENUM('baixo', 'medio', 'alto') NOT NULL DEFAULT 'baixo',
     description TEXT NULL,
-    -- Fase 2 (migrate-interop): distingue alerta digitado pelo gestor de um
+    -- Fase 2 (interop): distingue alerta digitado pelo gestor de um
     -- importado do InfoDengue. O sync só atualiza linhas source='infodengue',
     -- então a coluna é o que impede sobrescrever o que a unidade cadastrou.
     source VARCHAR(20) NOT NULL DEFAULT 'manual',
@@ -372,7 +371,7 @@ CREATE TABLE IF NOT EXISTS health_units (
         'outro'
     ) NOT NULL DEFAULT 'ubs',
     neighborhood VARCHAR(120) NULL,
-    -- Fase 2 (migrate-interop): cnes_code é a chave do sync com o CNES e
+    -- Fase 2 (interop): cnes_code é a chave do sync com o CNES e
     -- precisa ser único; sem ele, `npm run sync:cnes` aborta e a rede não
     -- sincroniza. phone e address vêm da mesma origem.
     cnes_code VARCHAR(10) NULL,
@@ -466,13 +465,12 @@ CREATE TABLE IF NOT EXISTS audit_log (
 -- concatenados sem teto pelas rotas de admin. Com a coluna curta, uma
 -- justificativa longa produzia ER_DATA_TOO_LONG, o erro era engolido e a
 -- ação acontecia SEM registro — o oposto do que a auditoria deve garantir.
--- Migration equivalente para bancos já existentes: migrate:audit:details.
     details TEXT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- Aulas 1/6: trilha encadeada à prova de adulteração. prev_hash aponta
     -- para a linha anterior e entry_hash cobre o conteúdo junto com ela;
     -- qualquer alteração ou remoção quebra a cadeia, verificável em
-    -- GET /admin/audit-log/verify. Criadas por migrate-audit.
+    -- GET /admin/audit-log/verify. Cadeia de hash.
     prev_hash CHAR(64) NULL,
     entry_hash CHAR(64) NULL,
     seq BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -481,6 +479,17 @@ CREATE TABLE IF NOT EXISTS audit_log (
     INDEX idx_audit_entity (entity_type, entity_id),
     INDEX idx_audit_created (created_at)
 ) ENGINE = InnoDB;
+
+-- Append-only: o banco recusa UPDATE e DELETE em audit_log, mesmo para quem
+-- tenha acesso direto ao MySQL. (Antes só uma migration criava estes
+-- triggers; uma instalação limpa ficava com a trilha adulterável.)
+-- MySQL não tem CREATE TRIGGER IF NOT EXISTS: DROP + CREATE mantém o arquivo reaplicável.
+DROP TRIGGER IF EXISTS trg_audit_no_update;
+CREATE TRIGGER trg_audit_no_update BEFORE UPDATE ON audit_log FOR EACH ROW
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'audit_log é append-only: UPDATE bloqueado.';
+DROP TRIGGER IF EXISTS trg_audit_no_delete;
+CREATE TRIGGER trg_audit_no_delete BEFORE DELETE ON audit_log FOR EACH ROW
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'audit_log é append-only: DELETE bloqueado.';
 
 -- ---------------------------------------------------------------------
 -- Agenda inteligente (V3) — profissionais vinculados às unidades,

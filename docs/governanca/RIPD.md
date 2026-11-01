@@ -16,7 +16,7 @@ reavaliados na minimização contínua (Fase 1, item 5 do plano).
 | Risco | Prob. × Impacto | Medida implementada | Residual |
 |---|---|---|---|
 | Vazamento de banco (dump) expõe CPF/RG/CNS | M × Alto | AES-256-GCM em coluna + backups gzip/SHA-256 + futuro TDE/KMS (Fase 1) | Baixo |
-| Vazamento da `CPF_HMAC_KEY` permite confirmar CPFs candidatos contra o `cpf_hmac` de um dump | B × Médio | Chave separada da de cifra, fora do repositório e dos backups do banco; exigida no boot; rotação por `migrate:cpf:hmac --rehash`; `doctor` recusa chave igual à de cifra | Baixo |
+| Vazamento da `CPF_HMAC_KEY` permite confirmar CPFs candidatos contra o `cpf_hmac` de um dump | B × Médio | Chave separada da de cifra, fora do repositório e dos backups do banco; exigida no boot; rotação por `npm --prefix server run migrate:cpf:rehash`; `doctor` recusa chave igual à de cifra | Baixo |
 | Roubo de sessão (XSS, dispositivo compartilhado) | M × Alto | Access 15 min + refresh rotativo com detecção de reuso + logout revogatório + MFA TOTP | Baixo |
 | Acesso indevido por atendente/admin | M × Médio | RBAC + `requireCapability` + CPF/RG ocultos do staff + auditoria de visualização (`admin_view_user_docs`) | Baixo |
 | Força bruta em login | M × Médio | Rate-limit duplo (global + `/auth`) + bloqueio 5/5min + 429 | Baixo |

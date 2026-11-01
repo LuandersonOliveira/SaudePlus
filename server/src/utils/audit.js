@@ -7,7 +7,7 @@ const pool = require('../db');
  *
  * Fase 0 (LGPD): `details` é sanitizado antes de persistir — tokens, senhas e
  * documentos completos nunca entram no audit_log (só referência/máscara).
- * A tabela é append-only: triggers em migration_002 bloqueiam UPDATE/DELETE.
+ * A tabela é append-only: triggers do schema.sql bloqueiam UPDATE/DELETE.
  *
  * Aulas 1/6 (integridade + não repúdio): cada linha carrega entry_hash =
  * SHA-256(prev_hash | ator | ação | entidade | detalhes | momento), encadeado

@@ -2,7 +2,7 @@
    Saúde+ — Migração (idempotente): integridade de unidade e profissional
    nos agendamentos (RFC-0001 / ADR-0007, achado B1 da Fase 6)
 
-   Roda: npm run migrate:booking:refs  (entra no migrate:all)
+   Roda: npm run db:migrate  (migration 0004; a estrutura equivalente já vem do schema.sql)
 
    Por que: `appointments` e `exams` guardavam `unit_id` e `professional_id`
    sem chave estrangeira — qualquer texto entrava, e não havia índice em
@@ -48,7 +48,7 @@ async function main() {
     const orfaos = [];
     for (const tabela of TABELAS) {
       if (!(await existe(conn, 'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?', [tabela]))) {
-        console.log(`  - ${tabela} ainda não existe (rode migrate:v3 antes)`);
+        console.log(`  - ${tabela} ainda não existe (banco fora do baseline: recrie com db:setup --fresh)`);
         return;
       }
       for (const ref of REFS) {

@@ -1,16 +1,13 @@
 /**
  * db-setup.js monta o banco do zero. A parte que executa SQL precisa do
  * MySQL; aqui testamos as decisões puras — o que o script aceita como nome
- * de banco e em que ordem ele aplica as migrations.
- *
- * A ordem importa: migrate:privacy depende de migrate:v3 (colunas de perfil),
- * e migrate:audit depende de migrate:security (refresh_tokens + audit_log).
+ * de banco e quais migrations ele encontra.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   assertSafeDbName,
-  migrationScripts,
+  migrationFiles,
   quoteIdent,
   resolveConfig,
   parseFreshArg,
@@ -99,51 +96,19 @@ test('assertSafeDbName recusa tudo que não é identificador simples', () => {
   }
 });
 
-test('migrationScripts devolve exatamente o que o migrate:all executa, na mesma ordem', () => {
-  // Esta lista NÃO pode ser escrita à mão. A versão anterior fixava 6 nomes
-  // aqui e em db-setup.js; quando a Fase 5 adicionou migrate:mfa:replay e
-  // migrate:booking:duration, o migrate:all cresceu e as duas listas fixas
-  // ficaram para trás — `npm run db:setup` imprimia "Pronto." sem criar as
-  // colunas, e todo agendamento passava a dar 500. O teste fixo é o que deu
-  // aparência de cobertura a um caminho que não conhecia as migrations novas.
-  const scripts = migrationScripts();
-  const pkg = require('../package.json');
-  const esperada = (pkg.scripts['migrate:all'].match(/npm run (migrate:[\w:-]+)/g) || [])
-    .map((n) => {
-      const cmd = pkg.scripts[n.replace('npm run ', '')];
-      return /node\s+(?:\.\/)?scripts\/([\w.-]+\.js)/.exec(cmd)[1];
-    });
-
-  assert.ok(esperada.length >= 6, 'o migrate:all deveria encadear todas as migrations');
-  assert.deepEqual(
-    scripts,
-    esperada,
-    'db-setup e migrate:all precisam executar exatamente as mesmas migrations, na mesma ordem'
-  );
-
-  const idx = (nome) => scripts.indexOf(nome);
-  assert.ok(idx('migrate-v3.js') < idx('migrate-privacy.js'), 'privacy depende das colunas de v3');
-  assert.ok(
-    idx('migrate-v3.js') < idx('migrate-professional-user-link.js'),
-    'o vínculo profissional↔atendente depende da tabela professionals criada em v3'
-  );
-  assert.ok(idx('migrate-professional-user-link.js') > -1, 'sem esta migration o atendente nunca é filtrado pela própria agenda');
-  assert.ok(idx('migrate-security.js') < idx('migrate-audit.js'), 'audit depende de refresh_tokens');
-  assert.ok(idx('migrate-interop.js') > -1, 'interop precisa existir - sem ele o MFA some em silêncio');
-  // E as migrations da Fase 5, que era exatamente o que faltava.
-  assert.ok(idx('migrate-mfa-replay.js') > -1, 'proteção de replay do TOTP precisa entrar no setup');
-  assert.ok(idx('migrate-booking-duration.js') > -1, 'duration_minutes precisa entrar no setup');
-});
-
-test('todo script de migration listado existe no disco', () => {
+test('migrationFiles lista as migrations numeradas, em ordem, e todas existem no disco', () => {
   const fs = require('node:fs');
   const path = require('node:path');
-  const dir = path.join(__dirname, '..', 'scripts');
-  for (const s of migrationScripts()) {
-    assert.ok(fs.existsSync(path.join(dir, s)), `${s} não existe em server/scripts/`);
+  const arquivos = migrationFiles();
+  assert.ok(arquivos.length >= 1);
+  assert.deepEqual(arquivos, [...arquivos].sort(), 'a ordem é a numérica do nome');
+  for (const f of arquivos) {
+    assert.match(f, /^\d{4}_[a-z0-9_]+\.js$/);
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'migrations', f)), `${f} não existe em server/migrations/`);
   }
+  // 0001 cifra/normaliza o CPF antes de 0002 indexá-lo.
+  assert.ok(arquivos.findIndex((f) => f.startsWith('0001_')) < arquivos.findIndex((f) => f.startsWith('0002_')));
 });
-
 test('quoteIdent envolve em crases o que precisar', () => {
   assert.equal(quoteIdent('saude'), '`saude`');
   assert.equal(quoteIdent('saude_producao_2026'), '`saude_producao_2026`');

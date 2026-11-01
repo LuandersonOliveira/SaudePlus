@@ -4,7 +4,7 @@
  *
  * Cobre as duas rotas até o mesmo estado:
  *   - instalação limpa: o schema.sql sozinho já traz as FKs;
- *   - banco antigo: a migrate:booking:refs adiciona (e só PARA, sem alterar nada, se houver órfãos,
+ *   - banco antigo: a migration 0004 (booking_refs) adiciona (e só PARA, sem alterar nada, se houver órfãos,
  *     a menos que se peça --fix-orphans).
  */
 const test = require('node:test');
@@ -48,7 +48,7 @@ async function apagarBanco(nome) {
 }
 
 const migrar = (db, ...args) =>
-  spawnSync(process.execPath, [path.join(ROOT, 'server', 'scripts', 'migrate-booking-refs.js'), ...args], {
+  spawnSync(process.execPath, [path.join(ROOT, 'server', 'migrations', '0004_booking_refs.js'), ...args], {
     cwd: path.join(ROOT, 'server'),
     env: { ...process.env, DB_NAME: db },
     encoding: 'utf8',
@@ -188,10 +188,4 @@ test('migração é idempotente: rodar de novo não muda nada e não falha', asy
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /já existe/);
   assert.doesNotMatch(r.stdout, /\+ /, 'nada novo deveria ser criado');
-});
-
-test('migrate:all executa a nova migração por último', () => {
-  const pkg = require('../package.json');
-  assert.match(pkg.scripts['migrate:all'], /migrate:agenda && npm run migrate:booking:refs$/);
-  assert.ok(pkg.scripts['migrate:booking:refs']);
 });

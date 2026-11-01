@@ -2,10 +2,9 @@
 /* ==========================================================================
    Saúde+ — bootstrap do banco, idempotente.
 
-   Substitui o caminho manual do README (mysql < schema.sql seguido de cinco
-   `npm run migrate:*`), que era fácil de fazer pela metade — e "pela metade"
-   aqui é silencioso: sem migrate:interop o users.totp_enabled fica
-   indefinido e o login nunca pede o segundo fator, sem erro em lugar nenhum.
+   Cria o banco, aplica o schema.sql (estrutura completa) e roda as migrations
+   pendentes (server/migrations, controladas por `schema_migrations`). Fazer
+   isso à mão é fácil de deixar pela metade — e "pela metade" aqui é silencioso.
 
    Uso:
      npm run db:setup                        cria/ajusta o banco e o admin
@@ -20,37 +19,15 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 const SERVER_DIR = path.join(ROOT, 'server');
 
-// Ordem importa. Cada entrada depende da anterior.
-//
-// A lista NÃO é escrita aqui: vem de `server/package.json` no script
-// `migrate:all`. Duas listas paralelas da mesma ordem divergiram — quando a
-// Fase 5 adicionou migrate:mfa:replay e migrate:booking:duration, o
-// migrate:all cresceu e esta ficou em 6. Resultado: `npm run db:setup` imprimia
-// "Pronto." em uma base sem as colunas novas, e todo agendamento passava a
-// devolver 500.
-//
-// Quem decide a ordem é o package.json, e o NOME DO ARQUIVO vem do comando de
-// cada script — não de uma tradução de `migrate:a:b` para `migrate-a-b.js`.
-// A tradução quebrava em `migrate:professional-user`, que aponta para
-// `migrate-professional-user-link.js`.
-function migrationScripts() {
-  const pkg = JSON.parse(fs.readFileSync(path.join(SERVER_DIR, 'package.json'), 'utf8'));
-  const linha = (pkg.scripts && pkg.scripts['migrate:all']) || '';
-  const nomes = linha.match(/npm run migrate:[\w:-]+/g) || [];
-  if (!nomes.length) {
-    throw new Error(
-      'server/package.json não define o script migrate:all — a ordem das migrations ficou indeterminada'
-    );
-  }
-  return nomes.map((n) => {
-    const script = n.replace(/^npm run /, '');
-    const comando = (pkg.scripts && pkg.scripts[script]) || '';
-    const m = /node\s+(?:\.\/)?scripts\/([\w.-]+\.js)/.exec(comando);
-    if (!m) {
-      throw new Error(`server/package.json: ${script} não aponta para um arquivo em scripts/`);
-    }
-    return m[1];
-  });
+// A ESTRUTURA vem toda do schema.sql. As migrations (server/migrations/NNNN_*.js)
+// cuidam só do que precisa tocar em dados de um banco existente; quem as
+// executa, em ordem e com registro em `schema_migrations`, é server/scripts/migrate.js.
+// Aqui só se confere que existe ao menos uma e se delega ao runner.
+function migrationFiles() {
+  const dir = path.join(SERVER_DIR, 'migrations');
+  const arquivos = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^\d{4}_[a-z0-9_]+\.js$/.test(f)).sort() : [];
+  if (!arquivos.length) throw new Error('server/migrations está vazio ou ausente');
+  return arquivos;
 }
 
 const BOLD = '\x1b[1m';
@@ -166,22 +143,18 @@ function createAdminConnection(cfg) {
 }
 
 /**
- * As migrations rodam em subprocesso e cada uma lê o .env por conta própria
+ * O runner roda em subprocesso e lê o .env por conta própria
  * (require('dotenv').config() NÃO sobrescreve o ambiente). Passar o env
  * resolvido é o que garante que pai e filhos apontem para o mesmo banco.
  */
-function runMigration(script, cfg) {
-  const file = path.join(SERVER_DIR, 'scripts', script);
-  if (!fs.existsSync(file)) {
-    throw new Error('migration ausente: server/scripts/' + script);
-  }
-  const res = spawnSync(process.execPath, [file], {
+function runMigrations(cfg) {
+  const res = spawnSync(process.execPath, [path.join(SERVER_DIR, 'scripts', 'migrate.js')], {
     cwd: SERVER_DIR,
     stdio: 'inherit',
     env: childEnvFrom(cfg),
   });
   if (res.status !== 0) {
-    throw new Error('migration ' + script + ' falhou (exit ' + res.status + ')');
+    throw new Error('migrations falharam (exit ' + res.status + ')');
   }
 }
 
@@ -223,13 +196,12 @@ async function main() {
     await conn.query(schema);
     console.log(GREEN + '[ok]' + RESET + ' schema.sql aplicado em ' + dbName);
 
-    for (const script of migrationScripts()) {
-      console.log(DIM + 'Migrando: ' + script + '…' + RESET);
-      await conn.end().catch(() => {});
-      runMigration(script, cfg);
-      conn = await createAdminConnection(cfg);
-      console.log(GREEN + '[ok]' + RESET + ' ' + script);
-    }
+    migrationFiles(); // falha cedo se server/migrations sumiu
+    console.log(DIM + 'Aplicando migrations pendentes…' + RESET);
+    await conn.end().catch(() => {});
+    runMigrations(cfg);
+    conn = await createAdminConnection(cfg);
+    console.log(GREEN + '[ok]' + RESET + ' migrations em dia');
   } finally {
     await conn.end().catch(() => {});
   }
@@ -253,7 +225,7 @@ async function main() {
 module.exports = {
   assertSafeDbName,
   quoteIdent,
-  migrationScripts,
+  migrationFiles,
   resolveConfig,
   parseFreshArg,
   rewriteSchemaForDb,

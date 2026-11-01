@@ -2,7 +2,7 @@
    Saúde+ — Migração (idempotente): índice cego do CPF (RFC-0001 / ADR-0006,
    achado B3 da Fase 6)
 
-   Roda: npm run migrate:cpf:hmac  (entra no migrate:all, depois de migrate:privacy)
+   Roda: npm run db:migrate  (migration 0002, depois da 0001 que cifra/normaliza o CPF)
 
    Por que: `users.cpf` é cifrado com IV aleatório, então o banco não consegue
    garantir "um CPF, uma conta" nem procurar por CPF (o vínculo do Gov.br
@@ -16,7 +16,7 @@
    errado…); nada é mesclado nem apagado aqui. Só ids são impressos — nunca o CPF.
 
    Flags:
-     --rehash   recalcula TODOS os cpf_hmac (use após trocar CPF_HMAC_KEY).
+     --rehash   (npm --prefix server run migrate:cpf:rehash) recalcula TODOS os cpf_hmac (use após trocar CPF_HMAC_KEY).
                 Com o UNIQUE já criado, ele é removido antes e recriado ao fim.
 
    Idempotente: coluna, preenchimento e índice só agem no que falta.
@@ -46,7 +46,7 @@ async function main() {
   });
   try {
     if (!(await existe(conn, 'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?', ['users']))) {
-      console.log('  - users ainda não existe (rode migrate:v3 antes)');
+      console.log('  - users ainda não existe (banco fora do baseline: recrie com db:setup --fresh)');
       return;
     }
 

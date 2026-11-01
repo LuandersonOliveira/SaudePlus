@@ -286,15 +286,15 @@ Design system com variáveis de cor/tipografia, componentes, responsividade, foc
 
 ### `server/package.json`
 
-`start`, `dev`, `start:local`, `test`, `test:race`, `seed:admin`, `seed:demo`, `migrate:supabase`, `link:professionals-users`, migrações individuais, `migrate:all`, `purge:retention`, `backup`, `sync:cnes`, `sync:alerts`, `test:rnds`, `smoke-test`.
+`start`, `dev`, `start:local`, `test`, `test:race`, `seed:admin`, `seed:demo`, `link:professionals-users`, `migrate`, `migrate:status`, `migrate:cpf:rehash`, `purge:retention`, `backup`, `sync:cnes`, `sync:alerts`, `test:rnds`, `smoke-test`.
 
-### Ordem de `migrate:all`
+### Migrations numeradas
 
-`v3` → `professional-user` → `security` → `privacy` → `interop` → `audit` → `audit:details` → `mfa:replay` → `booking:duration` → `reminder:delivery` → `password:reset`.
+A estrutura vem do `schema.sql`. `server/migrations/NNNN_*.js` guarda só o que mexe em dados de bancos existentes, aplicado em ordem por `scripts/migrate.js` e registrado em `schema_migrations`: `0001` documentos cifrados, `0002` índice cego do CPF, `0003` MFA base32, `0004` órfãos/FKs de agendamento.
 
 ### Scripts operacionais
 
-- `scripts/db-setup.js`: cria banco/schema e resolve a migração real pelo comando npm.
+- `scripts/db-setup.js`: cria banco, aplica o schema.sql e roda as migrations pendentes.
 - `scripts/doctor.js`: verifica ambiente, conexão, schema, migrations, CORS e configuração.
 - `scripts/serve-web.js`: servidor estático local.
 - `server/scripts/seed-admin.js`: cria/promove admin a partir de `ADMIN_EMAIL`/`ADMIN_PASSWORD`.

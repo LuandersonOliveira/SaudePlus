@@ -261,57 +261,32 @@ test('o seed de unidades sai do schema.sql já populado', async () => {
   assert.equal(Number(row.n), 10, 'o schema.sql traz as 10 unidades de Lagoa de Itaenga');
 });
 
-test('o README documenta a ordem real das migrations', () => {
+test('o README documenta o caminho de instalação e o runner de migrations', () => {
   const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
-
-  // O caminho principal é `npm run setup`, e o manual usa `migrate:all` —
-  // não a lista migration-por-migration, que era o que o README mostrava
-  // antes e que ninguém devia copiar na mão.
   assert.match(readme, /npm run setup/, 'o README precisa oferecer o setup por comando');
-  assert.match(readme, /npm run migrate:all/, 'o caminho manual precisa usar migrate:all');
+  assert.match(readme, /npm run db:migrate/, 'o README precisa citar o runner de migrations');
+  assert.match(readme, /schema_migrations/, 'o README precisa explicar o controle de versões');
 
-  // A ordem autoritativa é a linha da tabela que descreve o `migrate:all`.
-  // Não dá para varrer o README inteiro: o texto de aviso menciona
-  // `migrate:privacy` antes da tabela, e "primeira ocorrência" mede prosa,
-  // não ordem. A nota "Ordem importa" também quebra em várias linhas.
-  const linha = readme
-    .split('\n')
-    .find((l) => /^\s*\|\s*`migrate:all`/.test(l));
-  assert.ok(linha, 'o README precisa ter uma linha de tabela para migrate:all');
-
-  const ordem = ['v3', 'security', 'privacy', 'interop', 'audit'];
-  let pos = -1;
-  for (const passo of ordem) {
-    const i = linha.indexOf(passo);
-    assert.ok(i > -1, `a linha do migrate:all não menciona ${passo}`);
-    assert.ok(i > pos, `a linha do migrate:all lista ${passo} fora de ordem`);
-    pos = i;
-  }
-
-  // E a linha precisa bater com o que o script realmente executa.
+  // Nada de scripts migrate:* que não existem mais.
   const pkg = require('../package.json');
-  const executadas = (pkg.scripts['migrate:all'].match(/migrate:[\w:-]+/g) || [])
-    .map((m) => m.replace('migrate:', ''));
-  assert.ok(executadas.length >= 6, `migrate:all só encadeia ${executadas.length} migrations`);
-  let anterior = -1;
-  for (const passo of executadas) {
-    const i = linha.indexOf(passo);
-    assert.ok(i > -1, `o README não documenta migrate:${passo}, que o migrate:all executa`);
-    assert.ok(i > anterior, `o README documenta migrate:${passo} fora de ordem`);
-    anterior = i;
-  }
+  const citados = new Set((readme.match(/npm (?:--prefix server )?run (migrate[\w:-]*)/g) || []).map((m) => m.replace(/.*run /, '')));
+  for (const s of citados) assert.ok(pkg.scripts[s], `o README cita "npm run ${s}", que não existe no server/package.json`);
 });
 
-test('o README avisa que pular migrate:interop desliga o MFA', () => {
-  const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
-  const bloco = readme.slice(readme.indexOf('migrate:interop'));
-  assert.match(
-    bloco.slice(0, 1200),
-    /mfa|segundo fator/i,
-    'o README deveria avisar que pular migrate:interop desliga o MFA silenciosamente'
+test('schema.sql traz os triggers append-only de audit_log (não dependem de migration)', async () => {
+  const [triggers] = await conn.query(
+    'SELECT trigger_name AS n FROM information_schema.triggers WHERE trigger_schema = ? AND event_object_table = ?',
+    [DB, 'audit_log']
   );
-});
+  assert.deepEqual(triggers.map((r) => r.n).sort(), ['trg_audit_no_delete', 'trg_audit_no_update']);
 
+  const actor = crypto.randomUUID();
+  await conn.query("INSERT INTO users (id, full_name, email, password_hash, role) VALUES (?, 'Aud', 'aud@test.local', ?, 'paciente')", [actor, 'x'.repeat(60)]);
+  const id = crypto.randomUUID();
+  await conn.query("INSERT INTO audit_log (id, actor_id, action, entity_type, entity_id) VALUES (?,?,?,?,?)", [id, actor, 'teste', 'user', actor]);
+  await assert.rejects(conn.query("UPDATE audit_log SET action = 'x' WHERE id = ?", [id]), /append-only/);
+  await assert.rejects(conn.query('DELETE FROM audit_log WHERE id = ?', [id]), /append-only/);
+});
 // ===========================================================================
 // ENUMs: o validador e o schema não podem divergir
 // ===========================================================================

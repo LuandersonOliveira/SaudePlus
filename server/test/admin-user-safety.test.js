@@ -17,7 +17,6 @@ const ler = (rel) => fs.readFileSync(path.join(RAIZ, rel), 'utf8');
 const USERS = ler('server/src/routes/admin.users.routes.js');
 const STAFF = ler('server/src/routes/staff.routes.js');
 const ADMIN = ler('server/src/routes/admin.routes.js');
-const MIGRATE_ALL = ler('server/package.json');
 const DOCTOR = ler('scripts/doctor.js');
 const LINK_SCRIPT = ler('server/scripts/link-professionals-to-users.js');
 const CLEAN_SCRIPT = ler('server/scripts/clean-db-keep-admin.js');
@@ -92,12 +91,7 @@ test('histórico e métricas do admin ignoram contas excluídas', () => {
   assert.match(ADMIN, /FROM users WHERE deleted_at IS NULL`\)/, 'o CSV também conta só contas vivas');
 });
 
-test('migrate:all e doctor conhecem o vínculo profissional↔atendente', () => {
-  assert.match(
-    MIGRATE_ALL,
-    /migrate:v3 && npm run migrate:professional-user && npm run migrate:security/,
-    'a migration do vínculo precisa rodar depois de v3 e antes do resto'
-  );
+test('doctor conhece o vínculo profissional↔atendente', () => {
   assert.match(DOCTOR, /\['professionals', 'user_id'\]/);
   assert.match(DOCTOR, /'password_reset_tokens'/);
 });

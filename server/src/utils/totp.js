@@ -17,7 +17,7 @@ const WINDOW = 1; // aceita ±1 passo (relógio dessincronizado)
 // Google/Microsoft Authenticator e afins só aceitam base32 no `secret=` do
 // otpauth:// e na digitação manual. O formato anterior (base64url) não era
 // cadastrável em app real. Os segredos antigos continuam válidos: a migração
-// `migrate:mfa:base32` recodifica os MESMOS bytes, então os códigos não mudam.
+// a migration 0003 (mfa_base32) recodifica os MESMOS bytes, então os códigos não mudam.
 // --------------------------------------------------------------------------
 const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
