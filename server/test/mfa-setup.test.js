@@ -128,7 +128,10 @@ test('mfa/setup com a senha certa devolve o segredo e persiste', async () => {
   assert.ok(r.body.otpauth_url.includes(`secret=${r.body.secret}`), 'o app lê o mesmo segredo base32');
 
   const row = await lerMfa(u.id);
-  assert.equal(row.totp_secret, r.body.secret);
+  // Em repouso o segredo vai CIFRADO (a chave de produção); sem chave válida (CI/dev) o modo dev grava em claro.
+  const chaveValida = /^[0-9a-fA-F]{64}$/.test((process.env.DATA_ENCRYPTION_KEY || '').trim());
+  if (chaveValida) assert.ok(row.totp_secret.startsWith('enc:v1:'), 'o segredo do MFA não pode ficar em texto puro no banco');
+  assert.equal(require('../src/utils/crypto').decryptField(row.totp_secret), r.body.secret);
   assert.equal(row.totp_enabled, 0, 'ainda não está ativo: falta confirmar o código');
 });
 

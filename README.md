@@ -265,7 +265,7 @@
 > **Estrutura × migrations:** o `schema.sql` é a fonte da ESTRUTURA (tabelas, colunas, índices, FKs e os
 > triggers append-only do `audit_log`). `server/migrations/` guarda só o que precisa mexer em DADOS de um banco
 > existente: `0001` cifra/normaliza documentos legados, `0002` cria o índice cego do CPF (`cpf_hmac`, para se há
-> CPF duplicado), `0003` recodifica o segredo do MFA para base32 `0004` confere órfãos antes das FKs de agendamento e `0005` cria o horário único por profissional (`active_slot`; para se houver horário duplicado).
+> CPF duplicado), `0003` recodifica o segredo do MFA para base32 `0004` confere órfãos antes das FKs de agendamento, `0006` cifra o segredo do MFA (`totp_secret`) e `0005` cria o horário único por profissional (`active_slot`; para se houver horário duplicado).
 > Mudou a estrutura? Atualize o `schema.sql` **e** crie a migration seguinte (`0005_…js`). `npm run doctor` avisa
 > se houver migration pendente ou coluna esperada ausente.
 

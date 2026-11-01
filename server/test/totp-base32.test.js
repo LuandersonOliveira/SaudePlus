@@ -123,3 +123,64 @@ test('migrate:mfa:base32 recodifica os segredos antigos, é idempotente e não i
   assert.equal(r2.status, 0, r2.stderr);
   assert.match(r2.stdout, /0 convertido\(s\), 2 já em base32/);
 });
+
+// ---------------------------------------------------------------------------
+// Migration 0006: cifrar os segredos já gravados
+// ---------------------------------------------------------------------------
+
+const comChave = /^[0-9a-fA-F]{64}$/.test((process.env.DATA_ENCRYPTION_KEY || '').trim());
+
+test('migration 0006: cifra o que está em claro, não toca no que já está cifrado, é idempotente e não imprime segredo', { skip: !comChave && 'sem DATA_ENCRYPTION_KEY válida' }, async (t) => {
+  const { encryptField, decryptField, isEncrypted } = require('../src/utils/crypto');
+  const DB6 = `saude_totp6_${process.pid}`;
+  const admin = await mysql.createConnection(cfg());
+  await admin.query('DROP DATABASE IF EXISTS `' + DB6 + '`');
+  await admin.query('CREATE DATABASE `' + DB6 + '` CHARACTER SET utf8mb4');
+  await admin.end();
+  const conn = await mysql.createConnection({ ...cfg(), database: DB6, multipleStatements: true });
+  t.after(async () => {
+    await conn.end().catch(() => {});
+    const a = await mysql.createConnection(cfg());
+    await a.query('DROP DATABASE IF EXISTS `' + DB6 + '`').catch(() => {});
+    await a.end().catch(() => {});
+  });
+  await conn.query(rewriteSchemaForDb(fs.readFileSync(path.join(SERVER, 'schema.sql'), 'utf8'), DB6));
+
+  const mk = async (secret) => {
+    const id = crypto.randomUUID();
+    await conn.query("INSERT INTO users (id, full_name, email, password_hash, role, totp_secret, totp_enabled) VALUES (?,?,?,?, 'paciente', ?, 1)", [id, 'M6', `m6-${id}@test.local`, 'x'.repeat(60), secret]);
+    return id;
+  };
+  const claro = randomSecret();
+  const jaCifrado = encryptField(randomSecret());
+  const uClaro = await mk(claro);
+  const uCifrado = await mk(jaCifrado);
+  const uNulo = await mk(null);
+  const ler = async (id) => (await conn.query('SELECT totp_secret FROM users WHERE id = ?', [id]))[0][0].totp_secret;
+  const rodar = (env = {}) => spawnSync(process.execPath, [path.join(SERVER, 'migrations', '0006_totp_secret_cifrado.js')], { cwd: SERVER, env: { ...process.env, DB_NAME: DB6, ...env }, encoding: 'utf8' });
+
+  // sem chave e COM segredo em claro: falha e não altera nada
+  const semChave = rodar({ DATA_ENCRYPTION_KEY: '', ALLOW_PLAINTEXT_DEV: '' });
+  assert.equal(semChave.status, 1);
+  assert.match(semChave.stderr, /DATA_ENCRYPTION_KEY/);
+  assert.equal(await ler(uClaro), claro, 'nada foi alterado');
+
+  const r1 = rodar();
+  assert.equal(r1.status, 0, r1.stderr);
+  assert.match(r1.stdout, /1 em texto puro, 1 já cifrado/);
+  assert.match(r1.stdout, /1 segredo\(s\) cifrado/);
+  const depois = await ler(uClaro);
+  assert.ok(isEncrypted(depois));
+  assert.equal(decryptField(depois), claro, 'o mesmo segredo, só que cifrado: os códigos não mudam');
+  assert.equal(await ler(uCifrado), jaCifrado, 'valor já cifrado fica como está');
+  assert.equal(await ler(uNulo), null);
+  assert.ok(!(r1.stdout + r1.stderr).includes(claro), 'nunca imprime segredo');
+
+  const r2 = rodar();
+  assert.equal(r2.status, 0, r2.stderr);
+  assert.match(r2.stdout, /0 em texto puro, 2 já cifrado/);
+
+  // sem nada a cifrar, não precisa de chave
+  const semSegredos = rodar({ DATA_ENCRYPTION_KEY: '' });
+  assert.equal(semSegredos.status, 0, semSegredos.stderr);
+});

@@ -9,12 +9,28 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const { randomSecret, verifyTotp, matchStep, replayBloqueia, otpauthUrl } = require('../utils/totp');
+const { encryptField, decryptField } = require('../utils/crypto');
 const {
   mfaAttempts, bloqueioMfa, registrarFalhaMfa, registrarSucessoMfa,
 } = require('../utils/mfaAttempts');
 const { payloadDoUsuario } = require('./session');
 
 const falha = (status, error) => ({ ok: false, status, error });
+
+/**
+ * O segredo TOTP fica cifrado em repouso (AES-256-GCM, a mesma chave dos documentos). Valor
+ * antigo em texto puro ainda é aceito (decryptField o devolve como está) até a migration 0006
+ * rodar. Devolve null se não der para decifrar (chave errada/ausente): o chamador trata como
+ * "verificação indisponível" em vez de negar por engano ou aceitar sem checar.
+ */
+function lerSegredo(valor) {
+  try {
+    return decryptField(valor);
+  } catch (err) {
+    console.error(`mfa: não foi possível decifrar o segredo do segundo fator (${err.message})`);
+    return null;
+  }
+}
 
 /** Ticket de 5 min que o login entrega quando a senha está certa mas falta o segundo fator. */
 function criarTicketMfa(userId) {
@@ -55,7 +71,9 @@ async function verificarSegundoFator({ ticket, code }) {
   // Com WINDOW = ±1, o mesmo código vale por 90s; sem isto, um código
   // capturado (foto do app, log, alguém olhando por cima do ombro) abria
   // sessão nova quantas vezes quisesse dentro dessa janela.
-  const casou = matchStep(user.totp_secret, code);
+  const segredo = lerSegredo(user.totp_secret);
+  if (!segredo) return falha(401, 'Verificação indisponível.');
+  const casou = matchStep(segredo, code);
   const ultimoPasso = user.totp_last_step === null || user.totp_last_step === undefined
     ? null
     : Number(user.totp_last_step);
@@ -135,7 +153,7 @@ async function iniciarCadastroMfa({ userId, email, password }) {
   if (!senhaConfere) return falha(401, 'Senha incorreta.');
 
   const secret = randomSecret();
-  await pool.query('UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?', [secret, userId]);
+  await pool.query('UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?', [encryptField(secret), userId]);
   return { ok: true, secret, otpauthUrl: otpauthUrl({ secret, email }) };
 }
 
@@ -143,7 +161,9 @@ async function iniciarCadastroMfa({ userId, email, password }) {
 async function ativarMfa({ userId, code }) {
   const [[user]] = await pool.query('SELECT totp_secret, totp_enabled FROM users WHERE id = ?', [userId]);
   if (!user || !user.totp_secret) return falha(400, 'Gere o segredo primeiro.');
-  if (!verifyTotp(user.totp_secret, code)) return falha(401, 'Código inválido.');
+  const segredo = lerSegredo(user.totp_secret);
+  if (!segredo) return falha(401, 'Verificação indisponível.');
+  if (!verifyTotp(segredo, code)) return falha(401, 'Código inválido.');
   await pool.query('UPDATE users SET totp_enabled = 1 WHERE id = ?', [userId]);
   return { ok: true };
 }

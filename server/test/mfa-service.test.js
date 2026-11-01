@@ -17,6 +17,7 @@ const {
   criarTicketMfa, verificarSegundoFator, iniciarCadastroMfa, ativarMfa, desativarMfa,
 } = require('../src/services/mfa');
 const { randomSecret, totpNow } = require('../src/utils/totp');
+const { encryptField, decryptField } = require('../src/utils/crypto');
 
 const SENHA = 'senha-de-teste-123';
 const CRIADOS = [];
@@ -106,7 +107,9 @@ test('ciclo de vida: setup exige a senha, ativar exige o código, desativar exig
   assert.match(setup.secret, /^[A-Z2-7]{32}$/);
   assert.ok(setup.otpauthUrl.startsWith('otpauth://totp/'));
   const [[gravado]] = await pool.query('SELECT totp_secret, totp_enabled FROM users WHERE id = ?', [u.id]);
-  assert.equal(gravado.totp_secret, setup.secret);
+  const chaveValida = /^[0-9a-fA-F]{64}$/.test((process.env.DATA_ENCRYPTION_KEY || '').trim());
+  if (chaveValida) assert.ok(gravado.totp_secret.startsWith('enc:v1:'), 'segredo cifrado em repouso');
+  assert.equal(decryptField(gravado.totp_secret), setup.secret);
   assert.equal(Number(gravado.totp_enabled), 0, 'ainda não ativo');
 
   assert.equal((await ativarMfa({ userId: u.id, code: '000000' })).status, 401);
@@ -123,4 +126,46 @@ test('ciclo de vida: setup exige a senha, ativar exige o código, desativar exig
   const [[fim]] = await pool.query('SELECT totp_secret, totp_enabled FROM users WHERE id = ?', [u.id]);
   assert.equal(fim.totp_secret, null);
   assert.equal(Number(fim.totp_enabled), 0);
+});
+
+// ---------------------------------------------------------------------------
+// Segredo cifrado em repouso
+// ---------------------------------------------------------------------------
+
+const comChave = /^[0-9a-fA-F]{64}$/.test((process.env.DATA_ENCRYPTION_KEY || '').trim());
+
+test('segredo CIFRADO no banco funciona de ponta a ponta (setup → ativar → verificar) e não vaza em claro', { skip: !comChave && 'sem DATA_ENCRYPTION_KEY válida' }, async () => {
+  const u = await usuario();
+  const setup = await iniciarCadastroMfa({ userId: u.id, email: u.email, password: SENHA });
+  const [[bruto]] = await pool.query('SELECT totp_secret FROM users WHERE id = ?', [u.id]);
+  assert.ok(bruto.totp_secret.startsWith('enc:v1:'));
+  assert.ok(!bruto.totp_secret.includes(setup.secret), 'o segredo em claro não aparece no valor gravado');
+
+  assert.deepEqual(await ativarMfa({ userId: u.id, code: totpNow(setup.secret) }), { ok: true });
+  const r = await verificarSegundoFator({ ticket: criarTicketMfa(u.id), code: totpNow(setup.secret, Date.now() + 30000) });
+  assert.equal(r.ok, true, JSON.stringify(r));
+});
+
+test('segredo LEGADO em texto puro segue válido até a migration 0006 (compatibilidade na troca de versão)', async () => {
+  const u = await usuario({ mfa: true }); // o helper grava em claro
+  const r = await verificarSegundoFator({ ticket: criarTicketMfa(u.id), code: totpNow(u.secret) });
+  assert.equal(r.ok, true);
+});
+
+test('segredo ilegível (cifrado com outra chave) → "Verificação indisponível.", nunca aceita nem nega por engano', { skip: !comChave && 'sem DATA_ENCRYPTION_KEY válida' }, async () => {
+  const u = await usuario({ mfa: true });
+  const original = process.env.DATA_ENCRYPTION_KEY;
+  await pool.query('UPDATE users SET totp_secret = ? WHERE id = ?', [encryptField(u.secret), u.id]);
+  process.env.DATA_ENCRYPTION_KEY = 'ab'.repeat(32); // chave diferente da que cifrou
+  const silenciar = console.error;
+  console.error = () => {};
+  try {
+    const v = await verificarSegundoFator({ ticket: criarTicketMfa(u.id), code: totpNow(u.secret) });
+    assert.deepEqual([v.ok, v.status, v.error], [false, 401, 'Verificação indisponível.']);
+    const a = await ativarMfa({ userId: u.id, code: totpNow(u.secret) });
+    assert.deepEqual([a.ok, a.status, a.error], [false, 401, 'Verificação indisponível.']);
+  } finally {
+    console.error = silenciar;
+    process.env.DATA_ENCRYPTION_KEY = original;
+  }
 });
