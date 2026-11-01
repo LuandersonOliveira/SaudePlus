@@ -4,6 +4,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
 
 const T = require('../src/utils/booking-time');
 const P = require('../src/utils/booking-priority');
@@ -221,9 +222,29 @@ test('utils/booking.js segue exportando tudo o que rotas e serviços importam', 
     'isPriorityUser', 'prioridadeDoUsuario', 'quotaPrioritaria', 'gradeDoDia', 'reservasDoDia', 'slotReservado',
     'BOOKING_STATUS', 'parseDateTime', 'toDateStr', 'validateScheduleWindow', 'lockBookingActors',
     'validateUserOverlap', 'validateBooking', 'duracaoServico', 'duracaoMinutos', 'duracaoDe',
-    'DURACAO_PADRAO', 'getAvailability', 'findAvailabilityByService',
+    'DURACAO_PADRAO', 'getAvailability', 'findAvailabilityByService', 'applyBookingChange',
   ];
   for (const n of nomes) assert.notEqual(booking[n], undefined, `booking.${n} sumiu da fachada`);
   assert.equal(booking.parseDateTime, T.parseDateTime, 'a fachada reexporta a MESMA função, não uma cópia');
   assert.equal(booking.slotReservado, P.slotReservado);
+  assert.equal(booking.applyBookingChange, require('../src/services/bookingChange').applyBookingChange);
+  assert.equal(booking.validateBooking, require('../src/services/bookingRules').validateBooking);
+});
+
+test('os módulos de agendamento carregam em qualquer ordem, sem dependência circular', () => {
+  const { spawnSync } = require('node:child_process');
+  const base = path.resolve(__dirname, '..', 'src');
+  const ordens = [
+    ['services/bookingChange', 'services/bookingRules', 'utils/booking'],
+    ['services/bookingRules', 'services/bookingChange', 'utils/booking'],
+    ['utils/booking', 'services/bookingChange', 'services/bookingRules'],
+    ['repositories/agenda', 'utils/booking-slots', 'utils/booking'],
+  ];
+  for (const ordem of ordens) {
+    const codigo = ordem.map((m) => `require(${JSON.stringify(path.join(base, m))})`).join(';')
+      + ';const b=require(' + JSON.stringify(path.join(base, 'utils/booking')) + ');'
+      + 'if(typeof b.applyBookingChange!=="function"||typeof b.validateBooking!=="function")process.exit(3);';
+    const r = spawnSync(process.execPath, ['-e', codigo], { cwd: path.resolve(__dirname, '..'), encoding: 'utf8', env: process.env });
+    assert.equal(r.status, 0, `ordem ${ordem.join(' → ')}: ${r.stderr}`);
+  }
 });

@@ -23,10 +23,10 @@ const {
 const { validateScheduleWindow } = require('../utils/booking-time');
 const { registrarEvento } = require('./booking-events');
 const atendimentos = require('../repositories/atendimentos');
-// A revalidação da agenda usa as regras de booking.js (passo 7d as move para um serviço).
+// A revalidação da agenda usa as regras de agendamento.
 const {
   validateBooking, duracaoMinutos, prioridadeDoUsuario, lockBookingActors,
-} = require('../utils/booking');
+} = require('./bookingRules');
 
 const META = {
   appointments: { table: 'appointments', tipo: 'consulta', serviceColumn: 'specialty', entityType: 'appointment', kind: 'consulta' },

@@ -186,7 +186,7 @@ test('booking.js reexporta as leituras do repositório (mesma função, não có
   const booking = require('../src/utils/booking');
   assert.equal(booking.prioridadeDoUsuario, repo.prioridadeDoUsuario);
   assert.equal(booking.lockBookingActors, repo.travarEnvolvidos);
-  const fonte = require('node:fs').readFileSync(path.join(SERVER, 'src', 'utils', 'booking.js'), 'utf8');
+  const fonte = require('node:fs').readFileSync(path.join(SERVER, 'src', 'services', 'bookingRules.js'), 'utf8');
   const leituras = fonte.match(/pool\.query\(/g) || [];
-  assert.equal(leituras.length, 0, 'booking.js não faz mais SELECT por conta própria (o UPDATE do applyBookingChange usa a conexão c)');
+  assert.equal(leituras.length, 0, 'as regras não fazem SELECT por conta própria: leitura é do repositório');
 });
