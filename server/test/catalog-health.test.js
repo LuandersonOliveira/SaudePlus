@@ -1,6 +1,6 @@
-const crypto = require('node:crypto');
+﻿const crypto = require('node:crypto');
 /**
- * Fase 1.8 - saúde do catálogo: serviços ativos sem profissional ativo ou sem escala.
+ * Fase 1.8 - saÃºde do catÃ¡logo: serviÃ§os ativos sem profissional ativo ou sem escala.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -36,15 +36,15 @@ async function preparar() {
     [P.unidade, 'UBS Catalogo', 'ubs', 'Centro']);
   await pool.query(
     'INSERT INTO professionals (id, name, job_title, active) VALUES (?,?,?,1) ON DUPLICATE KEY UPDATE active=1',
-    [P.profAtivo, 'Prof Ativo', 'Clínica Geral']
+    [P.profAtivo, 'Prof Ativo', 'ClÃ­nica Geral']
   );
   await pool.query(
     'INSERT INTO professionals (id, name, job_title, active) VALUES (?,?,?,1) ON DUPLICATE KEY UPDATE active=1',
-    [P.profComEscala, 'Prof Com Escala', 'Clínica Geral']
+    [P.profComEscala, 'Prof Com Escala', 'ClÃ­nica Geral']
   );
   await pool.query(
     'INSERT INTO professionals (id, name, job_title, active) VALUES (?,?,?,0) ON DUPLICATE KEY UPDATE active=0',
-    [P.profInativo, 'Prof Inativo', 'Clínica Geral']
+    [P.profInativo, 'Prof Inativo', 'ClÃ­nica Geral']
   );
   await pool.query(
     `INSERT INTO users (id, full_name, email, password_hash, role, account_status, admin_level)
@@ -72,7 +72,7 @@ async function preparar() {
     }
   }
 
-  // Inativo também vinculado ao serviço "Sem Profissional", não deve contar.
+  // Inativo tambÃ©m vinculado ao serviÃ§o "Sem Profissional", nÃ£o deve contar.
   await pool.query(
     `INSERT INTO professional_offers (id, professional_id, unit_id, kind, name)
      VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE professional_id=VALUES(professional_id)`,
@@ -99,7 +99,6 @@ test.before(async () => {
 });
 
 test.after(async () => {
-  const crypto = require('node:crypto');
   await pool.query('DELETE FROM work_schedules WHERE id = ?', [P.schedule]).catch(() => {});
   await pool.query('DELETE FROM professional_offers WHERE unit_id = ? AND name IN (?,?,?)',
     [P.unidade, 'Servico Sem Prof', 'Servico Sem Escala', 'Servico Ok']).catch(() => {});
@@ -112,7 +111,7 @@ test.after(async () => {
   await pool.end().catch(() => {});
 });
 
-test('aponta serviço sem profissional ativo e serviço sem escala, mas não o saudável', async () => {
+test('aponta serviÃ§o sem profissional ativo e serviÃ§o sem escala, mas nÃ£o o saudÃ¡vel', async () => {
   const res = await fetch(`${base}/admin/catalog-health`, { headers: headers() });
   assert.equal(res.status, 200);
   const data = await res.json();

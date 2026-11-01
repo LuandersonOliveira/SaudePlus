@@ -173,8 +173,8 @@ test.before(async () => {
   for (let i = 0; i < 2; i += 1) {
     const id = crypto.randomUUID();
     await c.query(
-      `INSERT INTO users (id, full_name, email, password_hash, role, account_status)
-       VALUES (?,?,?,?,?,?)`,
+      `INSERT INTO users (id, full_name, email, password_hash, role, account_status, priority)
+       VALUES (?,?,?,?,?,?, 'idoso')`,
       [id, `Paciente ${i}`, `race+${i}@test.local`, await bcrypt.hash('senha12345', 4), 'paciente', 'ativo']
     );
     usuarios.push(

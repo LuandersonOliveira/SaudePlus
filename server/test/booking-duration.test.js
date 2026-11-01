@@ -75,6 +75,9 @@ async function preparar() {
      VALUES (?, 'Paciente Duração', 'duracao@caps.local', 'x', 'paciente', 'ativo')`,
     [P.paciente]
   );
+  // Este suíte testa duração, não prioridade: o paciente entra como
+  // prioritário para que a cota do NV02 não esconda as vagas do início do dia.
+  await pool.query("UPDATE users SET priority = 'idoso' WHERE id = ?", [P.paciente]);
 
   // As DUAS agendas sobrepostas: 60 min de manhã, 30 min à tarde — e as duas
   // cobrem as 09:00–10:00, que é onde a sobreposição vai aparecer.

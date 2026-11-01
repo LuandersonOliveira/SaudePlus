@@ -73,7 +73,7 @@ function prioridadeRank(value) {
   return ['idoso', 'gestante', 'pcd', 'lactante'].includes(String(value || '').toLowerCase()) ? 0 : 1;
 }
 
-async function buscarDia(tipo, de, ate, filtros, escopo) {
+async function buscarDia(tipo, de, ate, filtros, _escopo) {
   const itens = [];
   for (const [kind, table, serviceColumn] of [
     ['consulta', 'appointments', 'specialty'],
@@ -498,10 +498,10 @@ router.get('/agenda/reports', async (req, res, next) => {
          WHERE b.scheduled_at BETWEEN ? AND ?${where.sql}`,
         [de, ate, ...where.params]
       );
-      porTipo[meta.kind] += rows.length;
-      total += rows.length;
-      for (const row of rows) {
-        if (Object.prototype.hasOwnProperty.call(porStatus, row.status)) porStatus.set(row.status, porStatus.get(row.status) + 1);
+       porTipo[meta.kind] += rows.length;
+       total += rows.length;
+       for (const row of rows) {
+         if (porStatus.has(row.status)) porStatus.set(row.status, porStatus.get(row.status) + 1);
         if (row.outcome) {
           porDesfecho.set(row.outcome, (porDesfecho.get(row.outcome) || 0) + 1);
           if (row.outcome === 'faltou') faltas += 1;
@@ -519,9 +519,6 @@ router.get('/agenda/reports', async (req, res, next) => {
       `SELECT professional_id, unit_id, weekday, start_time, end_time
        FROM work_schedules WHERE active = 1`
     );
-    const [blocks] = await pool.query(
-      `SELECT professional_id, starts_at, ends_at FROM schedule_blocks`
-    );
     let minutosOfertados = 0;
     const inicio = new Date(de);
     const fim = new Date(ate);
@@ -529,7 +526,7 @@ router.get('/agenda/reports', async (req, res, next) => {
       const wd = d.getDay();
       for (const s of schedules) {
         if (Number(s.weekday) !== wd) continue;
-        if (unitId && false) continue;
+
         const start = String(s.start_time).slice(0, 5).split(':').map(Number);
         const end = String(s.end_time).slice(0, 5).split(':').map(Number);
         minutosOfertados += Math.max(0, (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]));

@@ -11,6 +11,7 @@ const { verifyToken, requireStaff } = require('../middleware/auth');
 const { requireCapability } = require('../middleware/capabilities');
 const { rndsConfig, buildRACBundle, validateBundle, sendBundle } = require('../services/rnds');
 const { govbrConfig } = require('../services/govbr');
+const { cnsConfig } = require('../services/cns');
 
 const router = express.Router();
 router.use(verifyToken, requireStaff);
@@ -23,11 +24,13 @@ const ENTITY = {
 router.get('/status', (req, res) => {
   const rnds = rndsConfig();
   const govbr = govbrConfig();
+  const cns = cnsConfig();
   res.json({
     cnes: { municipio: process.env.CNES_MUNICIPIO_CODE || '260850' },
     infodengue: { geocode: process.env.INFODENGUE_GEOCODE || '2608503' },
     rnds: { env: rnds.env, uf: rnds.uf, base: rnds.base, configured: rnds.configured },
     govbr: { base: govbr.base, configured: govbr.configured },
+    cns: { base: cns.base, configured: cns.configured },
   });
 });
 

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Manager Demo - Saúde+</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="assets/event-manager.css">
+</head>
+<body>
+  <main class="container" style="padding:2rem 1rem">
+    <h1 style="margin-bottom:1rem">Event Manager (HTML/CSS/JS)</h1>
+    <div id="eventManagerDemo"></div>
+  </main>
+  <script defer src="assets/event-manager.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (!window.initEventManager) return;
+      var demoEvents = [
+        { id: "1", title: "Reunião de equipe", description: "Sincronização diária", startTime: new Date(2026, 9, 20, 9, 0), endTime: new Date(2026, 9, 20, 9, 30), color: "blue", category: "Meeting", tags: ["Work", "Team"] },
+        { id: "2", title: "Revisão de design", description: "Mockups do painel", startTime: new Date(2026, 9, 20, 14, 0), endTime: new Date(2026, 9, 20, 15, 30), color: "purple", category: "Meeting", tags: ["Important", "Client"] },
+        { id: "3", title: "Revisão de código", description: "PRs de autenticação", startTime: new Date(2026, 9, 21, 10, 0), endTime: new Date(2026, 9, 21, 11, 0), color: "green", category: "Task", tags: ["Work", "Urgent"] }
+      ];
+      window.initEventManager(document.getElementById("eventManagerDemo"), {
+        events: demoEvents,
+        categories: ["Meeting", "Task", "Reminder", "Personal"],
+        availableTags: ["Important", "Urgent", "Work", "Personal", "Team", "Client"],
+        defaultView: "month",
+        onEventCreate: function (event) { console.log("Created", event); },
+        onEventUpdate: function (id, event) { console.log("Updated", id, event); },
+        onEventDelete: function (id) { console.log("Deleted", id); }
+      });
+    });
+  </script>
+</body>
+</html>

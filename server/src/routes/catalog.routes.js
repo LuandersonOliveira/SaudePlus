@@ -11,10 +11,22 @@
 const express = require('express');
 const pool = require('../db');
 const { verifyToken } = require('../middleware/auth');
-const { KINDS, TIPOS, getAvailability, findAvailabilityByService } = require('../utils/booking');
+const {
+  KINDS, TIPOS, getAvailability, findAvailabilityByService, resolveAvailabilityWindow,
+  prioridadeDoUsuario,
+} = require('../utils/booking');
 
 const router = express.Router();
 router.use(verifyToken);
+
+// Data-base do recorte: hoje + offset em dias, no fuso local do servidor.
+// O offset existe para o painel pedir a próxima página de 30 dias sem
+// recalcular datas no cliente.
+function fromDateAfter(offsetDays) {
+  const d = new Date();
+  if (offsetDays) d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 // GET /catalog/offers?unit_id=&kind=consulta|exame
 // Especialidades (ou tipos de exame) oferecidos pela unidade.
@@ -55,26 +67,29 @@ router.get('/professionals', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /catalog/availability?unit_id=&kind=&name=&professional_id=&days=30
+// GET /catalog/availability?unit_id=&kind=&name=&professional_id=&days=30&offset_days=0
 // Dias com horários livres + horários de cada dia (já com conflitos removidos).
+// `days` é limitado a 30; `offset_days` pede a página seguinte (máx. 336).
 router.get('/availability', async (req, res, next) => {
   try {
     const { unit_id: unitId, kind, name, professional_id: professionalId } = req.query;
-    const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 60);
+    const { days, offsetDays } = resolveAvailabilityWindow({
+      days: req.query.days,
+      offsetDays: req.query.offset_days,
+    });
     const excludeId = String(req.query.exclude_id || '').trim() || null;
     if (!unitId || !KINDS.includes(kind)) {
       return res.status(400).json({ error: 'unit_id e kind são obrigatórios.' });
     }
-    const from = new Date();
-    const fromDate = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`;
     const result = await getAvailability(pool, {
       unitId,
       professionalId: professionalId || null,
       kind,
       serviceName: name || '',
-      fromDate,
+      fromDate: fromDateAfter(offsetDays),
       days,
       excludeId,
+      userPriority: await prioridadeDoUsuario(pool, req.user.id),
     });
     res.json(result);
   } catch (err) { next(err); }
@@ -102,15 +117,19 @@ router.get('/services', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /catalog/slots?tipo=&name=&days=30&exclude_id=
+// GET /catalog/slots?tipo=&name=&days=30&offset_days=0&exclude_id=
 // Cartões de unidades e dias com VAGAS LIVRES DE VERDADE para o serviço
 // (Fase 1, item 1). Agrega todos os profissionais; conflitos de 30 min e
 // bloqueios já vêm removidos. Só retorna unidades/dias com pelo menos 1 vaga.
+// `days` é limitado a 30; `offset_days` pede a página seguinte (máx. 336).
 router.get('/slots', async (req, res, next) => {
   try {
     const tipo = req.query.tipo || req.query.kind;
     const name = String(req.query.name || '').trim();
-    const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 60);
+    const { days, offsetDays } = resolveAvailabilityWindow({
+      days: req.query.days,
+      offsetDays: req.query.offset_days,
+    });
     const excludeId = String(req.query.exclude_id || '').trim() || null;
     if (!TIPOS[tipo]) {
       return res.status(400).json({ error: 'tipo deve ser consulta ou exame.' });
@@ -118,14 +137,13 @@ router.get('/slots', async (req, res, next) => {
     if (!name) {
       return res.status(400).json({ error: 'name (nome do serviço) é obrigatório.' });
     }
-    const from = new Date();
-    const fromDate = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`;
     const result = await findAvailabilityByService(pool, {
       tipo,
       servico: name,
-      fromDate,
+      fromDate: fromDateAfter(offsetDays),
       days,
       excludeId,
+      userPriority: await prioridadeDoUsuario(pool, req.user.id),
     });
     res.json(result);
   } catch (err) { next(err); }

@@ -809,7 +809,6 @@ async function applyBookingChange(db, opts) {
     if (reason === null && (opts.autoReason || opts.defaultReason)) {
       reason = opts.autoReason || opts.defaultReason;
     }
-    const reasonEntrou = temMotivo || ((opts.autoReason || opts.defaultReason) && scheduled_at);
     if (temMotivo || reason !== null) {
       // Motivo só entra como coluna quando o chamador o enviou ou há default.
       if (temMotivo || (opts.autoReason || opts.defaultReason)) {
@@ -830,7 +829,6 @@ async function applyBookingChange(db, opts) {
     // Motivo obrigatório ao reagendar (salvo quando há default/paciente). A
     // exigência real depende do horário mudar de fato; uma gravação no mesmo
     // horário (salvar sem mudar) não precisa de justificativa.
-    const reagendando = Boolean(scheduled_at);
     const motivoObrigatorio = opts.reasonRequired !== undefined
       ? opts.reasonRequired
       : !opts.autoReason && !opts.defaultReason;

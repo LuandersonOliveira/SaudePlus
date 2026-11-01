@@ -51,6 +51,8 @@
       tipo: "all",
       unitId: "",
       professionalId: "",
+      status: "",
+      units: [],
       items: [],
       monthDays: [],
       patients: [],
@@ -68,10 +70,19 @@
       + "<button type=\"button\" class=\"btn btn-outline btn-sm\" data-action=\"relatorio\">Relatório</button>"
       + "<button type=\"button\" class=\"btn btn-primary btn-sm\" data-action=\"novo\">Novo agendamento</button>"
       + "</div>"
-      + "<div class=\"grid grid-3\" style=\"gap:12px;margin-bottom:12px\">"
+      + "<div class=\"grid grid-4\" style=\"gap:12px;margin-bottom:12px\">"
       + "<div class=\"field\"><label>Data</label><input class=\"input\" type=\"date\" data-field=\"date\"></div>"
       + "<div class=\"field\"><label>Tipo</label><select class=\"select\" data-field=\"tipo\"><option value=\"all\">Todos</option><option value=\"consulta\">Consultas</option><option value=\"exame\">Exames</option></select></div>"
-      + "<div class=\"field\"><label>Unidade</label><input class=\"input\" data-field=\"unit\" placeholder=\"Id da unidade (opcional)\"></div>"
+      + "<div class=\"field\"><label>Status</label><select class=\"select\" data-field=\"status\"><option value=\"\">Todos os status</option><option value=\"pendente\">Pendente</option><option value=\"confirmado\">Confirmado</option><option value=\"para_remarcar\">Para remarcar</option><option value=\"concluido\">Concluído</option><option value=\"cancelado\">Cancelado</option></select></div>"
+      + "<div class=\"field\"><label>Unidade</label><select class=\"select\" data-field=\"unit\"><option value=\"\">Todas as unidades</option></select></div>"
+      + "</div>"
+      + "<div class=\"field\" style=\"margin-bottom:12px\"><label>Profissional (id)</label><input class=\"input\" data-field=\"professional\" placeholder=\"Deixe em branco para todos\"></div>"
+      + "<div class=\"row\" style=\"gap:8px;margin-bottom:12px;flex-wrap:wrap\">"
+      + "<span class=\"grade-legenda\"><span class=\"badge\">Livre</span> livre</span>"
+      + "<span class=\"grade-legenda\"><span class=\"badge\">Ocupado</span> ocupado</span>"
+      + "<span class=\"grade-legenda\"><span class=\"badge\">Bloqueado</span> bloqueado</span>"
+      + "<span class=\"grade-legenda\"><span class=\"badge\">Reservado</span> reservado</span>"
+      + "<span class=\"grade-legenda\"><span class=\"badge\">Passado</span> passado</span>"
       + "</div>"
       + "<div class=\"card\" style=\"margin-bottom:12px\"><h3>Resumo do dia</h3><div data-summary></div></div>"
       + "<div class=\"grid grid-2\" style=\"gap:12px\">"
@@ -83,9 +94,23 @@
     function q(sel) { return root.querySelector(sel); }
     function qa(sel) { return Array.prototype.slice.call(root.querySelectorAll(sel)); }
 
+    async function carregarUnidades() {
+      try {
+        var rows = await apiGet("/health-units");
+        var sel = q("[data-field='unit']");
+        if (!sel) return;
+        var html = "<option value=\"\">Todas as unidades</option>";
+        for (var i = 0; i < (rows || []).length; i++) {
+          html += "<option value=\"" + esc(rows[i].id) + "\">" + esc(rows[i].name || rows[i].id) + "</option>";
+        }
+        sel.innerHTML = html;
+      } catch (e) {}
+    }
     async function carregarDia() {
       var url = "/staff/agenda?date=" + encodeURIComponent(state.date) + "&tipo=" + encodeURIComponent(state.tipo);
       if (state.unitId) url += "&unit_id=" + encodeURIComponent(state.unitId);
+      if (state.professionalId) url += "&professional_id=" + encodeURIComponent(state.professionalId);
+      if (state.status) url += "&status=" + encodeURIComponent(state.status);
       var data = await apiGet(url);
       state.items = (data && data.items) ? data.items : [];
       renderResumo(data && data.summary);
@@ -133,6 +158,8 @@
     async function carregarMes() {
       var url = "/staff/agenda/month?month=" + encodeURIComponent(state.month) + "&tipo=" + encodeURIComponent(state.tipo);
       if (state.unitId) url += "&unit_id=" + encodeURIComponent(state.unitId);
+      if (state.professionalId) url += "&professional_id=" + encodeURIComponent(state.professionalId);
+      if (state.status) url += "&status=" + encodeURIComponent(state.status);
       var data = await apiGet(url);
       state.monthDays = (data && data.days) ? data.days : [];
       q("[data-month-label]").textContent = state.month;
@@ -167,7 +194,7 @@
     }
 
     async function acaoConfirmar(kind, id) {
-      await apiPatch("/staff/" + kind + "s/" + encodeURIComponent(id), { status: "confirmado" });
+      await apiPatch("/staff/" + (kind === "consulta" ? "appointments" : "exams") + "/" + encodeURIComponent(id), { status: "confirmado" });
       toast("Confirmado", "success");
       await carregarDia();
     }
@@ -175,7 +202,7 @@
     async function acaoCancelar(kind, id) {
       var motivo = window.prompt("Motivo do cancelamento:");
       if (!motivo) return;
-      await apiPatch("/staff/" + kind + "s/" + encodeURIComponent(id), { status: "cancelado", reschedule_reason: motivo, outcome: "recusou" });
+      await apiPatch("/staff/" + (kind === "consulta" ? "appointments" : "exams") + "/" + encodeURIComponent(id), { status: "cancelado", reschedule_reason: motivo, outcome: "recusou" });
       toast("Cancelado", "success");
       await carregarDia();
     }
@@ -183,7 +210,7 @@
     async function acaoConcluir(kind, id) {
       var outcome = window.prompt("Desfecho (compareceu, faltou, recusou, desistiu):", "compareceu");
       if (!outcome) return;
-      await apiPatch("/staff/" + kind + "s/" + encodeURIComponent(id), { status: "concluido", outcome: outcome });
+      await apiPatch("/staff/" + (kind === "consulta" ? "appointments" : "exams") + "/" + encodeURIComponent(id), { status: "concluido", outcome: outcome });
       toast("Registrado", "success");
       await carregarDia();
     }
@@ -215,7 +242,7 @@
       var quando = window.prompt("Nova data e hora (YYYY-MM-DD HH:MM:SS):");
       if (!quando) return;
       var motivo = window.prompt("Motivo da remarcação:") || "solicitado_pelo_paciente";
-      await apiPatch("/staff/" + kind + "s/" + encodeURIComponent(id), { scheduled_at: quando, reschedule_reason: motivo });
+      await apiPatch("/staff/" + (kind === "consulta" ? "appointments" : "exams") + "/" + encodeURIComponent(id), { scheduled_at: quando, reschedule_reason: motivo });
       toast("Remarcado", "success");
       state.date = quando.slice(0, 10);
       q("[data-field='date']").value = state.date;
@@ -316,11 +343,15 @@
       el.addEventListener("change", function () {
         state.date = q("[data-field='date']").value || state.date;
         state.tipo = q("[data-field='tipo']").value || "all";
-        state.unitId = q("[data-field='unit']").value.trim();
+        state.status = q("[data-field='status']") ? q("[data-field='status']").value : "";
+        state.unitId = q("[data-field='unit']") ? q("[data-field='unit']").value.trim() : "";
+        var professionalField = q("[data-field='professional']");
+        state.professionalId = professionalField ? professionalField.value.trim() : "";
         atualizar();
       });
     });
 
+    carregarUnidades();
     q("[data-field='date']").value = state.date;
     atualizar();
   }

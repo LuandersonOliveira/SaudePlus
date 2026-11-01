@@ -35,6 +35,7 @@
     "sync:cnes": "node scripts/sync-cnes.js",
     "sync:alerts": "node scripts/sync-alerts.js",
     "test:rnds": "node scripts/test-rnds.js",
+    "test:cns": "node scripts/test-cns.js",
     "smoke-test": "node scripts/smoke-test.js"
   },
   "dependencies": {

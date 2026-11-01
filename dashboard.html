@@ -184,6 +184,14 @@
           </div>
         </form>
       </div>
+      <div class="card mt-4">
+        <h2>Lista de espera</h2>
+        <p class="muted card-sub mb-4">Se um horário abrir para um serviço em que você está
+          esperando, o Saúde+ agenda automaticamente e avisa por e-mail.</p>
+        <div id="waitlistList">
+          <div class="empty">Nenhum serviço na lista de espera.</div>
+        </div>
+      </div>
     </section>
 
     <!-- ALERTAS -->
@@ -536,7 +544,11 @@
         return '<div class="slot-empty"><span class="spinner"></span> Buscando vagas livres...</div>';
       }
       if (!s.unidades.length) {
-        return `<div class="slot-empty">${esc(s.erro || 'Nenhuma vaga livre para este serviço nos próximos dias.')}</div>`;
+        return `<div class="slot-empty">${esc(s.erro || 'Nenhuma vaga livre para este serviço nos próximos dias.')}` +
+          (s.servico && s.servico !== BOOKING_FORMS[kindKey].otherValue
+            ? `<div class="mt-2"><button class="btn btn-outline btn-sm" type="button" ` +
+              `onclick="joinWaitlist('${kindKey}')">Entrar na lista de espera</button></div>` : '') +
+          '</div>';
       }
       return `<p class="muted text-sm mb-1">${s.totalVagas} horário(s) livre(s) em ${s.unidades.length} unidade(s).</p>` +
         s.unidades.map((u) => unitCardHtml(s, kindKey, u)).join('');
@@ -919,6 +931,7 @@
         await loadBookingServices('appointments');
         await loadBookingServices('exams');
         await loadAll();
+        await loadWaitlist();
         refreshMfaStatus();
         initProfile();
         // P5.3: restaura rascunhos (precisa das unidades já carregadas).
@@ -1001,6 +1014,63 @@
       if (err.status >= 500) return 'O servidor teve um problema. Tente de novo em instantes.';
       return err.message || fallback;
     }
+
+    /* NV03 — lista de espera: a vaga é convertida pelo servidor no
+       cancelamento, sem ação do paciente. Aqui só mostramos/gerenciamos. */
+    async function loadWaitlist() {
+      const container = document.getElementById('waitlistList');
+      if (!container) return;
+      try {
+        const rows = await apiGet('/me/waitlist');
+        const lista = Array.isArray(rows) ? rows : [];
+        if (!lista.length) {
+          container.innerHTML = '<div class="empty">Nenhum serviço na lista de espera.</div>';
+          return;
+        }
+        container.innerHTML = lista.map((r) => {
+          const tipo = r.kind === 'exame' ? 'Exame' : 'Consulta';
+          const aguardando = r.status === 'aguardando';
+          const estado = aguardando
+            ? 'Aguardando vaga'
+            : r.status === 'convertido'
+              ? 'Vaga convertida em agendamento'
+              : 'Cancelada';
+          return `<div class="item"><div>
+            <h3><span class="badge mr-1">${esc(tipo)}</span>${esc(r.service_name)}</h3>
+            <p><span class="badge ${aguardando ? 'badge-warning' : ''}">${esc(estado)}</span></p>
+          </div><div class="row">
+            <span class="muted">${fmtDate(r.created_at)}</span>
+            ${aguardando ? `<button class="btn btn-outline btn-sm" type="button" data-waitlist-id="${esc(r.id)}" onclick="leaveWaitlist(this.getAttribute('data-waitlist-id'))">Sair da lista</button>` : ''}
+          </div></div>`;
+        }).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="empty">${esc(loadErrorMessage(err, 'Não foi possível carregar a lista de espera.'))}</div>`;
+      }
+    }
+
+    window.joinWaitlist = async function (kindKey) {
+      const m = BOOKING_FORMS[kindKey];
+      const s = bookingState[kindKey];
+      if (!m || !s.servico || s.servico === m.otherValue) return;
+      try {
+        await apiPost('/me/waitlist', { kind: m.tipo, service_name: s.servico });
+        toast('Você entrou na lista de espera. Avisaremos quando abrir vaga.', 'success');
+        await loadWaitlist();
+      } catch (err) {
+        toast(loadErrorMessage(err, 'Não foi possível entrar na lista de espera.'), 'error');
+      }
+    };
+
+    window.leaveWaitlist = async function (id) {
+      if (!window.confirm('Sair da lista de espera deste serviço?')) return;
+      try {
+        await apiDelete('/me/waitlist/' + encodeURIComponent(id));
+        toast('Você saiu da lista de espera.', 'success');
+        await loadWaitlist();
+      } catch (err) {
+        toast(loadErrorMessage(err, 'Não foi possível sair da lista de espera.'), 'error');
+      }
+    };
 
     /* As quatro fontes alimentam mais de um container cada. allSettled para
        que a falha de uma não mate as outras; cada seção quebrada mostra

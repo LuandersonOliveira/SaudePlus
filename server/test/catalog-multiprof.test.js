@@ -66,6 +66,8 @@ async function slotsDe(extra = {}) {
     serviceName: 'Clínica Geral',
     fromDate: DIA_SQL,
     days: 7,
+    // Esta suíte testa agregação por profissional, não a cota do NV02.
+    userPriority: 'idoso',
     ...extra,
   });
 }
