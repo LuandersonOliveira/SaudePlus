@@ -3,6 +3,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const { ehHorarioOcupado, MENSAGEM_HORARIO_OCUPADO } = require('./utils/dbErrors');
 const cookieParser = require('cookie-parser');
 const { globalLimiter, authLimiter, readinessLimiter } = require('./middleware/rateLimit');
 const { attachAudit } = require('./middleware/audit');
@@ -133,6 +134,10 @@ app.use((err, req, res, next) => {
   // Integrações opcionais (Gov.br, RNDS) usam err.status/code próprios.
   if (err && err.status && err.status >= 400 && err.status < 600) {
     return res.status(err.status).json({ error: err.message, code: err.code || undefined });
+  }
+  // B2: o banco recusou um segundo atendimento ativo no mesmo horário do profissional.
+  if (ehHorarioOcupado(err)) {
+    return res.status(409).json({ error: MENSAGEM_HORARIO_OCUPADO });
   }
   console.error(err);
   res.status(500).json({ error: 'Erro interno do servidor.' });

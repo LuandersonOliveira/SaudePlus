@@ -59,7 +59,9 @@ Resumo do modelo: `users` (40 colunas) concentra perfil, credenciais, MFA, conse
 `appointments`/`exams` têm `unit_id` e `professional_id`, mas **só `user_id` tem FK** (`schema.sql`). Não há índice em `unit_id`. Também guardam `location`, `doctor`, `specialty` como texto livre copiado no momento do agendamento. Consequências: ids órfãos possíveis; renomear uma unidade não reflete nos agendamentos antigos (pode ser desejado como "foto", mas hoje não é decisão documentada); consultas por unidade fazem varredura.
 **Ação:** (1) auditar órfãos (`SELECT … WHERE unit_id IS NOT NULL AND unit_id NOT IN (SELECT id FROM health_units)`); (2) adicionar FKs `ON DELETE SET NULL` + `INDEX (unit_id, scheduled_at)`; (3) documentar que `location/doctor` são a "foto" do momento.
 
-### B2 — Exclusividade de horário só na aplicação (média)
+### B2 — Exclusividade de horário só na aplicação (média) — **FEITO em 2026-11-01**
+**Implementado:** `active_slot` (coluna gerada `STORED`) + `UNIQUE (professional_id, active_slot)` em `appointments` e `exams` (no `schema.sql` e na migration `0005_horario_unico`, que PARA e lista ids se houver horário ativo duplicado). O erro `ER_DUP_ENTRY` do banco vira 409 "Horário já ocupado" no handler global (`utils/dbErrors.js`), a mesma resposta do conflito detectado pelo `FOR UPDATE`. Cancelado/concluído/para_remarcar liberam o horário. Limites mantidos: `professional_id` NULL não é protegido e a sobreposição por duração fica na aplicação. Testes: `horario-unico.test.js` (18, inclui 20 conexões simultâneas → 1 vence). Texto original abaixo.
+
 Não há restrição no banco contra dois agendamentos no mesmo (profissional, horário); a garantia vem de `SELECT … FOR UPDATE` dentro de transação (`utils/booking.js:321/849/950`) e dos testes de corrida. Funciona e está testado, mas depende de todo novo caminho de escrita lembrar do padrão.
 **Ação:** rede de proteção no banco: coluna gerada `active_slot = IF(status IN ('pendente','confirmado'), scheduled_at, NULL)` + `UNIQUE (professional_id, active_slot)`. Cobre o caso exato; sobreposição por duração continua na aplicação.
 
@@ -105,7 +107,7 @@ CPF/RG/CNS usam AES-256-GCM (correto), mas sem um *blind index* (HMAC do CPF). E
 | 5 | ~~A3 migrations numeradas~~ **feito** (ADR-0008; 13 migrations de estrutura removidas, 4 de dados numeradas) | M | habilita todas as mudanças de banco acima com segurança |
 | 6 | A1/A2 serviços + validação Zod, começando por `auth` | L | manutenção; faça junto de cada mudança, não como projeto à parte |
 | 7 | A7 aposentar legado, A6 higiene, A8 bundle | S–M | redução de superfície |
-| 8 | B2 índice único de horário, A5 request id/logs | S | defesa em profundidade e operação |
+| 8 | ~~B2 índice único de horário~~ **feito**, A5 request id/logs | S | defesa em profundidade e operação |
 
 S ≤ 1 dia · M 2–4 dias · L > 1 semana (estimativas de ordem de grandeza).
 

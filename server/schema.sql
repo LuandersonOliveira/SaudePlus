@@ -214,6 +214,12 @@ CREATE TABLE IF NOT EXISTS appointments (
     outcome VARCHAR(40) NULL DEFAULT NULL,
     reschedule_reason VARCHAR(255) NULL DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- RFC-0001 B2: o horário só vale enquanto o atendimento está ATIVO (pendente ou
+    -- confirmado). Cancelado, concluído e para_remarcar viram NULL e liberam o horário
+    -- (NULL não conflita no UNIQUE). Segunda barreira, no banco, contra dois
+    -- registros ativos do mesmo profissional no mesmo instante; o FOR UPDATE e a
+    -- validação de duração/sobreposição continuam na aplicação.
+    active_slot DATETIME GENERATED ALWAYS AS (IF(status IN ('pendente', 'confirmado'), scheduled_at, NULL)) STORED,
     CONSTRAINT fk_appointments_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     CONSTRAINT fk_appointments_unit FOREIGN KEY (unit_id) REFERENCES health_units (id) ON DELETE SET NULL,
     CONSTRAINT fk_appointments_professional FOREIGN KEY (professional_id) REFERENCES professionals (id) ON DELETE SET NULL,
@@ -222,7 +228,8 @@ CREATE TABLE IF NOT EXISTS appointments (
     INDEX idx_appointments_user_scheduled (user_id, scheduled_at),
     INDEX idx_appointments_prof_scheduled (professional_id, scheduled_at),
     INDEX idx_appointments_unit_scheduled (unit_id, scheduled_at),
-    INDEX idx_appointments_status_scheduled (status, scheduled_at)
+    INDEX idx_appointments_status_scheduled (status, scheduled_at),
+    UNIQUE KEY uq_appointments_prof_active_slot (professional_id, active_slot)
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -292,6 +299,12 @@ CREATE TABLE IF NOT EXISTS exams (
     outcome VARCHAR(40) NULL DEFAULT NULL,
     reschedule_reason VARCHAR(255) NULL DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- RFC-0001 B2: o horário só vale enquanto o atendimento está ATIVO (pendente ou
+    -- confirmado). Cancelado, concluído e para_remarcar viram NULL e liberam o horário
+    -- (NULL não conflita no UNIQUE). Segunda barreira, no banco, contra dois
+    -- registros ativos do mesmo profissional no mesmo instante; o FOR UPDATE e a
+    -- validação de duração/sobreposição continuam na aplicação.
+    active_slot DATETIME GENERATED ALWAYS AS (IF(status IN ('pendente', 'confirmado'), scheduled_at, NULL)) STORED,
     CONSTRAINT fk_exams_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     CONSTRAINT fk_exams_unit FOREIGN KEY (unit_id) REFERENCES health_units (id) ON DELETE SET NULL,
     CONSTRAINT fk_exams_professional FOREIGN KEY (professional_id) REFERENCES professionals (id) ON DELETE SET NULL,
@@ -300,7 +313,8 @@ CREATE TABLE IF NOT EXISTS exams (
     INDEX idx_exams_user_scheduled (user_id, scheduled_at),
     INDEX idx_exams_prof_scheduled (professional_id, scheduled_at),
     INDEX idx_exams_unit_scheduled (unit_id, scheduled_at),
-    INDEX idx_exams_status_scheduled (status, scheduled_at)
+    INDEX idx_exams_status_scheduled (status, scheduled_at),
+    UNIQUE KEY uq_exams_prof_active_slot (professional_id, active_slot)
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------

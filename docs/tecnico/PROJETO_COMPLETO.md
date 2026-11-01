@@ -290,7 +290,7 @@ Design system com variáveis de cor/tipografia, componentes, responsividade, foc
 
 ### Migrations numeradas
 
-A estrutura vem do `schema.sql`. `server/migrations/NNNN_*.js` guarda só o que mexe em dados de bancos existentes, aplicado em ordem por `scripts/migrate.js` e registrado em `schema_migrations`: `0001` documentos cifrados, `0002` índice cego do CPF, `0003` MFA base32, `0004` órfãos/FKs de agendamento.
+A estrutura vem do `schema.sql`. `server/migrations/NNNN_*.js` guarda só o que mexe em dados de bancos existentes, aplicado em ordem por `scripts/migrate.js` e registrado em `schema_migrations`: `0001` documentos cifrados, `0002` índice cego do CPF, `0003` MFA base32, `0004` órfãos/FKs de agendamento, `0005` horário único por profissional.
 
 ### Scripts operacionais
 

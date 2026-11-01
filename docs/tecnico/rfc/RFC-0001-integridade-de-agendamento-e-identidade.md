@@ -79,6 +79,6 @@ Coluna `cpf_hmac CHAR(64)` com `UNIQUE`, calculada com HMAC-SHA256 sobre os 11 d
 
 ## 9. Histórico de comentários
 
-- 2026-11-01 — B1 implementado (`2b51368`). Perguntas 1 e 3 decididas com o responsável do projeto; B3 implementado (ADR-0006 aceita). B2 (horário único) segue pendente.
+- 2026-11-01 — B1 implementado (`2b51368`). Perguntas 1 e 3 decididas com o responsável do projeto; B3 implementado (ADR-0006 aceita). B2 (horário único) implementado (migration 0005, ADR-0007 aceita). RFC integralmente implementada; perguntas 2 e 4 seguem abertas.
 
 _(registrar aqui data, autor e decisão a cada rodada)_

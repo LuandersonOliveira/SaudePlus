@@ -36,6 +36,9 @@ const COLUNAS_ESPERADAS = [
   ['users', 'cns'],
   // RFC-0001 B3: sem ela o cadastro dá 500 e "um CPF, uma conta" não vale.
   ['users', 'cpf_hmac'],
+  // RFC-0001 B2: sem elas o banco deixa de barrar dois atendimentos no mesmo horário.
+  ['appointments', 'active_slot'],
+  ['exams', 'active_slot'],
   ['users', 'job_role'],
   // Fase 5, migration 007: o INSERT do agendamento e o cálculo de conflito
   // referenciam estas duas; sem elas, agendar dá 500.

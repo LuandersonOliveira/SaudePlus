@@ -203,7 +203,8 @@ test('admin reagenda para vaga reservada conforme a prioridade do PACIENTE', asy
   assert.equal(negado.status, 409, JSON.stringify(negadoBody));
   assert.match(negadoBody.error, /prioritário/i);
 
-  const doPrioritario = await inserirAgendamento(P.prioritario, '09:00');
+  // Outro horário: o banco recusa dois atendimentos ativos do mesmo profissional no mesmo instante (B2).
+  const doPrioritario = await inserirAgendamento(P.prioritario, '10:00');
   const permitido = await fetch(`${base}/admin/appointments/${doPrioritario}`, {
     method: 'PATCH',
     headers: auth('admin'),
