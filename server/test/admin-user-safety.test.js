@@ -49,10 +49,16 @@ test('excluir, desativar, rebaixar ou trocar senha revoga sessão e reset penden
 });
 
 test('promover uma conta a admin exige a capability admins', () => {
+  // A regra mora em utils/adminHierarchy.js (bloqueioDePapel, testada em admin-hierarchy.test.js);
+  // a rota precisa entregar a capability do ator a ela.
   assert.match(
     USERS,
-    /role === 'admin' && currentUser\.role !== 'admin' && !pode\('admins', req\.user\)/,
+    /H\.bloqueioDePapel\(\{ actor: req\.user, alvo: currentUser, novoPapel: role, podeAdmins \}\)/,
     'sem este guard um gestor (que tem users) promovia qualquer conta a admin'
+  );
+  assert.match(
+    require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'src', 'utils', 'adminHierarchy.js'), 'utf8'),
+    /novoPapel === 'admin' && alvo\.role !== 'admin' && !podeAdmins/
   );
 });
 

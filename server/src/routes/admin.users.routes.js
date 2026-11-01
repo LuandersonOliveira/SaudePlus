@@ -4,6 +4,8 @@ const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { requireCapability, pode } = require('../middleware/capabilities');
 const { audit } = require('../middleware/audit');
 const { emailSchema } = require('../utils/validators');
+const H = require('../utils/adminHierarchy');
+const { SAFE_ROLES, SAFE_STATUSES } = H;
 
 const router = express.Router();
 router.use(verifyToken, requireAdmin);
@@ -13,25 +15,9 @@ router.use(verifyToken, requireAdmin);
 // qualquer admin (inclusive 'atendimento'/'alertas') tinha poder total aqui.
 router.use(requireCapability('users'));
 
-// Hierarquia de privilégio — impede escalonamento lateral (P0.4).
-// Um admin não pode alterar o status de alguém de nível igual ou superior.
-const LEVEL_RANK = { superadmin: 4, gestor: 3, atendimento: 2, alertas: 1 };
-
-// Sem `?? LEVEL_RANK.gestor`: nível ausente não pode virar gestor no cálculo
-// de rank — era o mesmo fail-open do middleware, aqui numa segunda forma.
-// Um alvo admin sem nível explícito simplesmente não é rebaixável por esta via.
-function rankDe(adminLevel) {
-  const r = LEVEL_RANK[adminLevel];
-  return typeof r === 'number' ? r : 0;
-}
-
-function actorRank(user) {
-  return rankDe(user && user.admin_level);
-}
-
-const SAFE_ROLES = ['paciente', 'atendente', 'admin'];
-const SAFE_STATUSES = ['ativo', 'inativo', 'pendente'];
-const SAFE_ADMIN_LEVELS = ['superadmin', 'gestor', 'atendimento', 'alertas'];
+// Hierarquia de privilégio (P0.4): as decisões vivem em utils/adminHierarchy.js (puras e testadas).
+// Cada uma devolve null (permitido) ou { status, error }.
+const recusar = (res, bloqueio) => res.status(bloqueio.status).json({ error: bloqueio.error });
 
 /**
  * Derruba as sessões e os links de redefinição pendentes do usuário.
@@ -145,14 +131,8 @@ router.patch('/:id', async (req, res, next) => {
     // Segurança (P0.4): escalonamento lateral. Um admin de nível inferior
     // (ou igual) não pode desativar nem rebaixar alguém de nível superior —
     // antes isso permitia, por exemplo, um 'atendimento' desativar o superadmin.
-    if (currentUser.role === 'admin') {
-      const targetRank = rankDe(currentUser.admin_level);
-      if (actorRank(req.user) <= targetRank) {
-        return res.status(403).json({
-          error: 'Você não pode alterar uma conta de nível administrativo igual ou superior ao seu.',
-        });
-      }
-    }
+    const porHierarquia = H.bloqueioPorHierarquia(req.user, currentUser);
+    if (porHierarquia) return recusar(res, porHierarquia);
 
     // Credenciais de conta administrativa (e-mail de login e senha) equivalem a
     // assumir a conta: e-mail novo + "esqueci a senha" dá acesso total. Por isso
@@ -160,17 +140,14 @@ router.patch('/:id', async (req, res, next) => {
     // gestor (tem 'users', não tem 'admins') tomava contas admin de nível menor.
     // Só vale quando o e-mail REALMENTE muda: os formulários reenviam o e-mail atual a cada gravação,
     // e isso não pode bloquear a edição de outros campos (celular, cargo…).
-    const trocaEmail = email !== undefined
-      && String(email ?? '').trim().toLowerCase() !== String(currentUser.email || '').trim().toLowerCase();
-    if (
-      currentUser.role === 'admin' &&
-      (trocaEmail || (password !== undefined && password !== '')) &&
-      !pode('admins', req.user)
-    ) {
-      return res.status(403).json({
-        error: 'Seu nível administrativo não permite alterar e-mail ou senha de administradores.',
-      });
-    }
+    const podeAdmins = pode('admins', req.user);
+    const porCredenciais = H.bloqueioDeCredenciais({
+      alvo: currentUser,
+      trocaEmail: H.emailMudou(email, currentUser.email),
+      trocaSenha: password !== undefined && password !== '',
+      podeAdmins,
+    });
+    if (porCredenciais) return recusar(res, porCredenciais);
 
     // Dados cadastrais: o painel edita nome, e-mail e telefones no mesmo
     // formulário que ativa a conta. Antes o PATCH ignorava esses campos em
@@ -221,26 +198,14 @@ router.patch('/:id', async (req, res, next) => {
     if (role !== undefined) {
       if (!SAFE_ROLES.includes(role)) return res.status(400).json({ error: 'Papel inválido.' });
       if (req.params.id === req.user.id) return res.status(400).json({ error: 'Você não pode alterar o próprio papel.' });
-      // Promover a admin é criar um par de privilégio: exige a capability
-      // 'admins'. Sem isto, um gestor (que tem 'users') promovia qualquer
-      // conta a administrador.
-      if (role === 'admin' && currentUser.role !== 'admin' && !pode('admins', req.user)) {
-        return res.status(403).json({ error: 'Seu nível administrativo não permite criar administradores.' });
-      }
-      if (currentUser.role === 'admin' && role !== 'admin') {
-        const targetRank = rankDe(currentUser.admin_level);
-        if (actorRank(req.user) <= targetRank) {
-          return res.status(403).json({ error: 'Você não pode rebaixar um administrador igual ou superior.' });
-        }
-      }
+      // Promover a admin é criar um par de privilégio ('admins'); rebaixar admin exige estar acima dele.
+      const porPapel = H.bloqueioDePapel({ actor: req.user, alvo: currentUser, novoPapel: role, podeAdmins });
+      if (porPapel) return recusar(res, porPapel);
       updates.push('role=?'); params.push(role);
     }
     if (admin_level !== undefined) {
-      if (!pode('admins', req.user)) return res.status(403).json({ error: 'Seu nível administrativo não permite alterar níveis de outros administradores.' });
-      if (!SAFE_ADMIN_LEVELS.includes(admin_level)) return res.status(400).json({ error: 'Nível administrativo inválido.' });
-      if ((LEVEL_RANK[admin_level] ?? 0) < actorRank(req.user)) {
-        return res.status(403).json({ error: 'Você não pode definir um nível abaixo do seu.' });
-      }
+      const porNivel = H.bloqueioDeNivel({ actor: req.user, novoNivel: admin_level, podeAdmins });
+      if (porNivel) return recusar(res, porNivel);
       updates.push('admin_level=?'); params.push(admin_level);
     }
     if (password !== undefined && password !== '') {
@@ -335,7 +300,8 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ error: 'Telefone excede o tamanho máximo (30 caracteres).' });
     }
     const r = role && SAFE_ROLES.includes(role) ? role : 'paciente';
-    if (r === 'admin' && !pode('admins', req.user)) return res.status(403).json({ error: 'Sem permissão para criar administradores.' });
+    const porCriacao = H.bloqueioDeCriacaoDeAdmin(r, pode('admins', req.user));
+    if (porCriacao) return recusar(res, porCriacao);
     const s = account_status && SAFE_STATUSES.includes(account_status) ? account_status : (r === 'atendente' ? 'pendente' : 'ativo');
     const normalizedEmail = parsedEmail.data;
     // A coluna `email` é UNIQUE global: e-mail de conta soft-deleted continua
@@ -394,12 +360,8 @@ router.delete('/:id', async (req, res, next) => {
       [req.params.id]
     );
     if (!currentUser) return res.status(404).json({ error: 'Usuário não encontrado.' });
-    if (currentUser.role === 'admin') {
-      const targetRank = rankDe(currentUser.admin_level);
-      if (actorRank(req.user) <= targetRank) {
-        return res.status(403).json({ error: 'Você não pode excluir um administrador igual ou superior.' });
-      }
-    }
+    const porExclusao = H.bloqueioDeExclusao(req.user, currentUser);
+    if (porExclusao) return recusar(res, porExclusao);
     await pool.query('UPDATE professionals SET user_id = NULL WHERE user_id = ?', [req.params.id]);
     await pool.query('UPDATE users SET deleted_at = NOW() WHERE id = ?', [req.params.id]);
     await revokeAccess(req.params.id);
