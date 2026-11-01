@@ -51,14 +51,16 @@ const emailField = z
   .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Informe um e-mail válido.')
 
 /** Campos da etapa 1 do cadastro (validados antes de avançar). */
-export const SIGNUP_STEP1_FIELDS = ['full_name', 'birth_date', 'cpf', 'mobile', 'guardian_name'] as const
+export const SIGNUP_STEP1_FIELDS = ['full_name', 'birth_date', 'cpf', 'cns', 'mobile', 'guardian_name'] as const
 
 // Cadastro mínimo (P4): o resto vai para "Meu perfil" depois do 1º login.
 export const signupSchema = z
   .object({
     full_name: z.string().trim().min(1, 'Informe seu nome completo.'),
     birth_date: z.string().min(1, 'Informe sua data de nascimento.'),
-    cpf: z.string().trim().min(1, 'Informe seu CPF.'),
+    // CPF: adulto exige; menor de 18 pode se cadastrar só com o CNS (ver superRefine).
+    cpf: z.string().trim(),
+    cns: z.string().trim().optional(),
     mobile: z.string().trim().min(1, 'Informe seu celular com DDD.'),
     guardian_name: z.string().trim().max(150).optional(),
     email: emailField,
@@ -70,8 +72,18 @@ export const signupSchema = z
     if (v.birth_date && (age === null || age < 0 || age > 130)) {
       ctx.addIssue({ code: 'custom', path: ['birth_date'], message: 'Data de nascimento inválida.' })
     }
+    const menor = age !== null && age >= 0 && age < 18
+    if (!v.cpf && !menor) {
+      ctx.addIssue({ code: 'custom', path: ['cpf'], message: 'Informe seu CPF.' })
+    }
     if (v.cpf && !isValidCPF(v.cpf)) {
       ctx.addIssue({ code: 'custom', path: ['cpf'], message: 'CPF inválido. Confira os números digitados.' })
+    }
+    if (menor && !v.cpf && !v.cns) {
+      ctx.addIssue({ code: 'custom', path: ['cns'], message: 'Informe o CPF ou o Cartão SUS (CNS) do menor.' })
+    }
+    if (v.cns && !isValidCNS(v.cns)) {
+      ctx.addIssue({ code: 'custom', path: ['cns'], message: 'Cartão SUS inválido. Confira os 15 números do cartão.' })
     }
     if (age !== null && age >= 0 && age < 18 && !v.guardian_name?.trim()) {
       ctx.addIssue({

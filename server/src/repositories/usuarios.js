@@ -27,12 +27,19 @@ async function listar(db, { role, status, search, pageSize, offset }) {
     params.push(pattern, pattern, pattern, pattern);
   }
   const where = ` WHERE ${filters.join(' AND ')}`;
-  const [rows] = await db.query(
-    `SELECT ${COLUNAS_LISTA} FROM users${where} ORDER BY full_name LIMIT ? OFFSET ?`,
+  // O total vem da MESMA consulta da página (janela COUNT(*) OVER()): duas consultas separadas
+  // deixavam o total menor que a página quando alguém excluía/criava uma conta entre elas.
+  const [brutas] = await db.query(
+    `SELECT ${COLUNAS_LISTA}, COUNT(*) OVER() AS total_geral FROM users${where} ORDER BY full_name LIMIT ? OFFSET ?`,
     [...params, pageSize, offset]
   );
+  if (brutas.length) {
+    const total = Number(brutas[0].total_geral);
+    return { rows: brutas.map(({ total_geral: _t, ...linha }) => linha), total };
+  }
+  // Página vazia (fora do intervalo ou nada encontrado): aí sim a contagem separada.
   const [[contagem]] = await db.query(`SELECT COUNT(*) AS total FROM users u${where}`, params);
-  return { rows, total: Number(contagem.total) };
+  return { rows: [], total: Number(contagem.total) };
 }
 
 /** Perfil completo, com documentos AINDA CIFRADOS e o profissional vinculado. */

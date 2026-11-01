@@ -67,7 +67,7 @@ Coluna `cpf_hmac CHAR(64)` com `UNIQUE`, calculada com HMAC-SHA256 sobre os 11 d
 ## 7. Perguntas abertas (para os revisores)
 
 1. ~~Duplicatas de CPF: mesclar ou sinalizar?~~ **Decidido (2026-11-01):** só relatar; a migração para e lista os ids, sem mesclar contas.
-2. Dependentes e menores podem usar o CPF do responsável? Se sim, o `UNIQUE` quebra esse caso — ver como `guardian_name` é usado hoje. **Aberta:** hoje o cadastro exige CPF próprio e `guardian_name` é texto; o `UNIQUE` bloqueia quem tentar usar o CPF do responsável.
+2. ~~Dependentes e menores podem usar o CPF do responsável?~~ **Decidido (2026-11-01):** não se usa o CPF do responsável. Menor de 18 pode se cadastrar **sem CPF**, desde que informe o **CNS** (cifrado, como sempre); o responsável legal continua obrigatório e é registrado só pelo nome (`guardian_name`). CPF ausente fica `NULL`, que não colide no `UNIQUE (cpf_hmac)`. Se o menor tem CPF próprio, ele vale e é único como o de qualquer pessoa.
 3. ~~Onde fica a chave HMAC?~~ **Decidido (2026-11-01):** variável `CPF_HMAC_KEY`, separada da de cifra, exigida no boot; em produção, injetada pelo cofre/provedor (nunca no repositório nem nos backups do banco).
 4. Aceitamos que `ON DELETE SET NULL` deixe agendamentos antigos sem unidade, ou preferimos gravar também `unit_name` como texto (já existe `location`)?
 

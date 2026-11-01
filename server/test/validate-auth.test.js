@@ -110,6 +110,23 @@ test('signup: regras de negócio, cada uma com a sua mensagem e na ordem origina
   assert.equal(msgSignup({ ...baseOk(), priority: 'vip', race: 'x' }), 'Prioridade de atendimento inválida.');
 });
 
+test('signup: menor de 18 se cadastra sem CPF desde que informe o CNS; adulto exige CPF', () => {
+  const anoMenor = `${new Date().getFullYear() - 8}-01-01`;
+  const crianca = () => { const c = baseOk(); delete c.cpf; return { ...c, birth_date: anoMenor, guardian_name: 'Maria Silva' }; };
+  assert.equal(msgSignup(crianca()), 'Menores de 18 anos sem CPF precisam informar o Cartão SUS (CNS).');
+  assert.equal(msgSignup({ ...crianca(), cpf: '' }), 'Menores de 18 anos sem CPF precisam informar o Cartão SUS (CNS).', 'CPF vazio = sem CPF');
+  assert.equal(msgSignup({ ...crianca(), cns: '898001234567891' }), null, 'com CNS válido, sem CPF: passa');
+  assert.equal(msgSignup({ ...crianca(), cpf: null, cns: '898001234567891' }), null);
+  assert.match(msgSignup({ ...crianca(), cns: '123' }), /CNS/, 'CNS informado precisa ser válido');
+  assert.equal(msgSignup({ ...baseOk(), birth_date: anoMenor, guardian_name: 'Maria Silva' }), null, 'menor COM CPF não precisa de CNS');
+  assert.equal(msgSignup({ ...crianca(), cpf: '111.111.111-11' }), 'CPF inválido. Confira os números digitados.', 'CPF informado precisa ser válido, até para menor');
+  assert.equal(msgSignup({ ...crianca(), cns: '898001234567891', guardian_name: undefined }), 'Informe o nome do responsável legal para menores de 18 anos.', 'o responsável segue obrigatório');
+  // adulto
+  const adulto = baseOk(); delete adulto.cpf;
+  assert.equal(msgSignup(adulto), 'CPF inválido. Confira os números digitados.');
+  assert.equal(msgSignup({ ...adulto, cpf: '', cns: '898001234567891' }), 'CPF inválido. Confira os números digitados.', 'CNS não substitui o CPF de adulto');
+});
+
 // ---------------------------------------------------------------------------
 // Login, MFA, exclusão
 // ---------------------------------------------------------------------------

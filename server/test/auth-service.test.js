@@ -114,6 +114,23 @@ test('cadastrar: e-mail ou CPF repetido → 409 com mensagem própria', async ()
   assert.deepEqual([mesmoCpf.status, mesmoCpf.error], [409, 'CPF já cadastrado. Entre na conta existente ou recupere a senha.']);
 });
 
+test('cadastrar: menores sem CPF (só CNS) convivem — NULL não colide no UNIQUE do cpf_hmac', async () => {
+  const crianca = (nome) => ({
+    email: `menor-${crypto.randomUUID()}@test.local`, password: SENHA, full_name: nome,
+    birth_date: `${new Date().getFullYear() - 7}-03-01`, guardian_name: 'Responsável Legal', cns: '898001234567891',
+  });
+  const a = await cadastrar(crianca('Criança A'), { encrypt: encryptField, ip: 'x' });
+  const b = await cadastrar(crianca('Criança B'), { encrypt: encryptField, ip: 'x' });
+  assert.equal(a.ok, true, JSON.stringify(a));
+  assert.equal(b.ok, true, 'a segunda criança sem CPF não é barrada como duplicata');
+  CRIADOS.push(a.id, b.id);
+  const [[u]] = await pool.query('SELECT cpf, cpf_hmac, cns, guardian_name FROM users WHERE id = ?', [a.id]);
+  assert.equal(u.cpf, null);
+  assert.equal(u.cpf_hmac, null);
+  assert.equal(decryptField(u.cns), '898001234567891', 'o CNS fica cifrado, como sempre');
+  assert.equal(u.guardian_name, 'Responsável Legal');
+});
+
 // ---------------------------------------------------------------------------
 // autenticar
 // ---------------------------------------------------------------------------

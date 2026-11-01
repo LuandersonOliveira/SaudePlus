@@ -15,7 +15,7 @@ Adicionar `users.cpf_hmac CHAR(64)` com `UNIQUE`, igual a `HMAC-SHA256(CPF_HMAC_
 - Gov.br: `WHERE cpf_hmac = ?` e, no único candidato, `cpfIgual` sobre o CPF decifrado (o índice aponta; o dado cifrado decide).
 - Anonimização LGPD zera `cpf_hmac`, liberando o CPF.
 - Troca de chave: `npm run migrate:cpf:hmac -- --rehash`.
-- Limitação: menor de idade que use o CPF do responsável no cadastro passa a ser bloqueado (o `UNIQUE` vale para todos); hoje o cadastro exige CPF próprio e `guardian_name` é só texto.
+- Menores: não usam o CPF do responsável. Menor de 18 pode se cadastrar sem CPF (então o CNS é obrigatório); `cpf_hmac` fica `NULL`, que não colide no `UNIQUE`. O responsável legal é registrado só pelo nome.
 
 ## Alternativas
 - **Cifra determinística do CPF** — permite `UNIQUE` direto, mas expõe igualdade em todas as linhas e enfraquece a cifra; rejeitada.

@@ -6,7 +6,7 @@
    ========================================================================== */
 const { z } = require('zod');
 const {
-  signupSchema, ageInYears, VALID_PRIORITIES, VALID_RACES,
+  signupSchema, ageInYears, digitsOnly, VALID_PRIORITIES, VALID_RACES,
 } = require('../utils/validators');
 
 const vazio = (v) => v === undefined || v === null || v === '';
@@ -21,6 +21,14 @@ const signupBody = signupSchema.superRefine((d, ctx) => {
 
   const age = ageInYears(d.birth_date);
   if (age === null || age < 0 || age > 130) return erro('Data de nascimento inválida.');
+  // CPF: adulto exige. Menor de 18 pode se cadastrar sem CPF (criança costuma ter só o Cartão SUS),
+  // mas então precisa do CNS para continuar identificado. O responsável legal segue obrigatório,
+  // registrado só pelo nome (o CPF do responsável não é coletado). CPF ausente vira NULL no banco,
+  // e NULL não colide no UNIQUE (cpf_hmac).
+  if (digitsOnly(d.cpf) === '') {
+    if (age >= 18) return erro('CPF inválido. Confira os números digitados.');
+    if (digitsOnly(d.cns) === '') return erro('Menores de 18 anos sem CPF precisam informar o Cartão SUS (CNS).');
+  }
   if (!vazio(d.priority) && !VALID_PRIORITIES.includes(d.priority)) erro('Prioridade de atendimento inválida.');
   if (!vazio(d.race) && !VALID_RACES.includes(d.race)) erro('Cor/raça inválida.');
   if (age < 18 && !d.guardian_name) erro('Informe o nome do responsável legal para menores de 18 anos.');

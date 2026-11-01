@@ -114,6 +114,55 @@ describe('cadastro', () => {
     expect(await screen.findByText(/responsável legal para menores/)).toBeInTheDocument()
   })
 
+  it('adulto sem CPF não avança', async () => {
+    setup()
+    await userEvent.click(screen.getByRole('tab', { name: 'Criar conta' }))
+    await userEvent.type(screen.getByLabelText(/Nome completo/), 'Maria Silva')
+    await userEvent.type(screen.getByLabelText(/Data de nascimento/), '1990-01-01')
+    await userEvent.type(screen.getByLabelText(/Celular/), '87988887777')
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByText('Informe seu CPF.')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Cartão SUS/)).not.toBeInTheDocument()
+  })
+
+  it('menor sem CPF precisa do CNS; com CNS válido avança e o payload leva o CNS e CPF nulo', async () => {
+    const f = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json(201, { message: 'Conta criada!' }))
+    setup()
+    await userEvent.click(screen.getByRole('tab', { name: 'Criar conta' }))
+    await userEvent.type(screen.getByLabelText(/Nome completo/), 'Joana Silva')
+    await userEvent.type(screen.getByLabelText(/Data de nascimento/), `${new Date().getFullYear() - 8}-01-01`)
+    await userEvent.type(screen.getByLabelText(/Celular/), '87988887777')
+    await userEvent.type(await screen.findByLabelText(/responsável legal/), 'Maria Silva')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByText('Informe o CPF ou o Cartão SUS (CNS) do menor.')).toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText(/Cartão SUS/), '123')
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByText(/Cartão SUS inválido/)).toBeInTheDocument()
+
+    await userEvent.clear(screen.getByLabelText(/Cartão SUS/))
+    await userEvent.type(screen.getByLabelText(/Cartão SUS/), '898001234567891')
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    await userEvent.type(await screen.findByLabelText(/E-mail/), 'joana@x.com')
+    await userEvent.type(screen.getByLabelText(/^Senha/), 'secreta123')
+    await userEvent.type(screen.getByLabelText(/Confirmar senha/), 'secreta123')
+    await userEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
+
+    await waitFor(() => expect(f).toHaveBeenCalled())
+    expect(JSON.parse((f.mock.calls[0][1] as RequestInit).body as string)).toMatchObject({
+      full_name: 'Joana Silva', cpf: null, cns: '898001234567891', guardian_name: 'Maria Silva',
+    })
+  })
+
+  it('menor COM CPF não precisa do CNS', async () => {
+    setup()
+    await preencherEtapa1({ nascimento: `${new Date().getFullYear() - 10}-01-01` })
+    await userEvent.type(await screen.findByLabelText(/responsável legal/), 'Maria Silva')
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    expect(await screen.findByLabelText(/Confirmar senha/)).toBeInTheDocument()
+  })
+
   it('envia o payload do legado e volta ao login com o e-mail preenchido', async () => {
     const f = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(json(201, { message: 'Conta criada!' }))
     setup()

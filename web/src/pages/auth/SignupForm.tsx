@@ -17,7 +17,7 @@ export function SignupForm({ onDone }: { onDone: (email: string) => void }) {
   const form = useForm<SignupInput>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
-      full_name: '', birth_date: '', cpf: '', mobile: '', guardian_name: '', email: '', password: '', confirm: '',
+      full_name: '', birth_date: '', cpf: '', cns: '', mobile: '', guardian_name: '', email: '', password: '', confirm: '',
     },
   })
   const { register, handleSubmit, watch, trigger, setFocus, formState: { errors, isSubmitting } } = form
@@ -27,7 +27,8 @@ export function SignupForm({ onDone }: { onDone: (email: string) => void }) {
   const strength = passwordStrength(watch('password'))
 
   async function next() {
-    const fields = isMinor ? SIGNUP_STEP1_FIELDS : SIGNUP_STEP1_FIELDS.filter((f) => f !== 'guardian_name')
+    // Responsável e CNS só existem na etapa para menores de 18.
+    const fields = isMinor ? SIGNUP_STEP1_FIELDS : SIGNUP_STEP1_FIELDS.filter((f) => f !== 'guardian_name' && f !== 'cns')
     if (await trigger(fields)) {
       setStep(2)
       return
@@ -45,6 +46,7 @@ export function SignupForm({ onDone }: { onDone: (email: string) => void }) {
         full_name: v.full_name,
         birth_date: v.birth_date || null,
         cpf: v.cpf || null,
+        cns: isMinor ? v.cns?.trim() || null : null,
         guardian_name: isMinor ? v.guardian_name?.trim() || null : null,
         mobile: v.mobile || null,
         job_role: null,
@@ -84,9 +86,11 @@ export function SignupForm({ onDone }: { onDone: (email: string) => void }) {
             {(a) => <Input {...a} type="date" {...register('birth_date')} />}
           </FormField>
           <FormField
-            label="CPF *"
+            label={isMinor ? 'CPF' : 'CPF *'}
             error={errors.cpf?.message}
-            hint="Usado para garantir que seus agendamentos fiquem vinculados unicamente a você."
+            hint={isMinor
+              ? 'Se o menor ainda não tem CPF, deixe em branco e informe o Cartão SUS abaixo.'
+              : 'Usado para garantir que seus agendamentos fiquem vinculados unicamente a você.'}
           >
             {(a) => (
               <Input
@@ -98,6 +102,15 @@ export function SignupForm({ onDone }: { onDone: (email: string) => void }) {
               />
             )}
           </FormField>
+          {isMinor && (
+            <FormField
+              label="Cartão SUS (CNS)"
+              error={errors.cns?.message}
+              hint="Obrigatório quando o menor não tem CPF. São 15 números, no cartão do SUS."
+            >
+              {(a) => <Input {...a} inputMode="numeric" maxLength={18} placeholder="000 0000 0000 0000" {...register('cns')} />}
+            </FormField>
+          )}
           <FormField
             label="Celular *"
             error={errors.mobile?.message}

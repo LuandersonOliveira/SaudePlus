@@ -45,7 +45,12 @@ const signupSchema = z.object({
   password: z.string({ error: 'A senha precisa ter ao menos 6 caracteres.' }).min(6, 'A senha precisa ter ao menos 6 caracteres.'),
   full_name: z.string({ error: 'Nome, e-mail e senha são obrigatórios.' }).trim().min(1, 'Nome, e-mail e senha são obrigatórios.'),
   birth_date: z.string({ error: 'A data de nascimento é obrigatória.' }).min(1, 'A data de nascimento é obrigatória.'),
-  cpf: z.string({ error: 'CPF inválido. Confira os números digitados.' }).refine(isValidCPF, 'CPF inválido. Confira os números digitados.'),
+  // CPF: válido quando informado. Se é OBRIGATÓRIO depende da idade (adulto exige; menor de 18 pode
+  // se cadastrar só com o CNS) e fica no signupBody (schemas/auth.js), que conhece a data de nascimento.
+  cpf: z.string({ error: 'CPF inválido. Confira os números digitados.' }).optional().nullable().refine(
+    (v) => !v || digitsOnly(v) === '' || isValidCPF(v),
+    'CPF inválido. Confira os números digitados.'
+  ),
   cns: z.string().optional().nullable().refine(
     (v) => !v || digitsOnly(v) === '' || isValidCNS(v),
     'Cartão SUS (CNS) inválido. Confira os 15 números.'
