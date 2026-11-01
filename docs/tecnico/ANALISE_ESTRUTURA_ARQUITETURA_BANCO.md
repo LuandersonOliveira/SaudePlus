@@ -99,6 +99,8 @@ CPF/RG/CNS usam AES-256-GCM (correto), mas sem um *blind index* (HMAC do CPF). E
   3. `seed:demo` cria agendamentos para outro usuário, não para o paciente de teste (atrapalha demonstração).
   4. Servidor rejeita agendar sem profissional (409) quando há profissionais para o serviço; o React já exige a escolha, o legado não.
 
+> **Nova fase (2026-11-01):** antes de seguir com o 3B (`staff.routes.js`), `admin.routes.js` e os itens pequenos abaixo, entra a **Fase 7 — atualização do grafo e análise de system design** (`docs/planos/PLANO_FASE_7_SYSTEM_DESIGN.md`). O resultado pode reordenar, cancelar ou criar itens desta lista.
+
 ## 5. Ordem sugerida
 
 | Prioridade | Item | Esforço | Por quê primeiro |
