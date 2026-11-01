@@ -25,8 +25,8 @@
 ## PROCEDIMENTOS (onde está o "como")
 
 - P1. Ativar atendente: `admin.html → Cadastros → Pessoas → status ativo + motivo`.
-- P2. Responder incidente: `docs/RESPOSTA_INCIDENTES.md`.
-- P3. Backup/restore: `npm run backup` (diário); restore em `docs/TRILHA_AUDITORIA.md §5`.
+- P2. Responder incidente: `docs/governanca/RESPOSTA_INCIDENTES.md`.
+- P3. Backup/restore: `npm run backup` (diário); restore em `docs/governanca/TRILHA_AUDITORIA.md §5`.
 - P4. Expurgo: `npm run purge:retention -- --apply` (dry-run primeiro).
 - P5. Auditar a trilha: botão **Verificar integridade** (Auditoria) ou `GET /admin/audit-log/verify`.
 

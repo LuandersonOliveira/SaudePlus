@@ -1,5 +1,10 @@
 # Saúde+ — Lista de Ajustes Pendentes (fácil de entender)
 
+> **Substituído por [`TAREFAS_SIMPLES_V3.md`](./TAREFAS_SIMPLES_V3.md).** Esta versão
+> fica só como registro histórico do pedido original — o status atual de cada item
+> (o que foi feito, o que ficou pela metade, o que ainda falta) está na V3, com o
+> "Painel Rápido de Status (V2 → V3)". Não edite este arquivo; edite a V3.
+
 > **Para quem é este documento:** para o time do projeto — vocês não precisam saber programar para entender e decidir sobre estas tarefas. Cada item explica **onde** fica (qual tela, qual campo), **o que muda** e **por que muda**. A parte de programar quem faz é a IA; a parte de decidir "faz sentido ou não" é do time.
 >
 > Marque a caixinha `[x]` quando o time decidir que aquele item está aprovado e pronto (ou concluído).

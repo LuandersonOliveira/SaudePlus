@@ -103,5 +103,5 @@ Ainda pendente (conforme verificação): ampliar cobertura E2E contínua para ag
 ---
 
 Achados CRITICAL e HIGH corrigidos nesta rodada estão no
-[plano de estabilização](superpowers/plans/2026-10-16-saudeplus-estabilizacao.md)
+[plano de estabilização](../superpowers/plans/2026-10-16-saudeplus-estabilizacao.md)
 e no histórico de commits (`git log --oneline`).

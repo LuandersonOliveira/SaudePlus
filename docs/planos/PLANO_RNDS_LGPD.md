@@ -55,12 +55,20 @@ Dependências novas: `helmet`, `express-rate-limit`, `cookie-parser`, `zod`.
 
 ## 3. Fase 2 — Interoperabilidade SUS (ordem sugerida)
 
+> **Alvo municipal ainda não confirmado.** O sistema usado pela Secretaria de
+> Lagoa de Itaenga será apurado na descoberta institucional
+> ([`DESCOBERTA_SAUDE_DIGITAL.md`](../tecnico/DESCOBERTA_SAUDE_DIGITAL.md)); o desenho
+> técnico e os gates estão em
+> [`INTEROPERABILIDADE.md`](../tecnico/INTEROPERABILIDADE.md). A ordem abaixo assume
+> RNDS como rota primária e não autoriza integração com nenhum fornecedor
+> local antes dos gates G1–G7.
+
 | Ordem | Integração | Mapeamento com o Saúde+ |
 |---|---|---|
 | 2.1 | **CNES sync** ✅ (`scripts/sync-cnes.js`, dry-run default; `CNES_MUNICIPIO_CODE=260850` corrigido via IBGE — era 260890) | Upsert em `health_units` (`cnes_code`+`phone`+`address`, migration 004); 27 lidos, 20 relevantes (9 seeds casadas por nome + 11 novas); executado em 09/10/2026 |
 | 2.2 | **Alertas automáticos** ✅ (`scripts/sync-alerts.js`, InfoDengue/Fiocruz; `source='infodengue'`, nunca toca `source='manual'`) | Dengue+Chikungunya nível baixo (SE 202636–639, 9 casos dengue); Zika sem dados; executado em 09/10/2026 |
 | 2.3 | **Login Gov.br** ✅ scaffold (`services/govbr.js`, `GET /auth/govbr/login`, `GET /auth/govbr/callback`; 501 sem credencial; nunca cria usuário — vincula por `govbr_sub`/e-mail/CPF) | Falta: client homologado em `sso.acesso.gov.br` + conta prata/ouro |
-| 2.4 | **CNS WebService** ⏳ (exige credenciamento DATASUS; checksum local já valida formato) | validar `cns` no signup contra base oficial; deduplicar paciente |
+| 2.4 | **CNS WebService** ✅ camada pronta (`services/cns.js`: normalização + dedup por CNS/CPF+nascimento testados offline em `scripts/test-cns.js`; `lookupByCns()` 501 sem credencial) | Falta: credenciamento DATASUS (e-CNPJ + certificado) para `CNS_WS_BASE_URL`/`CNS_WS_LOOKUP_PATH`; wiring no signup fica para quando a credencial chegar |
 | 2.5 | **RNDS FHIR R4** ✅ camada pronta (`services/rnds.js`: builders RAC + validador + mTLS; `scripts/test-rnds.js` 7/7 offline; `POST /interop/rnds/send`, `GET /interopatatus`) | Falta: credenciamento (e-CNPJ + CNES), validar Bundle no validador DATASUS, **novo RIPD** antes de enviar dado real |
 | 2.6 | **e-SUS APS/SISAB via e-Gestor AB** ⏳ (organizacional, com a Secretaria) | evita prontuário paralelo: dado entra uma vez, vale no SUS inteiro |
 
@@ -73,8 +81,9 @@ server/src/services/rnds.js      → ✅ EHR Auth mTLS + POST Bundle FHIR R4 + v
 server/src/services/govbr.js     → ✅ OIDC (authorize, token, userinfo)
 server/src/services/cnes.js      → ✅ CNES → health_units (dry-run default)
 server/src/services/infodengue.js→ ✅ InfoDengue → diseases (source='infodengue')
-server/src/routes/interop.routes.js → ✅ GET /interop/status, POST /interop/rnds/send
-server/scripts/sync-cnes.js / sync-alerts.js / test-rnds.js → ✅ + npm scripts
+server/src/services/cns.js       → ✅ normalização + dedup CNS/CPF+nascimento; lookupByCns() 501 sem credencial
+server/src/routes/interop.routes.js → ✅ GET /interop/status (+ cns), POST /interop/rnds/send
+server/scripts/sync-cnes.js / sync-alerts.js / test-rnds.js / test-cns.js → ✅ + npm scripts
 server/scripts/migrate-interop.js→ ✅ cnes_code/phone/address, govbr_sub, source/external_ref
 dashboard.html                   → ⏳ aba "Meu histórico SUS" (após RNDS homologado)
 ```

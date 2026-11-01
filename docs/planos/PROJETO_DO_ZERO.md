@@ -2,7 +2,12 @@
 
 > Documento de planejamento de produto, escrito como se o projeto estivesse começando agora, do zero. Serve dois propósitos: (1) ensinar a equipe — adolescentes sem experiência prévia de programação, apoiados por IA — o raciocínio por trás de cada decisão técnica e de produto; (2) servir de roadmap real de Sprint 0 até o lançamento comercial.
 >
-> Versão original do projeto: proposta da equipe "Conectados para o Sucesso" (programa Passaporte Digital, Lagoa de Itaenga-PE), documento-fonte em [`docs/Conectados para o Sucesso 2.0.pdf`](Conectados%20para%20o%20Sucesso%202.0.pdf). Aquele documento previa 5 meses corridos, sem sprints, sem papéis de time definidos. Este documento substitui aquele cronograma por um plano de produto real — mantendo o problema, o público e o objetivo originais.
+> Versão original do projeto: proposta da equipe "Conectados para o Sucesso" (programa Passaporte Digital, Lagoa de Itaenga-PE), documento-fonte em [`docs/referencia/Conectados para o Sucesso 2.0.pdf`](../referencia/Conectados%20para%20o%20Sucesso%202.0.pdf). Aquele documento previa 5 meses corridos, sem sprints, sem papéis de time definidos. Este documento substitui aquele cronograma por um plano de produto real — mantendo o problema, o público e o objetivo originais.
+>
+> **Status (2026-10-31):** a maior parte das Sprints 1–3 e 5–9 já está implementada — ver
+> [`REQUISITOS_REFERENCIA.md`](../tecnico/REQUISITOS_REFERENCIA.md) para o veredito
+> requisito-a-requisito contra o código atual. O que segue genuinamente aberto: Sprint 10
+> (multi-tenant), Sprint 11 (material comercial) e partes da Sprint 7 (deploy/HTTPS real).
 
 ---
 
@@ -108,7 +113,7 @@ Diferente do que o título sugere, este NÃO é um projeto vazio. Já existe uma
 - 5 telas HTML funcionando (`index`, `auth`, `dashboard`, `admin`, `atendente`).
 - API REST cobrindo autenticação, agendamento de consultas/exames, alertas de doença, unidades de saúde, administração de usuários e log de auditoria.
 - Banco MySQL com 5+ tabelas relacionadas por chave estrangeira.
-- Dois diagnósticos técnicos completos já produzidos: [`PLANO_MELHORIAS.md`](../PLANO_MELHORIAS.md) (backend/segurança/dado) e [`PLANO_UIUX.md`](../PLANO_UIUX.md) (interface/acessibilidade).
+- Dois diagnósticos técnicos completos já produzidos: [`PLANO_MELHORIAS.md`](./PLANO_MELHORIAS.md) (backend/segurança/dado) e [`PLANO_UIUX.md`](./PLANO_UIUX.md) (interface/acessibilidade).
 
 As sprints deste plano tratam a Sprint 0 e 1 como **fundação documentada** (o time entende o que já existe e por quê) e usam os achados dos dois planos acima como **backlog priorizado** a partir da Sprint 2.
 
@@ -334,115 +339,35 @@ Este documento não fecha esses pontos de negócio (preço, contrato formal, CNP
 
 ---
 
-## 8. Apêndice — Achados detalhados do diagnóstico técnico
+## 8. Apêndice — achados detalhados: ver documentos vivos, não esta cópia
 
-Este apêndice condensa os dois diagnósticos completos já produzidos sobre a base de código existente — [`PLANO_MELHORIAS.md`](../PLANO_MELHORIAS.md) (backend, segurança, dado) e [`PLANO_UIUX.md`](../PLANO_UIUX.md) (interface, acessibilidade) — para que este documento seja autocontido. Cada achado remete ao épico correspondente na seção 4.
+Este apêndice continha, na versão original deste plano, uma cópia condensada dos
+achados de [`PLANO_MELHORIAS.md`](./PLANO_MELHORIAS.md) e [`PLANO_UIUX.md`](./PLANO_UIUX.md)
+"para que este documento fosse autocontido". Essa cópia **parou no estado do código
+de 2026-07-20** e hoje contradiz os dois documentos-fonte (que foram atualizados em
+2026-10-26 e marcam a maioria dos achados como ✅ resolvidos — rate limiting, Helmet,
+CORS allowlist, MFA, refresh rotativo, testes automatizados, CI, validação server-side,
+etc.). Mantê-la causaria exatamente o problema que ela tentava evitar: duas fontes da
+verdade divergentes.
 
-### 8.1 O que já está bem resolvido (não mexer sem motivo)
+**Para o estado atual, verificado contra o código, use:**
 
-- SQL 100% parametrizado (`?` bindings) em todas as rotas — sem risco de injeção SQL.
-- Isolamento por `user_id` consistente em rotas `/me/*`.
-- `password_hash` nunca retornado pela API; CPF/RG restritos a admin.
-- Log de auditoria (`audit_log`) em ações administrativas.
-- Separação clara de middleware (`verifyToken`, `requireAdmin`, `requireStaff`).
-- Design system consolidado em `styles.css` via CSS custom properties, paleta com propósito declarado (alto contraste, tipografia generosa para público com baixa familiaridade digital).
-- Acessibilidade de base já presente: `:focus-visible` global, `prefers-reduced-motion` respeitado, `aria-selected`/`role="tab"`/`role="tabpanel"` nas abas dos 3 painéis internos.
-- Sanitização de output (`esc()`) usada consistentemente antes de injetar dado dinâmico no DOM — evita XSS refletido.
-- Estado vazio tratado, feedback de carregamento (spinner) e de ação (toast) presentes em todo fluxo assíncrono.
-- Wizard de cadastro em 2 passos (Você → Acesso) com indicador visual de progresso, máscaras em tempo real (CPF, telefone, CEP) e autopreenchimento via ViaCEP. Perfil completo vai para "Minha conta".
+- [`PLANO_MELHORIAS.md`](./PLANO_MELHORIAS.md) — backend, segurança e dado (achados com veredito e fase de correção).
+- [`PLANO_UIUX.md`](./PLANO_UIUX.md) — interface, acessibilidade e o refactor do admin/dashboard.
+- [`REQUISITOS_REFERENCIA.md`](../tecnico/REQUISITOS_REFERENCIA.md) — matriz requisito → código → veredito (Existe/Ajustar/Implementar), a comparação mais recente e mais granular.
+- [`TECHNICAL_DEBT.md`](../tecnico/TECHNICAL_DEBT.md) — o que foi corrigido, o que foi fechado como falso positivo, e o que permanece como dívida consciente.
 
-### 8.2 Segurança — crítico (backend)
-
-1. `.env` real com senha de banco, `JWT_SECRET` e senha de admin em texto plano solto no disco — risco de ser commitado no primeiro `git init` (endereçado na Sprint 1).
-2. Sem rate limiting em `/auth/login` — força bruta de senha é trivial (Sprint 1).
-3. JWT em `localStorage` sem blocklist/revogação — token vazado por XSS fica válido até expirar (trade-off aceito, documentado na seção 3.4).
-4. Sem Helmet/cabeçalhos de segurança HTTP (Sprint 1).
-5. CORS com fallback `origin: '*'` quando `CORS_ORIGIN` não definido (Sprint 1).
-6. Sem validação de formato de entrada (email, CPF, telefone, datas) além de checagem de presença (Sprint 2).
-7. Sem guia de deploy/HTTPS documentado (Sprint 7).
-
-### 8.3 Robustez e correção — alto (backend)
-
-8. Sem testes automatizados — nenhuma regressão é pega automaticamente (Sprint 6).
-9. Sem `server/.env.example` real no repositório (Sprint 1).
-10. Rotas de agendamento (`appointments`, `exams`) duplicam lógica quase idêntica entre `me/*`, `admin` e `staff` — 3 cópias do mesmo padrão (Sprint 5).
-11. Lembretes são somente leitura, sem geração automática (Sprint 9).
-12. Sem paginação real (`OFFSET`/cursor) além do `LIMIT` fixo — dado além do limite fica inacessível pela UI.
-13. Erro handler global sempre devolve 500 genérico; erros de constraint do MySQL não são traduzidos em mensagem útil.
-14. Mudança de `role` de usuário só é possível direto no banco — decisão de segurança intencional, mas sem trilha de auditoria própria.
-
-### 8.4 Manutenibilidade e DX — médio (backend)
-
-15. Sem linter/formatter configurado (`.eslintrc`, `prettier`).
-16. CI configurado em `.github/workflows/ci.yml` (lint, suíte + E2E com MySQL 8.4/Playwright, `npm audit` critical).
-17. Sem tipagem (JS puro, sem TypeScript/JSDoc consistente) em schema com 20+ campos em `users`.
-18. `assets/api.js` é um único arquivo global (IIFE), sem módulos ES.
-19. Sem `package.json` no nível raiz do projeto (só em `server/`).
-20. Datas tratadas como string livre (`scheduled_at`) sem checagem de formato/futuro no servidor (Sprint 2).
-
-### 8.5 Recebimento de dados e formulário de cadastro (achado central)
-
-O front valida mais do que o back exige — toda a integridade do cadastro hoje depende do JavaScript do navegador, não do servidor. Qualquer chamada direta à API contorna essas regras (endereçado na Sprint 2).
-
-- `job_role` é texto livre, gerando inconsistência ("Enfermeira", "enfermeiro", "ENFERMEIRA(O)") que quebra filtro/relatório por cargo.
-- CPF e RG são obrigatórios no HTML mas opcionais na API (`|| null`); mesma lacuna em `birth_date`, `gender`, `mother_name`, `mobile`.
-- Confirmação de senha só é checada no cliente, nunca no servidor.
-- CPF sem dígito verificador — `111.111.111-11` passa em front e back.
-- Email sem validação real no back (`a@b` passa).
-- Celular sem validação de DDD/tamanho real.
-- Datas de agendamento sem checagem de "não pode ser no passado" no servidor.
-- CEP preenche endereço mas campos continuam editáveis sem revalidação de consistência.
-- `zone`/`reference_point` obrigatórios para todos, mesmo quem já preencheu endereço urbano completo.
-- Validação do wizard é só "forward" — reenvio pelo passo 4 não revalida os passos anteriores.
-- Nenhum campo sensível explica *por que* é coletado (transparência LGPD).
-
-### 8.6 Recebimento de dados — telas internas (dashboard, admin, atendente)
-
-- `exam_type` não tem campo livre condicional para "Outro" (ao contrário de `specialty`, que já tem esse padrão) — dado se perde quando "Outro" é selecionado (Sprint 5).
-- Catálogo de unidades de saúde (`health_units`) não tem tela de cadastro/manutenção pelo admin — exige `UPDATE` manual no banco.
-- Campo `notes`/`reason` sem `maxlength` visível.
-- Reagendamento usa `prompt()` nativo pedindo data digitada à mão, sem validação de formato no front nem no back — replicado em admin e atendente (Sprint 4).
-- `region` do alerta de doença é texto livre, mesmo problema de `job_role` (Sprint 3 normaliza via padrão CADSUS/select fechado).
-- Duas telas de busca de usuário (Histórico vs. Usuários) fazem quase a mesma coisa com UX diferente (Sprint 5 unifica).
-- Alteração de status de conta não pede motivo/observação para o audit log.
-- Busca de paciente pelo atendente só retorna contas `ativo` — paciente inativo/pendente "some" sem explicação, risco de cadastro duplicado.
-
-### 8.7 Usabilidade e acessibilidade — alto impacto (UI/UX)
-
-1. `confirm()` nativo para cancelar agendamento — inconsistente com o design system, ruim para leitor de tela (Sprint 4).
-2. `alert()`/`confirm()` como única confirmação de ação destrutiva, sem explicar consequência específica (Sprint 4).
-3. Sem loading state nos botões de submit de `addAppt`/`addExam` — permite duplo envio acidental (Sprint 4).
-4. Mensagens de erro genéricas demais — não diferenciam erro de rede, validação ou servidor.
-5. Navegação por teclado (seta esquerda/direita) não implementada nas tabs (Sprint 4).
-6. Campos obrigatórios do wizard não usam `aria-invalid` nem mensagem inline associada (Sprint 4).
-7. Sem indicação de força de senha no cadastro.
-
-### 8.8 Consistência e polimento — médio impacto (UI/UX)
-
-8. Duplicação de CSS inline (`style="..."`) espalhada pelos HTMLs em vez de classes utilitárias (Sprint 5).
-9. Duplicação de JS entre `dashboard.html`, `admin.html`, `atendente.html` (`switchTab`, `statusClass`, helpers) (Sprint 5).
-10. Formulários de agendamento não usam `max` em `datetime-local`, só `min` — permite agendar décadas no futuro sem aviso.
-11. Botão "Editar" faz scroll ao formulário mas não destaca visualmente o "modo edição ativo".
-12. Padrão "Outro" condicional existe para especialidade mas não para tipo de exame/local (Sprint 5).
-13. Busca de usuário e busca de histórico são telas separadas fazendo a mesma coisa (Sprint 5).
-14. Sem botão "Cancelar" explícito nos formulários de criação (só "Cancelar edição").
-15. `.wizard-steps` sem regra de mobile específica para telas muito pequenas (< 360px).
-
-### 8.9 Refinamento — baixo impacto (UI/UX)
-
-16. Resolvido: Inter autohospedada em `assets/fonts/inter-latin.woff2`, sem request externo — adequada ao público rural com internet instável.
-17. Ícones SVG inline repetidos sem sprite/symbol compartilhado.
-18. Sem skeleton loading nas listas (usa spinner central genérico).
-19. Sem dark mode (ausência consciente, baixa prioridade dado o público).
-20. Contraste de `.opt` ("(opcional)") deve ser confirmado com ferramenta de contraste real (AA).
-21. Emoji de aviso (⚠️) sem `aria-label`/`role="img"`.
+Os épicos E1–E8 e E12 da seção 4 deste documento estão, na prática, concluídos pelas
+fases descritas nesses quatro documentos. Os que seguem genuinamente abertos são E9
+(multi-tenant), E10 (material comercial) e E11 (monitoramento estruturado em produção).
 
 ---
 
 ## 9. Referências
 
-- Proposta original da equipe: [`Conectados para o Sucesso 2.0.pdf`](Conectados%20para%20o%20Sucesso%202.0.pdf)
-- Diagnóstico técnico backend/segurança/dado: [`PLANO_MELHORIAS.md`](../PLANO_MELHORIAS.md)
-- Diagnóstico técnico UI/UX/acessibilidade: [`PLANO_UIUX.md`](../PLANO_UIUX.md)
-- Setup e decisões técnicas herdadas: [`README.md`](../README.md)
-- Roteiro de teste com aluno/usuário real: [`ROTEIRO_TESTE_ALUNOS.md`](../ROTEIRO_TESTE_ALUNOS.md)
+- Proposta original da equipe: [`Conectados para o Sucesso 2.0.pdf`](../referencia/Conectados%20para%20o%20Sucesso%202.0.pdf)
+- Diagnóstico técnico backend/segurança/dado: [`PLANO_MELHORIAS.md`](./PLANO_MELHORIAS.md)
+- Diagnóstico técnico UI/UX/acessibilidade: [`PLANO_UIUX.md`](./PLANO_UIUX.md)
+- Matriz de requisitos atualizada (estado real do código): [`REQUISITOS_REFERENCIA.md`](../tecnico/REQUISITOS_REFERENCIA.md)
+- Setup e decisões técnicas herdadas: [`README.md`](../../README.md)
+- Roteiro de teste com aluno/usuário real: [`ROTEIRO_TESTE_ALUNOS.md`](../../ROTEIRO_TESTE_ALUNOS.md)

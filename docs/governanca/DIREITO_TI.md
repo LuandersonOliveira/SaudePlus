@@ -16,7 +16,7 @@
 
 - **Guarda de registros de acesso** (art. 13): 6 meses (provedores de conexão);
   aplicações (art. 15): registros de acesso por 6 meses, em sigilo.
-  → Nosso `audit_log` cumpre e excede (temporalidade em `docs/ROPA.md §3`).
+  → Nosso `audit_log` cumpre e excede (temporalidade em `docs/governanca/ROPA.md §3`).
 - **Responsabilidade por conteúdo de terceiros** (art. 19): só após ordem
   judicial (regra geral) — relevante para observações digitadas por usuários.
 - **Neutralidade e privacidade** (arts. 3º, 7º): sigilo das comunicações →

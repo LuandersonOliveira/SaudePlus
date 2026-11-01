@@ -1,8 +1,12 @@
 # Plano de Agenda Operacional (SIGMA) - Saúde+
 
 > Documento de planejamento criado em 2026-10-29 a partir da análise da proposta
-> SIGMA e do código atual do Saúde+. Status: **decisões aprovadas, implementação
-> não iniciada**. Nenhum código foi alterado por este documento.
+> SIGMA e do código atual do Saúde+. Status (2026-10-31, verificado contra o
+> código): **Fases 0–3 implementadas** — `assets/agenda.js`, `GET /staff/agenda`,
+> `/staff/agenda/month`, `/staff/agenda/reports`, `server/src/services/booking-events.js`,
+> `e2e/agenda.spec.js` + `agenda-responsive.spec.js` e os testes de
+> `server/test/agenda-*.test.js` existem e cobrem o escopo abaixo. Seção 7 marcada
+> de acordo; Fase 4 permanece fora de escopo por decisão (seção 7).
 
 **Objetivo:** transformar a agenda atual em uma agenda operacional completa para
 recepção e administração, sem reescrever o motor de disponibilidade existente.
@@ -16,9 +20,9 @@ histórico de remarcação, fila “Para remarcar” e uma UI compartilhada entr
 **Stack:** Node/Express, MySQL (`mysql2/promise`), HTML/CSS/JS sem build step,
 testes `node:test`, Playwright para E2E.
 
-**Referências:** [`REQUISITOS_REFERENCIA.md`](./REQUISITOS_REFERENCIA.md),
+**Referências:** [`REQUISITOS_REFERENCIA.md`](../tecnico/REQUISITOS_REFERENCIA.md),
 [`PLANO_UIUX.md`](./PLANO_UIUX.md),
-[`INTEROPERABILIDADE.md`](./INTEROPERABILIDADE.md).
+[`INTEROPERABILIDADE.md`](../tecnico/INTEROPERABILIDADE.md).
 
 ## 1. Decisões aprovadas
 
@@ -283,66 +287,66 @@ No `PATCH /admin/professionals/:id`, quando `active` mudar de 1 para 0:
 
 ### Fase 0 - Fundação
 
-- [ ] **0.1 RF17:** adicionar filtros server-side em `/admin/appointments` e
+- [x] **0.1 RF17:** adicionar filtros server-side em `/admin/appointments` e
   `/admin/exams`, com paginação e testes.
   - Teste: `server/test/admin-appointments-filter.test.js`.
-- [ ] **0.2 Contrato de status:** documentar e implementar `para_remarcar`,
+- [x] **0.2 Contrato de status:** documentar e implementar `para_remarcar`,
   `outcome`, `reschedule_reason` e `booking_events`.
   - Teste: `server/test/booking-status.test.js`.
-- [ ] **0.3 Tempo local:** centralizar helpers de data local para agenda e
+- [x] **0.3 Tempo local:** centralizar helpers de data local para agenda e
   relatórios, evitando regressão de fuso.
 
 ### Fase 1 - Backend da agenda
 
-- [ ] **1.1 Migração:** `migrate:agenda`, schema parity e rollback documentado.
+- [x] **1.1 Migração:** `migrate:agenda`, schema parity e rollback documentado.
   - Teste: `server/test/schema-parity.test.js` atualizado.
-- [ ] **1.2 Duração por serviço:** `unit_offers.duration_minutes`, fallback para
+- [x] **1.2 Duração por serviço:** `unit_offers.duration_minutes`, fallback para
   `slot_minutes`, validação e disponibilidade.
   - Teste: `server/test/service-duration.test.js`.
-- [ ] **1.3 Sobreposição por utente:** validação cruzada consultas + exames,
+- [x] **1.3 Sobreposição por utente:** validação cruzada consultas + exames,
   com lock de utente e profissional.
   - Teste: `server/test/booking-user-overlap.test.js`.
-- [ ] **1.4 Criação pela recepção:** `POST /staff/appointments` e
+- [x] **1.4 Criação pela recepção:** `POST /staff/appointments` e
   `POST /staff/exams`.
   - Teste: `server/test/staff-booking-create.test.js`.
-- [ ] **1.5 Agenda do dia:** `GET /staff/agenda` e `GET /staff/agenda/month`.
+- [x] **1.5 Agenda do dia:** `GET /staff/agenda` e `GET /staff/agenda/month`.
   - Teste: `server/test/agenda-day.test.js`.
-- [ ] **1.6 Remarcação com motivo:** estender `applyBookingChange` e gravar
+- [x] **1.6 Remarcação com motivo:** estender `applyBookingChange` e gravar
   eventos.
   - Teste: `server/test/reschedule-reason.test.js`.
-- [ ] **1.7 Desativação de profissional:** mover pendentes, liberar horário,
+- [x] **1.7 Desativação de profissional:** mover pendentes, liberar horário,
   gravar evento e avisar.
   - Teste: `server/test/professional-deactivation.test.js`.
-- [ ] **1.8 Saúde do catálogo:** serviço ativo sem profissional ativo ou sem
+- [x] **1.8 Saúde do catálogo:** serviço ativo sem profissional ativo ou sem
   escala.
   - Teste: `server/test/catalog-health.test.js`.
 
 ### Fase 2 - UI compartilhada
 
-- [ ] **2.1 `assets/agenda.js`:** abas Dia/Para remarcar, calendário, filtros e
+- [x] **2.1 `assets/agenda.js`:** abas Dia/Para remarcar, calendário, filtros e
   grade.
   - Teste: `e2e/agenda.spec.js`.
-- [ ] **2.2 Modal único:** detalhes, novo agendamento e remarcação.
+- [x] **2.2 Modal único:** detalhes, novo agendamento e remarcação.
   - Teste E2E: criar consulta para utente cadastrado; utente inexistente não
   aparece.
-- [ ] **2.3 Ações operacionais:** confirmar, registrar, remarcar, recusar e
+- [x] **2.3 Ações operacionais:** confirmar, registrar, remarcar, recusar e
   cancelar com motivo.
   - Teste E2E: cada ação grava o status/outcome esperado.
-- [ ] **2.4 Responsividade e acessibilidade:** 360/820/1440, teclado, foco,
+- [x] **2.4 Responsividade e acessibilidade:** 360/820/1440, teclado, foco,
   nomes acessíveis.
   - Teste: `e2e/agenda-responsive.spec.js`.
 
 ### Fase 3 - Operação e gestão
 
-- [ ] **3.1 Fila “Para remarcar”:** listar, filtrar, reabrir e reagendar.
+- [x] **3.1 Fila “Para remarcar”:** listar, filtrar, reabrir e reagendar.
   - Teste: `server/test/agenda-remarcar.test.js` + E2E.
-- [ ] **3.2 Base NV07:** ocupação, absenteísmo, cancelamentos por motivo e tempo
+- [x] **3.2 Base NV07:** ocupação, absenteísmo, cancelamentos por motivo e tempo
   até reagendamento.
   - Teste: `server/test/agenda-reports.test.js`.
-- [ ] **3.3 Fila do dia:** incluir confirmados, ordenar por prioridade legal e
+- [x] **3.3 Fila do dia:** incluir confirmados, ordenar por prioridade legal e
   horário, check-in e chamada.
   - Teste: `server/test/agenda-queue.test.js` + E2E.
-- [ ] **3.4 NV08 parcial:** auditoria de acessibilidade dos novos componentes.
+- [x] **3.4 NV08 parcial:** auditoria de acessibilidade dos novos componentes.
 
 ### Fase 4 - Fora de escopo imediato
 

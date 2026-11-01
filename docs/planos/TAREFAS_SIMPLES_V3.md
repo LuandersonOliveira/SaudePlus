@@ -348,3 +348,59 @@ Para o time não se perder tentando fazer tudo de uma vez, sugerimos aprovar as 
 2. Leiam item por item.
 3. Se o item estiver aprovado como prioridade do time, instruam a IA para executar o código daquela etapa.
 4. Após testarem e confirmarem na prática que a tela está funcionando, marquem a caixinha `[x]`.
+
+---
+
+## 9. Apêndice — Origem e rastreabilidade
+
+> Este apêndice não altera os itens acima. Ele responde "de onde veio esta
+> tarefa?" e "a qual requisito ela atende?".
+>
+> Origem: **PDF** = caso de uso do TCC de referência; **Nosso** = necessidade
+> identificada no Saúde+; **Norma** = exigência legal ou de política pública.
+>
+> Referências: [`REQUISITOS_REFERENCIA.md`](../tecnico/REQUISITOS_REFERENCIA.md) (RF/RNF),
+> [`DESCOBERTA_SAUDE_DIGITAL.md`](../tecnico/DESCOBERTA_SAUDE_DIGITAL.md) e
+> [`INTEROPERABILIDADE.md`](../tecnico/INTEROPERABILIDADE.md).
+
+| Seção | Tema | Origem | Requisito | Observação |
+|---|---|---|---|---|
+| 1.1 | Cargo do atendente | Nosso | — | Papel `atendente` e `job_role` já existem; falta o select correto |
+| 1.2 | Nome social | Norma | RNF04 | Decreto 8.727/2016; coluna já existe |
+| 1.3 | Cartão SUS (CNS) | Norma | RNF04 | Checksum já validado no servidor |
+| 1.4 | Prioridade legal | Norma | NV02 | Lei 10.048/2000; NV02 reserva 10% das vagas por dia/profissional até 24 h antes |
+| 1.5 | Responsável legal | Norma | RNF04 | Obrigatório para menor de 18 anos |
+| 1.6 | Cor ou raça | Norma | RNF04 | Autodeclaração IBGE |
+| 1.7 | Ponto de referência rural | Nosso | — | Evita exigir dado inútil na zona urbana |
+| 1.8 | Textos LGPD nos campos | Norma | RNF04 | Transparência e base legal |
+| 1.9 | Força de senha | Nosso | RNF06 | Complementa política do servidor |
+| 1.10 | Erro no campo certo | Nosso | — | Usabilidade; reduz abandono no cadastro |
+| 2.1 | Escopo do painel | PDF | RF07 | Equivale a "Consultas Agendadas" |
+| 2.3 | Exigir descrição em "Outro" | Nosso | — | Evita tipo de exame vazio |
+| 2.4 | Trava de 1 ano no futuro | PDF | RF05 / F0-05 | Alinhar com a janela paginada de 30 dias |
+| 2.5 | Destacar edição de exame | Nosso | — | Feedback visual |
+| 2.6 | Reagendar item cancelado | PDF | NV01 | PDF só cancela; reagendar é evolução |
+| 2.7 | Agenda por unidade/especialidade/profissional | Misto | RF02–RF06 | Saúde+ já é superior ao turno do PDF |
+| 2.8 | Campos dependentes | PDF | RF02–RF04 | Especialidade → médico → UBS |
+| 3.1 | Carregamento do painel do atendente | Nosso | — | Bug de sessão/perfil |
+| 3.2 | Aviso de paciente inativo/pendente | Nosso | — | Não pode vazar dado sensível |
+| 3.3 | Lista de cargos no cabeçalho | Nosso | — | Consistência de nomenclatura |
+| 3.4 | Limite de data no reagendamento | PDF | RF05 / F0-05 | Mesma fonte de verdade da janela |
+| 4.1 | Motivo ao ativar/inativar conta | Nosso | RNF05 | Já vai para `audit_log.details` |
+| 4.2 | Modal ao excluir alerta | Nosso | — | Evita exclusão acidental |
+| 4.3 | Gestão de postos e unidades | Misto | RF04 | Saúde+ usa CNES; PDF usa cadastro livre |
+| 4.4 | Profissionais e especialidades por unidade | PDF | RF13 / RF14 | `professionals` + `*_offers` |
+| 4.5 | Disponibilidade e conflito | Misto | RNF02 | Regra local em `booking.js` |
+| 4.6 | Histórico e auditoria da agenda | Nosso | RNF05 | Hash chain já existe |
+| 5.1 | Redirecionamento do atendente | Nosso | — | Bug de navegação por papel |
+| 5.2 | Organização dos arquivos de conexão | Nosso | — | Manutenção |
+| 6.1 | Lembretes na véspera | Nosso | NV06 (parcial) | E-mail já implementado |
+| 6.2 | Blindagem de cadastro e datas | Norma | RNF06 | Validação server-side |
+| 6.3 | Proteção contra força bruta | Nosso | RNF06 | Throttle já implementado |
+
+### Defeitos da Fase 0 (não listados nas seções acima)
+
+Os itens `F0-01` a `F0-07` estão detalhados em
+[`REQUISITOS_REFERENCIA.md`](../tecnico/REQUISITOS_REFERENCIA.md) §4.1. Eles corrigem
+chamadas quebradas do `admin.html`, o campo `admin_level` exposto e a janela de
+agenda inconsistente.
