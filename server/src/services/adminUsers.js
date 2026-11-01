@@ -16,6 +16,7 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const pool = require('../db');
+const { emTransacao: emTransacaoCom } = require('../utils/transacao');
 const H = require('../utils/adminHierarchy');
 const usuarios = require('../repositories/usuarios');
 const profissionais = require('../repositories/profissionais');
@@ -28,22 +29,7 @@ const NAO_ENCONTRADO = 'Usuário não encontrado.';
 const PROFISSIONAL_INVALIDO = 'Profissional não encontrado ou inativo.';
 const PROFISSIONAL_JA_VINCULADO = 'Profissional já vinculado a outro atendente.';
 
-/** Roda `fn(conn)` numa transação: confirma se devolver `ok`, desfaz em qualquer outro caso. */
-async function emTransacao(fn) {
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const r = await fn(conn);
-    if (r && r.ok) await conn.commit();
-    else await conn.rollback();
-    return r;
-  } catch (err) {
-    await conn.rollback().catch(() => {});
-    throw err;
-  } finally {
-    conn.release();
-  }
-}
+const emTransacao = (fn) => emTransacaoCom(pool, fn);
 
 const ehEmailDuplicado = (err) => Boolean(err) && err.code === 'ER_DUP_ENTRY' && /email/i.test(String(err.message));
 

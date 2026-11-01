@@ -175,7 +175,21 @@ async function removerBloqueio(db, blockId) {
   await db.query('DELETE FROM schedule_blocks WHERE id = ?', [blockId]);
 }
 
+// Edição do cadastro (8d)
+async function paraEdicao(db, id, { travar = false } = {}) {
+  const [[p]] = await db.query(
+    `SELECT name, job_title, registry, active FROM professionals WHERE id = ?${travar ? ' FOR UPDATE' : ''}`,
+    [id]
+  );
+  return p;
+}
+
+async function atualizar(db, id, sets, params) {
+  await db.query(`UPDATE professionals SET ${sets.join(', ')} WHERE id=?`, [...params, id]);
+}
+
 module.exports = {
+  paraEdicao, atualizar,
   ativoParaVinculo, desvincularUsuario, vincular, doUsuario, criarParaAtendente, acompanharCargo,
   listarTudo, inserir, existe, unidade, rotuloDaUnidade,
   inserirOferta, ofertaDoProfissional, removerOferta,

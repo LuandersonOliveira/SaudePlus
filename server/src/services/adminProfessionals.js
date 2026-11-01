@@ -7,11 +7,16 @@
    Cada função devolve `{ ok: true, ... }` ou `{ ok: false, status, error }` e NÃO toca em
    req/res: a rota responde e registra a auditoria com `entidade`, `id` e `auditoria`.
 
-   (A desativação do profissional — que move atendimentos para a fila de remarcação — é
-   o passo 8d.)
+   Editar o cadastro e DESATIVAR o profissional (que move os atendimentos futuros para a
+   fila de remarcação) rodam numa transação só; o aviso por e-mail sai depois do commit.
    ========================================================================== */
 const pool = require('../db');
 const profissionais = require('../repositories/profissionais');
+const atendimentos = require('../repositories/atendimentos');
+const usuarios = require('../repositories/usuarios');
+const mailer = require('./mailer');
+const { registrarEvento } = require('./booking-events');
+const { emTransacao } = require('../utils/transacao');
 const V = require('../schemas/adminProfessionals');
 
 const falha = (status, error) => ({ ok: false, status, error });
@@ -27,6 +32,123 @@ async function criarProfissional(body, reason) {
     ok: true, id, entidade: 'professional',
     auditoria: `profissional "${v.dados.name}"${V.sufixoMotivo(reason)}`,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Edição e desativação
+// ---------------------------------------------------------------------------
+
+const MOTIVO_INATIVADO = 'profissional_inativado';
+const TIPOS_DE_ATENDIMENTO = [
+  { tabela: 'appointments', kind: 'consulta' },
+  { tabela: 'exams', kind: 'exame' },
+];
+
+/**
+ * Move os atendimentos FUTUROS e ativos do profissional para "Para remarcar", registrando o
+ * evento operacional de cada um. Devolve os registros afetados (id, user_id, scheduled_at).
+ */
+async function moverAtendimentosParaRemarcar(conn, professionalId, actorUserId) {
+  const afetados = [];
+  for (const { tabela, kind } of TIPOS_DE_ATENDIMENTO) {
+    const futuros = await atendimentos.futurosAtivosDoProfissional(conn, tabela, professionalId);
+    for (const rec of futuros) {
+      await atendimentos.moverParaRemarcar(conn, tabela, rec.id, MOTIVO_INATIVADO);
+      await registrarEvento(conn, {
+        kind,
+        bookingId: rec.id,
+        eventType: 'professional_deactivated',
+        fromScheduledAt: rec.scheduled_at,
+        toScheduledAt: rec.scheduled_at,
+        fromProfessionalId: professionalId,
+        toProfessionalId: professionalId,
+        reason: MOTIVO_INATIVADO,
+        actorUserId,
+      });
+    }
+    afetados.push(...futuros);
+  }
+  return afetados;
+}
+
+/**
+ * Edita nome, cargo, registro e/ou ativo. Desativar (1 → 0) manda para a fila de remarcação
+ * todo atendimento futuro ativo do profissional. TUDO na mesma transação: ou o cadastro muda e
+ * os atendimentos são movidos juntos, ou nada muda.
+ *
+ * @param {{id: string, body: object, reason: string, actorId: string}} p
+ * @returns {Promise<{ok: true, moved: number, userIds: string[], auditoria: string} | {ok: false, status: number, error: string}>}
+ *   `userIds`: pacientes a avisar depois do commit (`avisarPacientes`).
+ */
+async function atualizarProfissional({ id, body, reason, actorId }) {
+  const { name, job_title: jobTitle, registry, active } = body || {};
+
+  return emTransacao(pool, async (conn) => {
+    const atual = await profissionais.paraEdicao(conn, id, { travar: true });
+    if (!atual) return falha(404, PROFISSIONAL_NAO_ENCONTRADO);
+
+    const sets = [];
+    const params = [];
+    const detalhes = [];
+
+    if (name !== undefined) {
+      const v = String(name).trim();
+      if (!v) return falha(400, 'Nome do profissional é obrigatório.');
+      if (v !== atual.name) { sets.push('name=?'); params.push(v); detalhes.push(`nome -> ${v}`); }
+    }
+    if (jobTitle !== undefined) {
+      sets.push('job_title=?'); params.push(jobTitle || null);
+      detalhes.push(`cargo -> ${jobTitle || 'não informado'}`);
+    }
+    if (registry !== undefined) {
+      sets.push('registry=?'); params.push(registry || null);
+      detalhes.push(`registro -> ${registry || 'não informado'}`);
+    }
+
+    const desativando = active !== undefined && !Number(active) && Number(atual.active) === 1;
+    if (active !== undefined) {
+      const v = Number(active) ? 1 : 0;
+      if (v !== Number(atual.active)) {
+        sets.push('active=?'); params.push(v);
+        detalhes.push(v ? 'profissional ativado' : 'profissional desativado');
+      }
+    }
+    if (!sets.length) return falha(400, 'Nada para atualizar.');
+
+    await profissionais.atualizar(conn, id, sets, params);
+
+    let afetados = [];
+    if (desativando) {
+      afetados = await moverAtendimentosParaRemarcar(conn, id, actorId);
+      detalhes.push(`${afetados.length} registro(s) movido(s) para remarcar`);
+    }
+
+    return {
+      ok: true,
+      moved: afetados.length,
+      userIds: [...new Set(afetados.map((r) => r.user_id))],
+      auditoria: `${detalhes.join('; ')}${V.sufixoMotivo(reason)}`,
+    };
+  });
+}
+
+/**
+ * Avisa por e-mail os pacientes cujo atendimento foi para a fila de remarcação.
+ * Melhor esforço: roda DEPOIS do commit, e uma falha de envio não desfaz nada nem
+ * impede os demais avisos.
+ */
+async function avisarPacientes(userIds) {
+  const contatos = await usuarios.contatos(pool, userIds);
+  for (const u of contatos) {
+    if (!u.email) continue;
+    try {
+      await mailer.enviar({
+        para: u.email,
+        assunto: 'Profissional indisponível - reagendamento',
+        texto: `Olá ${u.full_name || ''}, seu atendimento foi movido para a fila de remarcação.`,
+      });
+    } catch (err) { /* best-effort */ }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +262,7 @@ async function removerBloqueio(professionalId, blockId, reason) {
 }
 
 module.exports = {
-  listar, criarProfissional,
+  listar, criarProfissional, atualizarProfissional, avisarPacientes,
   adicionarVinculo, removerVinculo,
   adicionarHorario, removerHorario,
   adicionarBloqueio, removerBloqueio,

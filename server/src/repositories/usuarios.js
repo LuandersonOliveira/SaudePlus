@@ -120,7 +120,14 @@ async function revogarAcesso(db, userId) {
   await db.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL', [userId]);
 }
 
+/** Nome e e-mail de vários usuários (para avisos). */
+async function contatos(db, ids) {
+  if (!ids || !ids.length) return [];
+  const [rows] = await db.query('SELECT id, full_name, email FROM users WHERE id IN (?)', [ids]);
+  return rows;
+}
+
 module.exports = {
-  listar, detalhe, paraEdicao, paraExclusao, emailEmUsoPorOutro, emailExiste,
+  contatos, listar, detalhe, paraEdicao, paraExclusao, emailEmUsoPorOutro, emailExiste,
   atualizar, inserir, nomeECargo, excluirLogicamente, revogarAcesso,
 };

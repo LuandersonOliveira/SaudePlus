@@ -13,6 +13,8 @@ require(require.resolve('dotenv', { paths: [SERVER] })).config({ path: path.join
 const pool = require('../src/db');
 const svc = require('../src/services/adminProfessionals');
 const V = require('../src/schemas/adminProfessionals');
+const mailer = require('../src/services/mailer');
+const { listarEventos } = require('../src/services/booking-events');
 
 const uid = () => crypto.randomUUID();
 const unit = uid();
@@ -22,7 +24,12 @@ const PROFS = [];
 test.before(async () => {
   await pool.query("INSERT INTO health_units (id, name, type, active) VALUES (?, 'UBS Prof A', 'ubs', 1), (?, 'UBS Prof B', 'ubs', 1)", [unit, unit2]);
 });
+const USUARIOS = [];
 test.after(async () => {
+  for (const id of USUARIOS) {
+    await pool.query('DELETE FROM booking_events WHERE booking_id IN (SELECT id FROM appointments WHERE user_id = ? UNION SELECT id FROM exams WHERE user_id = ?)', [id, id]).catch(() => {});
+    await pool.query('DELETE FROM users WHERE id = ?', [id]).catch(() => {});
+  }
   for (const id of PROFS) {
     for (const t of ['professional_offers', 'work_schedules', 'schedule_blocks']) await pool.query(`DELETE FROM ${t} WHERE professional_id = ?`, [id]).catch(() => {});
     await pool.query('DELETE FROM professionals WHERE id = ?', [id]).catch(() => {});
@@ -194,4 +201,126 @@ test('a rota fica fina: sem SQL de oferta, horário ou bloqueio, e sem cleanTime
     assert.ok(!fonte.includes(tabela), `a rota não deveria conhecer ${tabela}`);
   }
   assert.doesNotMatch(fonte, /function cleanTime/);
+});
+
+// ---------------------------------------------------------------------------
+// Edição e desativação (8d)
+// ---------------------------------------------------------------------------
+
+async function paciente() {
+  const id = uid();
+  await pool.query("INSERT INTO users (id, full_name, email, password_hash, role) VALUES (?,?,?,?, 'paciente')", [id, 'Paciente Desativ', `desat-${id}@test.local`, 'x'.repeat(60)]);
+  USUARIOS.push(id);
+  return id;
+}
+async function atendimento(tabela, { user, prof, dias, status = 'pendente' }) {
+  const id = uid();
+  const col = tabela === 'appointments' ? 'specialty' : 'exam_type';
+  await pool.query(
+    `INSERT INTO ${tabela} (id, user_id, ${col}, location, unit_id, professional_id, scheduled_at, status)
+     VALUES (?,?,?,?,?,?, DATE_ADD(NOW(), INTERVAL ? DAY), ?)`,
+    [id, user, 'Clínica Teste', 'UBS', unit, prof, dias, status]
+  );
+  return id;
+}
+const estado = async (tabela, id) => (await pool.query(`SELECT status, reschedule_reason FROM ${tabela} WHERE id = ?`, [id]))[0][0];
+const ativo = async (id) => Number((await pool.query('SELECT active FROM professionals WHERE id = ?', [id]))[0][0].active);
+
+test('atualizarProfissional: 404, nome vazio, nada a atualizar', async () => {
+  const id = await novo('Nome Fixo');
+  assert.deepEqual(await svc.atualizarProfissional({ id: uid(), body: { name: 'x' }, reason: '', actorId: null }), { ok: false, status: 404, error: 'Profissional não encontrado.' });
+  assert.deepEqual(await svc.atualizarProfissional({ id, body: { name: '   ' }, reason: '', actorId: null }), { ok: false, status: 400, error: 'Nome do profissional é obrigatório.' });
+  assert.deepEqual(await svc.atualizarProfissional({ id, body: {}, reason: '', actorId: null }), { ok: false, status: 400, error: 'Nada para atualizar.' });
+  assert.deepEqual(await svc.atualizarProfissional({ id, body: { name: 'Nome Fixo' }, reason: '', actorId: null }), { ok: false, status: 400, error: 'Nada para atualizar.' }, 'mesmo nome não é mudança');
+});
+
+test('atualizarProfissional: grava os campos e descreve a mudança com o motivo', async () => {
+  const id = await novo('Antes');
+  const r = await svc.atualizarProfissional({ id, body: { name: ' Depois ', job_title: 'Clínico', registry: '' }, reason: 'correção', actorId: null });
+  assert.equal(r.ok, true);
+  assert.equal(r.moved, 0);
+  assert.equal(r.auditoria, 'nome -> Depois; cargo -> Clínico; registro -> não informado; motivo: correção');
+  const [[row]] = await pool.query('SELECT name, job_title, registry FROM professionals WHERE id = ?', [id]);
+  assert.deepEqual([row.name, row.job_title, row.registry], ['Depois', 'Clínico', null]);
+});
+
+test('desativar move SÓ os atendimentos futuros e ativos (consultas e exames), com evento e motivo', async () => {
+  const prof = await novo();
+  const user = await paciente();
+  const futuraConsulta = await atendimento('appointments', { user, prof, dias: 10 });
+  const futuraConfirmada = await atendimento('appointments', { user, prof, dias: 11, status: 'confirmado' });
+  const futuroExame = await atendimento('exams', { user, prof, dias: 12 });
+  const passada = await atendimento('appointments', { user, prof, dias: -10 });
+  const cancelada = await atendimento('appointments', { user, prof, dias: 13, status: 'cancelado' });
+  const doOutro = await atendimento('appointments', { user, prof: await novo(), dias: 10 });
+
+  const r = await svc.atualizarProfissional({ id: prof, body: { active: 0 }, reason: 'saiu da unidade', actorId: null });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.moved, 3);
+  assert.deepEqual(r.userIds, [user], 'um paciente, avisado uma vez só');
+  assert.equal(r.auditoria, 'profissional desativado; 3 registro(s) movido(s) para remarcar; motivo: saiu da unidade');
+  assert.equal(await ativo(prof), 0);
+
+  for (const [tabela, id] of [['appointments', futuraConsulta], ['appointments', futuraConfirmada], ['exams', futuroExame]]) {
+    assert.deepEqual(await estado(tabela, id), { status: 'para_remarcar', reschedule_reason: 'profissional_inativado' }, id);
+  }
+  assert.equal((await estado('appointments', passada)).status, 'pendente', 'passado não é tocado');
+  assert.equal((await estado('appointments', cancelada)).status, 'cancelado');
+  assert.equal((await estado('appointments', doOutro)).status, 'pendente', 'outro profissional não é tocado');
+
+  const eventos = await listarEventos(pool, { kind: 'consulta', bookingId: futuraConsulta });
+  assert.ok(eventos.some((e) => e.event_type === 'professional_deactivated' && e.reason === 'profissional_inativado'));
+  const eventosExame = await listarEventos(pool, { kind: 'exame', bookingId: futuroExame });
+  assert.ok(eventosExame.some((e) => e.event_type === 'professional_deactivated'));
+});
+
+test('desativar é ATÔMICO: se o registro do evento falha, nada muda (profissional segue ativo, atendimento intacto)', async () => {
+  const prof = await novo();
+  const user = await paciente();
+  const consulta = await atendimento('appointments', { user, prof, dias: 20 });
+  // actor inexistente → a FK de booking_events recusa o evento no meio da operação
+  await assert.rejects(svc.atualizarProfissional({ id: prof, body: { active: 0, name: 'Mudou' }, reason: '', actorId: uid() }));
+  assert.equal(await ativo(prof), 1, 'o UPDATE do cadastro foi desfeito');
+  assert.equal((await pool.query('SELECT name FROM professionals WHERE id = ?', [prof]))[0][0].name !== 'Mudou', true);
+  assert.equal((await estado('appointments', consulta)).status, 'pendente', 'o atendimento voltou ao que era');
+});
+
+test('reativar e editar sem desativar NÃO movem atendimento algum', async () => {
+  const prof = await novo();
+  const user = await paciente();
+  const consulta = await atendimento('appointments', { user, prof, dias: 9 });
+  await svc.atualizarProfissional({ id: prof, body: { active: 0 }, reason: '', actorId: null });
+  await pool.query("UPDATE appointments SET status = 'pendente', reschedule_reason = NULL WHERE id = ?", [consulta]);
+  const r = await svc.atualizarProfissional({ id: prof, body: { active: 1, job_title: 'Voltou' }, reason: '', actorId: null });
+  assert.deepEqual([r.ok, r.moved, r.userIds], [true, 0, []]);
+  assert.equal(r.auditoria, 'cargo -> Voltou; profissional ativado');
+  assert.equal((await estado('appointments', consulta)).status, 'pendente');
+  const mesmo = await svc.atualizarProfissional({ id: prof, body: { active: 1 }, reason: '', actorId: null });
+  assert.equal(mesmo.status, 400, 'ativar quem já está ativo não é mudança');
+});
+
+test('avisarPacientes: um e-mail por paciente com endereço; falha de envio não interrompe os demais', async () => {
+  const a = await paciente();
+  const b = await paciente();
+  const enviados = [];
+  const original = mailer.enviar;
+  mailer.enviar = async (msg) => {
+    enviados.push(msg.para);
+    if (msg.para.includes(a)) throw new Error('SMTP caiu');
+    return { enviado: true };
+  };
+  try {
+    await svc.avisarPacientes([a, b, uid()]); // o terceiro não existe
+    await svc.avisarPacientes([]); // nada a fazer
+  } finally {
+    mailer.enviar = original;
+  }
+  assert.equal(enviados.length, 2);
+  assert.ok(enviados.some((e) => e.includes(b)), 'o segundo foi avisado mesmo com o primeiro falhando');
+});
+
+test('a rota de profissionais ficou só com validar-permissão, chamar o serviço e responder', () => {
+  const fonte = require('node:fs').readFileSync(path.join(SERVER, 'src', 'routes', 'admin.professionals.routes.js'), 'utf8');
+  assert.doesNotMatch(fonte, /require\('\.\.\/db'\)/, 'a rota não acessa o banco');
+  assert.doesNotMatch(fonte, /registrarEvento|mailer|pool\./, 'eventos e e-mails são do serviço');
 });
