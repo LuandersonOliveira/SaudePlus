@@ -4,10 +4,12 @@
   "private": true,
   "description": "Saúde+ — cuidado integrado Lagoa de Itaenga. Orquestra a API (server/) e o front estático.",
   "scripts": {
-    "setup": "npm install && npm --prefix server install && npm run db:setup",
+    "setup": "npm install && npm --prefix server install && npm --prefix web install && npm run db:setup",
     "dev": "concurrently -k -n api,web -c green,cyan \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "npm --prefix server run start:local",
-    "dev:web": "node scripts/serve-web.js",
+    "dev:web": "npm --prefix web run dev",
+    "dev:legacy": "concurrently -k -n api,web -c green,cyan \"npm:dev:api\" \"npm:dev:web:legacy\"",
+    "dev:web:legacy": "node scripts/serve-web.js",
     "start": "npm run dev",
     "start:api": "node server/src/server.js",
     "db:setup": "node scripts/db-setup.js",
@@ -24,7 +26,10 @@
     "check": "npm run lint && npm run test:all",
     "smoke-test": "npm --prefix server run smoke-test",
     "backup": "npm --prefix server run backup",
-    "doctor": "node scripts/doctor.js"
+    "doctor": "node scripts/doctor.js",
+    "build:web": "npm --prefix web run build",
+    "test:web": "npm --prefix web test",
+    "typecheck:web": "npm --prefix web run typecheck"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

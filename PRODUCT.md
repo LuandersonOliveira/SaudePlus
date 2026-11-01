@@ -37,7 +37,7 @@ Nome Saúde+, marca `brand-dot` radial verde-lagoa + anel `primary-100`, paleta 
 
 - `index.html` (hero, como-funciona 3 passos, recursos, trust), `auth.html` (login + wizard 2 passos + MFA), `assets/styles.css` (design system), `assets/ui.js` (helpers compartilhados), `assets/api.js` (sessão Bearer)
 - `GET /public/stats` e `GET /public/dpo` reais para prova social e encarregado (não usados na landing hoje — lacuna)
-- `docs/PLANO_UIUX.md`, `docs/PLANO_MELHORIAS.md`, `docs/PROJETO_COMPLETO.md`, `ROTEIRO_TESTE_ALUNOS.md`
+- `docs/planos/PLANO_UIUX.md`, `docs/planos/PLANO_MELHORIAS.md`, `docs/tecnico/PROJETO_COMPLETO.md`, `ROTEIRO_TESTE_ALUNOS.md`
 - Ausências que não devem ser fabricadas: depoimentos reais de pacientes, números assistenciais verificados, telefones/horários das unidades (seed não confirmada — README avisa validar antes de divulgar)
 
 ## Product Principles

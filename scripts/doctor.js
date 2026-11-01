@@ -47,6 +47,10 @@ const COLUNAS_ESPERADAS = [
   // Vínculo profissional ↔ atendente. Sem esta coluna, o atendente nunca é
   // filtrado pela própria agenda e o vínculo some do painel do admin.
   ['professionals', 'user_id'],
+  // NV03: sem estas a lista de espera responde 500 na primeira consulta.
+  ['waitlist', 'user_id'],
+  ['waitlist', 'status'],
+  ['waitlist', 'record_id'],
 ];
 const TABELAS_ESPERADAS = [
   'refresh_tokens',
@@ -56,6 +60,7 @@ const TABELAS_ESPERADAS = [
   'professional_offers',
   'work_schedules',
   'schedule_blocks',
+  'waitlist',
 ];
 
 // --------------------------------------------------------------------------

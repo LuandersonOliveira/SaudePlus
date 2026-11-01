@@ -1,0 +1,141 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Inter autohospedada: zero dependência de rede (3G instável / offline). */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/inter-latin.woff2') format('woff2');
+}
+
+/* Paleta "lagoa" (DESIGN.md) mapeada para os tokens do shadcn/ui. */
+:root {
+  --radius: 0.875rem; /* 14px */
+
+  --background: #f3f7f5;
+  --foreground: #0e2a27;
+  --card: #ffffff;
+  --card-foreground: #0e2a27;
+  --popover: #ffffff;
+  --popover-foreground: #0e2a27;
+  --primary: #0f7a6b;
+  --primary-foreground: #ffffff;
+  --secondary: #dceFea;
+  --secondary-foreground: #0b5c50;
+  --muted: #e9f0ed;
+  --muted-foreground: #5b6e6a;
+  --accent: #dcefea;
+  --accent-foreground: #0b5c50;
+  --destructive: #c0392b;
+  --border: #dce6e2;
+  --input: #dce6e2;
+  --ring: #0f7a6b;
+
+  --success: #1e8f5e;
+  --success-soft: #e1f3ea;
+  --warning: #b9790f;
+  --warning-soft: #fbf0dc;
+  --warning-ink: #6b4a00;
+  --danger-soft: #fbe7e4;
+  --terracota: #e0622e;
+
+  --chart-1: #0f7a6b;
+  --chart-2: #e0622e;
+  --chart-3: #1e8f5e;
+  --chart-4: #b9790f;
+  --chart-5: #5fc9b8;
+}
+
+@theme inline {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-ink: var(--warning-ink);
+  --color-danger-soft: var(--danger-soft);
+  --color-terracota: var(--terracota);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  /* Foco visível sempre — acessibilidade não é opcional aqui. */
+  :focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
+  }
+}
+
+/* Ondulação da "lagoa": assinatura visual do hero (some com movimento reduzido). */
+@layer components {
+  .hero-wave::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 -1px 0;
+    height: 64px;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 60px 30px at 10% 100%, var(--background) 60%, transparent 61%),
+      radial-gradient(ellipse 60px 30px at 35% 100%, var(--background) 60%, transparent 61%),
+      radial-gradient(ellipse 60px 30px at 60% 100%, var(--background) 60%, transparent 61%),
+      radial-gradient(ellipse 60px 30px at 85% 100%, var(--background) 60%, transparent 61%),
+      radial-gradient(ellipse 60px 30px at 110% 100%, var(--background) 60%, transparent 61%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-wave::after {
+    display: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

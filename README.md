@@ -102,7 +102,7 @@
   │   ├── styles.css      # design system
   │   └── api.js          # cliente HTTP + sessão + helpers
   ├── ROTEIRO_TESTE_ALUNOS.md  # roteiro de teste em sala
-  ├── docs/               # especificações, planos e tarefas (V2/V3, PLANO_UIUX, PLANO_MELHORIAS, PROJETO_*)
+  ├── docs/               # governanca/ (LGPD/ISO 27001), planos/, tecnico/, referencia/ (ver "Documentação extra")
   └── server/
       ├── schema.sql           # schema canônico (instalação do zero)
       ├── migration_001.sql    # migração p/ bancos antigos (perfil estendido)
@@ -270,8 +270,8 @@
 
 > **Ordem importa:** `migrate:all` roda `v3` → `professional-user` → `security`
 > → `privacy` → `interop` → `audit` → `audit:details` → `mfa:replay`
-> → `booking:duration` → `reminder:delivery` → `password:reset`,
-> nessa ordem. Pular o
+> → `booking:duration` → `reminder:delivery` → `password:reset` →
+> `waitlist` → `agenda`, nessa ordem. Pular o
 > `migrate:privacy` causa `Unknown column 'privacy_version'` no signup.
   >
   > **Pular o `migrate:interop` não dá erro visível — apenas desliga o MFA
@@ -371,8 +371,10 @@
   | ------ | -------- |
   | `npm run setup` | Instala as dependências, cria o banco, aplica todas as migrations e cria o admin. Idempotente. |
   | `npm run doctor` | Diagnóstico do ambiente: Node, `.env`, MySQL, migrations pendentes, porta 4000/8080 livre, e se falta `DATA_ENCRYPTION_KEY`. |
-  | `npm run dev` | Sobe a API (:4000) e o front (:8080) juntos. |
-  | `npm run dev:api` / `npm run dev:web` | Sobe um lado só. O `dev:api` libera texto puro de propósito (modo local). |
+  | `npm run dev` | Sobe a API (:4000) e o front **React** (`web/`, Vite, :8080) juntos. As páginas ainda não migradas (atendente, dashboard, admin) **não abrem** neste modo. |
+  | `npm run dev:legacy` | API (:4000) + front antigo em HTML (:8080, `serve-web.js`). É o que o `npm run test:e2e` usa até a migração terminar. |
+  | `npm run dev:api` / `npm run dev:web` | Sobe um lado só (`dev:web` = Vite). O `dev:api` libera texto puro de propósito (modo local). |
+  | `npm run build:web` / `npm run test:web` | Build de produção e testes (Vitest) do app React. |
 | `npm run start:api` | Sobe **só a API**, no modo fechado: sem `DATA_ENCRYPTION_KEY` ela recusa iniciar. É o caminho de produção. |
   | `npm test` | Suíte completa (`node:test`): contratos HTTP, RBAC, auditoria, cripto, front e banco. |
   | `npm run test:race` | Só o teste de concorrência do booking — precisa de duas conexões MySQL simultâneas. |
@@ -412,7 +414,7 @@ credencial, o sistema funciona mas não finge" que vale em produção.
 A auditoria falha só em severidade **crítica**. As 3 `high` restantes são de
 `nodemon → chokidar → braces`, que não têm correção upstream e só existem na
 máquina do desenvolvedor — descritas em
-[`docs/TECHNICAL_DEBT.md`](docs/TECHNICAL_DEBT.md). Um portão que falha todo
+[`docs/tecnico/TECHNICAL_DEBT.md`](docs/tecnico/TECHNICAL_DEBT.md). Um portão que falha todo
 dia por algo que ninguém pode corrigir é um portão que ninguém lê.
 
 ### Dentro de `server/` (`npm run <script>`)
@@ -424,7 +426,7 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   | `dev`              | `nodemon src/server.js`                             | Dev com auto-reload                                                                                                                                                        |
   | `seed:admin`       | `node scripts/seed-admin.js`                        | Cria (ou promove a `superadmin`) o admin do `.env` com `bcryptjs`                                                                                                          |
   | `seed:demo` | `node scripts/seed-v3-demo.js [--reset]` | Popula agenda demo em 4 unidades (serviços, 6 profissionais, horários + 3 vagas ocupadas p/ testar conflito; idempotente) |
-| `migrate:all` | roda todas em ordem | `v3` → `professional-user` → `security` → `privacy` → `interop` → `audit` → `audit:details` → `mfa:replay` → `booking:duration` → `reminder:delivery` → `password:reset`. Idempotente. **É o que o `setup` usa.** |
+| `migrate:all` | roda todas em ordem | `v3` → `professional-user` → `security` → `privacy` → `interop` → `audit` → `audit:details` → `mfa:replay` → `booking:duration` → `reminder:delivery` → `password:reset` → `waitlist` → `agenda`. Idempotente. **É o que o `setup` usa.** |
 | `migrate` | importa `migration_001.sql` | Só para bancos muito antigos (perfil estendido). O `schema.sql` já é a união de tudo, então banco novo não precisa. |
   | `migrate:v3` | `node scripts/migrate-v3.js` | Cria `social_name/cns/priority/guardian`, `unit_id/professional_id` e tabelas `professionals/unit_offers/professional_offers/work_schedules/schedule_blocks` (idempotente) |
   | `migrate:professional-user` | `node scripts/migrate-professional-user-link.js` | Adiciona `professionals.user_id` e o índice único que vincula a agenda ao atendente (idempotente; deve rodar antes de `migrate:security`) |
@@ -434,6 +436,8 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   | `migrate:audit` | `node scripts/migrate-audit.js` | **Aulas 1/6:** hash encadeado (`prev_hash`/`entry_hash`/`seq`) + MFA (`totp_*`) + FK do log `CASCADE→RESTRICT` |
   | `migrate:reminder:delivery` | `node scripts/migrate-reminder-delivery.js` | **Fase 7:** `reminders.sent_at/send_channel/send_error` — o job passou a enviar e-mail, e sem essas colunas um envio recusado seria indistinguível de um enviado |
 | `migrate:password:reset` | `node scripts/migrate-password-reset.js` | **Fase 7:** tabela `password_reset_tokens` (só o SHA-256 do token, `used_at` para uso único, `ON DELETE CASCADE` para respeitar a anonimização LGPD) |
+| `migrate:waitlist` | `node scripts/migrate-waitlist.js` | **NV03:** tabela `waitlist` (fila por serviço, prioridade legal primeiro, `record_id` do agendamento convertido; idempotente) |
+| `migrate:agenda` | `node scripts/migrate-agenda.js` | **Agenda operacional:** `para_remarcar`, `outcome`, `reschedule_reason`, duração por serviço, índices e `booking_events` (idempotente) |
   | `backup` | `node scripts/backup.js [--dir] [--keep=7]` | **Aulas 1/6:** dump `mysqldump` → gzip → SHA-256 + manifesto, com retenção |
   | `purge:retention` | `node scripts/purge-retention.js [--apply]` | **Fase 1:** sem `--apply` só lista contas inativas +5 anos; com `--apply` anonimiza + limpa refresh tokens +90 dias |
   | `sync:cnes` | `node scripts/sync-cnes.js [--apply]` | **Fase 2:** CNES → `health_units` (dry-run default; `CNES_MUNICIPIO_CODE=260850`) |
@@ -457,7 +461,7 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   - **Conta:** `account_status` (`ativo`/`inativo`/`pendente`); login bloqueia `inativo` e `pendente`; exclusão é soft delete e não retorna em listagens, stats, histórico nem CSV.
   - **Recuperação de senha:** `POST /auth/password/forgot` responde sempre igual (não revela e-mail), grava apenas o SHA-256 do token de uso único; sem SMTP a pendência fica registrada em vez de fingir envio. `POST /auth/password/reset` consome o token e revoga sessões antigas.
   - **Medidas administrativas:** desativar, excluir, trocar papel/senha ou rebaixar um admin revoga refresh tokens e resets pendentes; promover a `admin` exige capability `admins`.
-  - **LGPD — Fase 1:** CPF/RG/CNS cifrados no banco (AES-256-GCM, `utils/crypto.js`; chave em `DATA_ENCRYPTION_KEY`, futuro KMS/Vault); consentimento registrado no signup (`privacy_version`, `consent_at`, `consent_ip`); direitos exercíveis pelo titular — portabilidade (`GET /auth/me/export` + botão no dashboard), eliminação via anonimização (`DELETE /auth/me` com senha + botão no dashboard); visualização de documentos pelo admin auditada (`admin_view_user_docs`); expurgo automático de inativas +5 anos (`purge:retention`); DPO público (`GET /public/dpo` + `privacy.html` com bases legais art. 11). Governança em `docs/ROPA.md`, `docs/RIPD.md`, `docs/RESPOSTA_INCIDENTES.md`. Antes de uso com população ainda faltam: HTTPS/HSTS, DPO nomeado de verdade (`DPO_NAME/DPO_EMAIL` ainda vazios), revisão jurídica da `privacy.html` pela Procuradoria e KMS/Vault.
+  - **LGPD — Fase 1:** CPF/RG/CNS cifrados no banco (AES-256-GCM, `utils/crypto.js`; chave em `DATA_ENCRYPTION_KEY`, futuro KMS/Vault); consentimento registrado no signup (`privacy_version`, `consent_at`, `consent_ip`); direitos exercíveis pelo titular — portabilidade (`GET /auth/me/export` + botão no dashboard), eliminação via anonimização (`DELETE /auth/me` com senha + botão no dashboard); visualização de documentos pelo admin auditada (`admin_view_user_docs`); expurgo automático de inativas +5 anos (`purge:retention`); DPO público (`GET /public/dpo` + `privacy.html` com bases legais art. 11). Governança em `docs/governanca/ROPA.md`, `docs/governanca/RIPD.md`, `docs/governanca/RESPOSTA_INCIDENTES.md`. Antes de uso com população ainda faltam: HTTPS/HSTS, DPO nomeado de verdade (`DPO_NAME/DPO_EMAIL` ainda vazios), revisão jurídica da `privacy.html` pela Procuradoria e KMS/Vault.
 
   ## Segurança da informação (Aulas 1–8 de auditoria)
 
@@ -474,7 +478,7 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   **Trilha tamper-evident:** cada linha carrega `entry_hash = SHA-256(prev_hash|ator|ação|entidade|detalhes|momento)`. Adulterar, remover ou reinserir uma linha quebra o elo seguinte — e a verificação aponta **qual** linha. Botão **Verificar integridade** em `admin.html → Auditoria`.
 
   - Ativar MFA: `dashboard.html → Início → Verificação em duas etapas` → cadastre o segredo no Google/Microsoft Authenticator → digite o código.
-  - docs: `docs/PSI.md` (política/normas/procedimentos), `docs/GOVERNANCA.md` (três linhas, RACI, matriz de risco, PDCA), `docs/SOA_27001.md` (93 controles mapeados), `docs/TRILHA_AUDITORIA.md` (tipos, abordagens, kit SQL do auditor), `docs/DIREITO_TI.md` (LGPD, Marco Civil, art. 154-A CP).
+  - docs: `docs/governanca/PSI.md` (política/normas/procedimentos), `docs/governanca/GOVERNANCA.md` (três linhas, RACI, matriz de risco, PDCA), `docs/governanca/SOA_27001.md` (93 controles mapeados), `docs/governanca/TRILHA_AUDITORIA.md` (tipos, abordagens, kit SQL do auditor), `docs/governanca/DIREITO_TI.md` (LGPD, Marco Civil, art. 154-A CP).
 
   ## Lembretes automáticos e auditoria
 
@@ -494,18 +498,65 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
 
   ## Documentação extra
 
-  | Doc                                                       | Conteúdo                                                                                            |
-  | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-  | `docs/PROJETO_COMPLETO.md`                                | Documentação técnica consolidada (camadas, papéis, 14 tabelas, endpoints, fluxos, scripts, lacunas) |
-  | `docs/PLANO_MELHORIAS.md`                                 | Diagnóstico 2026-07-20 + plano em fases (segurança, dados, qualidade, produto)                      |
-  | `docs/PLANO_UIUX.md`                                      | Plano visual/UX                                                                                     |
-  | `docs/PROJETO_DO_ZERO.md`                                 | Guia de reconstrução do zero                                                                        |
-  | `docs/TAREFAS_SIMPLES_V2.md` / `V3.md` (+ `.html`/`.pdf`) | Tarefas fatiadas para alunos                                                                        |
-  | `docs/PLANO_RNDS_LGPD.md` | Plano Fases 0–2 (hardening, LGPD, RNDS/FHIR) |
-  | `docs/ROPA.md` | Registro de tratamentos + temporalidade/expurgo |
-  | `docs/RIPD.md` | Minuta de impacto (riscos × medidas) para DPO/Procuradoria |
-  | `docs/RESPOSTA_INCIDENTES.md` | Playbook (contenção, ANPD 3 dias úteis, modelo de aviso) |
-  | `server/scripts/build-pdf.js`                             | Gera os PDFs de `docs/`                                                                             |
+  `docs/` é organizado por assunto. Dentro de cada pasta, os documentos se
+  cross-referenciam por caminho relativo — ao mover um arquivo, atualize os
+  links que apontam para ele.
+
+  ### `docs/governanca/` — segurança da informação, LGPD e auditoria (Aulas 1–8)
+
+  | Doc | Conteúdo |
+  | --- | --- |
+  | `GOVERNANCA.md` | Três linhas de defesa, RACI, matriz de risco, PDCA do SGSI |
+  | `PSI.md` | Política de Segurança da Informação: política/normas/procedimentos/diretrizes |
+  | `SOA_27001.md` | Statement of Applicability — 93 controles ISO 27001/27002:2022 mapeados |
+  | `TRILHA_AUDITORIA.md` | Manual da trilha: tipos de auditoria, abordagens, kit SQL do auditor |
+  | `DIREITO_TI.md` | LGPD, Marco Civil, Lei Carolina Dieckmann (art. 154-A CP) → controle implementado |
+  | `ROPA.md` | Registro de Operações de Tratamento + temporalidade/expurgo |
+  | `RIPD.md` | Relatório de Impacto à Proteção de Dados (minuta Fase 1) |
+  | `RESPOSTA_INCIDENTES.md` | Playbook (contenção, ANPD 3 dias úteis, modelo de aviso ao titular) |
+
+  ### `docs/planos/` — planejamento e backlog
+
+  | Doc | Conteúdo |
+  | --- | --- |
+  | `PLANO_RNDS_LGPD.md` | Plano Fases 0–2 (hardening, LGPD, RNDS/FHIR) — o mais atualizado dos planos |
+  | `PLANO_MELHORIAS.md` | Diagnóstico backend/segurança/dado + plano em fases (atualizado 2026-10-26) |
+  | `PLANO_UIUX.md` | Diagnóstico visual/UX/acessibilidade + refactor do admin/dashboard |
+  | `PLANO_AGENDA_OPERACIONAL.md` | Plano da agenda operacional (recepção/admin) — Fases 0–3 implementadas |
+  | `PROJETO_DO_ZERO.md` | Visão de produto e roadmap de Sprints Scrum; apêndice aponta para `REQUISITOS_REFERENCIA.md` para o estado atual |
+  | `TAREFAS_SIMPLES_V3.md` (+ `.html`/`.pdf` gerados por `build-pdf.js`) | Checklist vivo para o time, com painel de status V2→V3 |
+  | `TAREFAS_SIMPLES_V2.md` (+ `.pdf`) | **Substituído pela V3** — mantido só como histórico do pedido original |
+  | `PROJETO_DO_ZERO.pdf` | PDF gerado de `PROJETO_DO_ZERO.md` |
+
+  ### `docs/tecnico/` — referência técnica
+
+  | Doc | Conteúdo |
+  | --- | --- |
+  | `PROJETO_COMPLETO.md` | Documentação técnica consolidada (camadas, papéis, 14 tabelas, endpoints, fluxos, scripts, lacunas) |
+  | `INTEROPERABILIDADE.md` | Arquitetura de interoperabilidade SUS: modelo FHIR R4, contrato de adaptador, gates G1–G7 |
+  | `REQUISITOS_INTEGRACAO_EXTERNA.md` | O que falta pra cada API (RNDS, CNS, Gov.br, e-SUS) funcionar de verdade — credencial, onde pedir, ordem de ação |
+  | `DESCOBERTA_SAUDE_DIGITAL.md` | Discovery institucional em andamento: qual sistema o município usa de fato (e-SUS CDS/PEC?) |
+  | `REQUISITOS_REFERENCIA.md` | Matriz requisito → código → veredito, comparando o TCC de referência com o Saúde+ atual |
+  | `TECHNICAL_DEBT.md` | Dívida técnica conhecida: o que foi corrigido, falso positivo, ou aceito conscientemente |
+
+  ### `docs/referencia/` — documentos-fonte externos (não editar)
+
+  | Doc | Conteúdo |
+  | --- | --- |
+  | `app_saude_referencia.pdf` | TCC (FATEC Lins) que originou o levantamento de requisitos |
+  | `Conectados para o Sucesso 2.0.pdf` | Proposta original da equipe/Programa Passaporte Digital |
+
+  ### `docs/superpowers/plans/` — registro histórico de execução
+
+  Planos de implementação já executados (plan-mode do agente), preservados como
+  auditoria do que foi decidido e por quê — não são documentação viva e não devem
+  ser editados retroativamente.
+
+  ### Scripts relacionados
+
+  | Script | Para quê |
+  | --- | --- |
+  | `server/scripts/build-pdf.js` | Gera o HTML/PDF de `docs/planos/TAREFAS_SIMPLES_V3.md` |
 
   ## Decisões técnicas
 
@@ -528,9 +579,9 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   6. ~~`admin_level` granular no backend~~ — **feito (P0.4):** `requireCapability` aplicado de verdade (`users`, `appointments`, `diseases`, `audit`, `reports`, `admins`); painel admin ainda unificado — separar visões por nível.
   7. ~~Retenção/expurgo~~ — **feito** (temporalidade + `purge:retention`); falta antes de dados reais: HTTPS/HSTS, DPO nomeado, revisão jurídica, KMS/Vault, Fase 2 (RNDS).
 
-  Ver detalhes em `docs/PLANO_MELHORIAS.md`. Os achados da auditoria que
+  Ver detalhes em `docs/planos/PLANO_MELHORIAS.md`. Os achados da auditoria que
   ficaram **fora** desta rodada estão em
-  [`docs/TECHNICAL_DEBT.md`](docs/TECHNICAL_DEBT.md), com gravidade, local e
+  [`docs/tecnico/TECHNICAL_DEBT.md`](docs/tecnico/TECHNICAL_DEBT.md), com gravidade, local e
   risco de cada um.
 
   ## Problemas comuns

@@ -59,7 +59,9 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run dev',
+    // Front legado (HTML) até cada página ser migrada para React: o e2e atual
+    // cobre atendente/dashboard/admin, que o `npm run dev` (React) não serve.
+    command: 'npm run dev:legacy',
     url: FRONT,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
