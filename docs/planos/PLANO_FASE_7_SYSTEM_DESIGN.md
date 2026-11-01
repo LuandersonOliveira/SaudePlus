@@ -87,10 +87,10 @@ Decisões estruturais viram **ADR** novo (`docs/tecnico/adr/`). O backlog result
 - **Escopo:** esta fase **analisa e propõe**; executar as mudanças é a fase seguinte, com planos próprios.
 
 ## 6. Checklist
-- [ ] Baseline: e2e verde em banco descartável
-- [ ] 7.1 Escopo do grafo definido; `.claude/` e dependências fora
-- [ ] 7.1 `graphify` atualizado; cobertura dos arquivos novos conferida
-- [ ] 7.1 Destino de `graphify-out/` decidido
+- [x] Baseline: e2e verde em banco descartável (28/28)
+- [x] 7.1 Escopo do grafo definido; `.claude/` e dependências fora
+- [x] 7.1 `graphify` atualizado; cobertura dos arquivos novos conferida
+- [x] 7.1 Destino de `graphify-out/` decidido
 - [ ] 7.2 `SYSTEM_DESIGN.md`: contexto, contêineres, componentes, sequências, fluxo de dados pessoais
 - [ ] 7.3 Consultas ao grafo: nós centrais, comunidades, violações de camada, código sem uso, duplicações
 - [ ] 7.4 Matriz requisito × componente × evidência

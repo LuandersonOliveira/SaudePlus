@@ -8,3 +8,7 @@ playwright-report/
 test-results/
 # Sessão do global-setup: contém o JWT do admin real. NUNCA versionar.
 e2e/.auth/
+
+# Grafo do graphify: so o relatorio e versionado; graph.json/html e cache sao regeneraveis.
+graphify-out/*
+!graphify-out/GRAPH_REPORT.md

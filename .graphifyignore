@@ -1,0 +1,33 @@
+# Escopo do grafo (Fase 7.1). Mesma sintaxe do .gitignore.
+# O .gitignore já é respeitado; aqui ficam só as exclusões que o git NÃO faz.
+
+# Configuração local de ferramentas: sem valor arquitetural e pode conter dados do ambiente
+.claude/
+.vscode/
+.superpowers/
+
+# Saídas geradas e dependências
+graphify-out/
+node_modules/
+web/dist/
+server/backups/
+e2e/.auth/
+playwright-report/
+test-results/
+
+# Código de terceiros copiado para o projeto (componentes shadcn gerados): ruído no grafo
+web/src/components/ui/
+
+# Binários e formatos duplicados dos .md
+*.pdf
+*.html
+!web/index.html
+
+# Planos históricos já executados (o que importa foi para docs/tecnico e para os ADRs)
+docs/superpowers/
+
+# Imagens e ícones: sem valor arquitetural e cada uma custaria uma chamada de visão
+*.svg
+*.png
+*.ico
+*.jpg
