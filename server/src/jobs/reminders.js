@@ -31,6 +31,7 @@
 const crypto = require('crypto');
 const pool = require('../db');
 const mailer = require('../services/mailer');
+const { comTravaDeJob } = require('../utils/jobLock');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Limite de reminders.message. Espelha o VARCHAR(255) do schema.
@@ -217,10 +218,18 @@ async function runReminderJob(now = new Date()) {
 }
 
 function startReminderJob() {
-    const execute = () => runReminderJob()
-        .then((result) => console.log(
-            `Job de lembretes: ${result.created} criado(s), ${result.failed} falha(s), ${result.pendentes} sem envio aceito.`
-        ))
+    // Uma instância por vez (A4): sem a trava, duas réplicas mandavam o mesmo
+    // lembrete duas vezes, porque "já existe?" + INSERT não é atômico.
+    const execute = () => comTravaDeJob(pool, 'reminders', () => runReminderJob())
+        .then(({ ran, result }) => {
+            if (!ran) {
+                console.log('Job de lembretes: outra instância já está executando; rodada pulada.');
+                return;
+            }
+            console.log(
+                `Job de lembretes: ${result.created} criado(s), ${result.failed} falha(s), ${result.pendentes} sem envio aceito.`
+            );
+        })
         .catch((err) => console.error('Falha no job de lembretes:', err));
 
     execute();

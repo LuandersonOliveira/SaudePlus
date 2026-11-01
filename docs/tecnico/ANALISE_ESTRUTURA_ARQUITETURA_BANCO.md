@@ -99,7 +99,7 @@ CPF/RG/CNS usam AES-256-GCM (correto), mas sem um *blind index* (HMAC do CPF). E
 | 1 | ~~B1 FKs + índice em `unit_id`~~ **feito** | S | integridade de dados clínicos |
 | 2 | ~~B3 `cpf_hmac` único + busca indexada~~ **feito** | M | duplicidade de pacientes + varredura O(N) |
 | 3 | ~~MFA base32 com migração de segredos~~ **feito** | M | 2º fator inutilizável em app real |
-| 4 | A4 trava no job de lembretes | S | duplicação de e-mails/SMS ao escalar |
+| 4 | ~~A4 trava no job de lembretes~~ **feito** (`utils/jobLock.js`, `GET_LOCK`; `job-lock.test.js`, 7) | S | duplicação de e-mails/SMS ao escalar |
 | 5 | A3 migrations numeradas | M | habilita todas as mudanças de banco acima com segurança |
 | 6 | A1/A2 serviços + validação Zod, começando por `auth` | L | manutenção; faça junto de cada mudança, não como projeto à parte |
 | 7 | A7 aposentar legado, A6 higiene, A8 bundle | S–M | redução de superfície |
