@@ -17,6 +17,10 @@ const { randomSecret, verifyTotp, matchStep, replayBloqueia, otpauthUrl } = requ
 const { cpfIgual, hmacCpf, ehCpfDuplicado, MENSAGEM_CPF_DUPLICADO } = require('../utils/cpf');
 const mailer = require('../services/mailer');
 const {
+  hashRefreshToken, readRefreshRaw, setRefreshCookie, clearRefreshCookie,
+  iniciarSessao, encerrarSessao, rotacionarSessao,
+} = require('../services/session');
+const {
   mfaAttempts,
   bloqueioMfa,
   registrarFalhaMfa,
@@ -29,83 +33,6 @@ const VALID_ROLES = ['paciente', 'atendente'];
 // As listas de ENUM e os validadores vivem em utils/validators.js (fonte
 // única, copiadas dos ENUMs do schema) para que signup e PUT /auth/me não
 // divirjam entre si.
-
-// --------------------------------------------------------------------------
-// Sessão curta + refresh rotativo (Fase 0, item 0.3 — alinhado ao padrão RNDS
-// de access de 15 min). Access continua Bearer; refresh via cookie httpOnly
-// (+ body p/ clientes sem cookie, ex. fetch sem credentials).
-// Guarda-se só o SHA-256 do refresh; roubo detectado por reuso => revoga família.
-// --------------------------------------------------------------------------
-const ACCESS_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
-const REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '30d';
-const REFRESH_COOKIE = 'saude_refresh';
-
-function refreshTtlMs() {
-  const m = String(REFRESH_EXPIRES_IN).trim().match(/^(\d+)\s*([smhd])$/i);
-  if (!m) return 30 * 24 * 60 * 60 * 1000;
-  const n = Number(m[1]);
-  const unit = { s: 1000, m: 60 * 1000, h: 3600 * 1000, d: 24 * 3600 * 1000 }[m[2].toLowerCase()];
-  return n * unit;
-}
-
-function hashRefreshToken(raw) {
-  return crypto.createHash('sha256').update(String(raw)).digest('hex');
-}
-
-function signAccessToken(payload) {
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: ACCESS_EXPIRES_IN });
-}
-
-function setRefreshCookie(res, raw, ttlMs = refreshTtlMs()) {
-  res.cookie(REFRESH_COOKIE, raw, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/auth',
-    maxAge: ttlMs,
-  });
-}
-
-/**
- * Prazo ABSOLUTO de uma família: o `expires_at` mais antigo que existe
- * nela, que é o do token original.
- *
- * A rotação precisa deste valor. Emitir com `Date.now() + TTL` a cada
- * vez faria o prazo andar junto com o uso — a família nunca venceria, e
- * um refresh token roubado viveria indefinidamente enquanto o titular
- * legítimo nunca perceberia. É o OAuth 2.0 BCP §4.14.2: rotacionar
- * preserva o prazo da família.
- */
-async function prazoDaFamilia(family) {
-  const [[minimo]] = await pool.query(
-    'SELECT MIN(expires_at) AS prazo FROM refresh_tokens WHERE family = ?',
-    [family]
-  );
-  if (!minimo || !minimo.prazo) return Date.now() + refreshTtlMs();
-  const ms = new Date(minimo.prazo).getTime();
-  return Number.isFinite(ms) && ms > 0 ? ms : Date.now() + refreshTtlMs();
-}
-
-/** Quanto ainda resta de vida, em ms, sem passar do prazo da família. */
-function restanteDaFamilia(deadlineMs, agora = Date.now()) {
-  return Math.max(0, Number(deadlineMs) - agora);
-}
-
-async function issueRefreshToken(userId, family, expiresAt = null) {
-  const raw = crypto.randomBytes(48).toString('hex');
-  const id = crypto.randomUUID();
-  const fam = family || crypto.randomUUID();
-  const prazo = expiresAt || new Date(Date.now() + refreshTtlMs());
-  await pool.query(
-    'INSERT INTO refresh_tokens (id, user_id, token_hash, family, expires_at) VALUES (?,?,?,?,?)',
-    [id, userId, hashRefreshToken(raw), fam, prazo]
-  );
-  return { raw, id, family: fam, expiresAt: new Date(prazo).getTime() };
-}
-
-function readRefreshRaw(req) {
-  return (req.body && req.body.refreshToken) || (req.cookies && req.cookies[REFRESH_COOKIE]) || null;
-}
 
 // --------------------------------------------------------------------------
 // Validações de dados essenciais (TAREFAS V3, item 6.2).
@@ -296,9 +223,7 @@ router.post('/login', async (req, res, next) => {
       return res.json({ mfa_required: true, mfa_ticket: mfaTicket });
     }
 
-    const token = signAccessToken(payload);
-    const { raw: refreshToken } = await issueRefreshToken(user.id);
-    setRefreshCookie(res, refreshToken);
+    const { token, refreshToken } = await iniciarSessao(res, payload, user.id);
 
     res.json({ token, refreshToken, user: payload });
   } catch (err) {
@@ -412,9 +337,7 @@ router.post('/mfa/verify', async (req, res, next) => {
       role: user.role, admin_level: user.admin_level || null, full_name: user.full_name,
       job_role: user.job_role || null,
     };
-    const token = signAccessToken(payload);
-    const { raw: refreshToken } = await issueRefreshToken(user.id);
-    setRefreshCookie(res, refreshToken);
+    const { token, refreshToken } = await iniciarSessao(res, payload, user.id);
     await req.audit('mfa_login', 'user', user.id, 'login com segundo fator', user.id);
     res.json({ token, refreshToken, user: payload });
   } catch (err) {
@@ -658,57 +581,13 @@ router.post('/password/reset', async (req, res, next) => {
 // Reuso de refresh já rotacionado = possível roubo => revoga a família inteira.
 router.post('/refresh', async (req, res, next) => {
   try {
-    const raw = readRefreshRaw(req);
-    if (!raw) return res.status(401).json({ error: 'Sessão expirada. Entre novamente.' });
-
-    const [rows] = await pool.query('SELECT * FROM refresh_tokens WHERE token_hash = ?', [hashRefreshToken(raw)]);
-    if (!rows.length) return res.status(401).json({ error: 'Sessão expirada. Entre novamente.' });
-
-    const stored = rows[0];
-    const expired = new Date(stored.expires_at).getTime() < Date.now();
-    if (stored.revoked || expired) {
-      // Token já usado/trocado e apresentado de novo: trata como comprometido.
-      await pool.query('UPDATE refresh_tokens SET revoked = 1 WHERE family = ?', [stored.family]);
-      res.clearCookie(REFRESH_COOKIE, { path: '/auth' });
-      return res.status(401).json({ error: 'Sessão invalidada por segurança. Entre novamente.' });
+    const r = await rotacionarSessao(readRefreshRaw(req));
+    if (!r.ok) {
+      if (r.limparCookie) clearRefreshCookie(res);
+      return res.status(r.status).json({ error: r.error });
     }
-
-// Emite o substituto ANTES de revogar o atual: se a emissão falhar,
-    // a sessão antiga continua válida (sem logout acidental).
-    // O prazo vem da FAMÍLIA, não de agora: rotacionar não pode estender a
-    // vida da sessão, senão o par nunca expira.
-    const deadline = await prazoDaFamilia(stored.family);
-    const { raw: nextRaw, id: nextId } = await issueRefreshToken(stored.user_id, stored.family, new Date(deadline));
-    const [upd] = await pool.query(
-      'UPDATE refresh_tokens SET revoked = 1, replaced_by = ? WHERE id = ? AND revoked = 0',
-      [nextId, stored.id]
-    );
-    if (upd.affectedRows === 0) {
-      // Corrida: o token foi usado em paralelo — trata como reuso.
-      await pool.query('UPDATE refresh_tokens SET revoked = 1 WHERE family = ?', [stored.family]);
-      res.clearCookie(REFRESH_COOKIE, { path: '/auth' });
-      return res.status(401).json({ error: 'Sessão invalidada por segurança. Entre novamente.' });
-    }
-    setRefreshCookie(res, nextRaw, restanteDaFamilia(deadline));
-
-    const [users] = await pool.query(
-      'SELECT id, email, role, admin_level, full_name, job_role, account_status FROM users WHERE id = ?',
-      [stored.user_id]
-    );
-    if (!users.length) {
-      return res.status(401).json({ error: 'Sessão expirada. Entre novamente.' });
-    }
-    const user = users[0];
-    if (user.account_status !== 'ativo') {
-      await pool.query('UPDATE refresh_tokens SET revoked = 1 WHERE family = ?', [stored.family]);
-      return res.status(403).json({ error: 'Conta desativada. Entre em contato com a administração.' });
-    }
-    const payload = {
-      id: user.id, email: user.email,
-      role: user.role, admin_level: user.admin_level || null, full_name: user.full_name,
-      job_role: user.job_role || null,
-    };
-    res.json({ token: signAccessToken(payload), refreshToken: nextRaw, user: payload });
+    setRefreshCookie(res, r.refreshToken, r.cookieTtlMs);
+    res.json({ token: r.token, refreshToken: r.refreshToken, user: r.payload });
   } catch (err) {
     next(err);
   }
@@ -796,9 +675,7 @@ router.get('/govbr/callback', async (req, res, next) => {
       await req.audit('govbr_login', 'user', user.id, 'login via Gov.br (aguardando MFA)', user.id);
       return res.json({ mfa_required: true, mfa_ticket: mfaTicket });
     }
-    const token = signAccessToken(payload);
-    const { raw: refreshToken } = await issueRefreshToken(user.id);
-    setRefreshCookie(res, refreshToken);
+    const { token, refreshToken } = await iniciarSessao(res, payload, user.id);
     await req.audit('govbr_login', 'user', user.id, 'login via Gov.br', user.id);
     res.json({ token, refreshToken, user: payload });
   } catch (err) {
@@ -809,11 +686,7 @@ router.get('/govbr/callback', async (req, res, next) => {
 // POST /auth/logout — revoga o refresh atual (se houver) e limpa o cookie.
 router.post('/logout', async (req, res, next) => {
   try {
-    const raw = readRefreshRaw(req);
-    if (raw) {
-      await pool.query('UPDATE refresh_tokens SET revoked = 1 WHERE token_hash = ?', [hashRefreshToken(raw)]);
-    }
-    res.clearCookie(REFRESH_COOKIE, { path: '/auth' });
+    await encerrarSessao(req, res);
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -898,11 +771,7 @@ router.delete('/me', verifyToken, async (req, res, next) => {
     if (!ok) return res.status(401).json({ error: 'Senha incorreta.' });
 
     await anonymizeUser(pool, req.user.id);
-    const raw = readRefreshRaw(req);
-    if (raw) {
-      await pool.query('UPDATE refresh_tokens SET revoked = 1 WHERE token_hash = ?', [hashRefreshToken(raw)]);
-    }
-    res.clearCookie(REFRESH_COOKIE, { path: '/auth' });
+    await encerrarSessao(req, res);
     res.json({ ok: true, message: 'Conta excluída e dados pessoais removidos.' });
   } catch (err) {
     next(err);
