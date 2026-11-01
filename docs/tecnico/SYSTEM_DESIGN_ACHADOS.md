@@ -98,8 +98,62 @@ Vêm da seção 8 do `SYSTEM_DESIGN.md`. Aqui só a classificação.
 | M-06 | Serviços recebem `{encrypt, decrypt}` e não `req` (`services/profile`, `adminUsers`) | O serviço não conhece a chave nem o HTTP | **I**, **encapsulamento** |
 | M-07 | Schemas puros em `schemas/` e regras puras em `utils/booking-*` | Testáveis sem banco; a equivalência do gerador de horários foi provada em 20 mil casos | **S**, **abstração** |
 
-## 8. Próximos passos da fase
+## 8. Comunidades e nós centrais do grafo (7.3)
 
-1. **7.3, o que falta:** nós centrais e comunidades (o grafo diz que `staff`, `admin` e `booking` se misturam?), caminhos do requisito até o código, e conferir no grafo que cada entidade da seção 8 do `SYSTEM_DESIGN.md` tem o mesmo conjunto de escritores que a busca achou.
+**Comunidades de `server/src`.** O grafo agrupa o código quase exatamente nos módulos pretendidos:
+
+| Comunidade do grafo | Arquivos | Leitura |
+|---|---|---|
+| Agendamento: núcleo e regras (7) | `bookingRules`, `booking-time`, `booking-priority`, `booking-slots` | Coesa, como a A1 desenhou |
+| Repositórios (27, 45) | `profissionais`, `agenda` | Coesa |
+| Serviço e schema de usuários do admin (23), de profissionais (30), de auth (28, 37), de MFA (54) | um serviço com seu schema | Coesa: cada serviço refatorado vira uma comunidade |
+| Auditoria (26) | `utils/audit`, `middleware/audit` | Coesa |
+| Reserva do paciente (56) | `me.booking.routes`, `booking-events`, `appointments.routes`, `exams.routes` | Coesa, mas é rota com SQL (E-01) |
+| Staff (29) | só `staff.routes.js` (24 nós) | Isolada: não se mistura com admin nem com booking no grafo |
+| Unidades e autorização (57) | `units.routes`, `middleware/auth`, `capabilities` | Acoplamento por uso, não mistura de domínio |
+
+**A hipótese do plano não se confirmou para `server/src`:** o grafo não mostra `staff`, `admin` e `booking` misturados. O problema deles não é mistura entre domínios, e sim **tamanho e SQL dentro da rota** (E-01), o que o grafo não mede. A baixa coesão (0,06 a 0,25) está no front (`web/src/features/*`), a olhar na 7.4 (evolução).
+
+**Nós mais chamados em `server/src` (hubs):**
+
+| Nó | Entradas | Leitura |
+|---|---|---|
+| `db.js` (pool) | 34 (19 módulos de `src`, mais testes e scripts) | Dependência concreta importada por todos: evidência de E-02 |
+| `utils/booking.js` (fachada) | 14 | Hub de uma fachada que reexporta tudo: interface larga (**I**), E-03 |
+| `utils/validators.js` | 10 (`digitsOnly` sozinho, 9) | Utilitário genuinamente compartilhado |
+| `utils/booking-time.js` | 8 (`parseDateTime`) | Núcleo puro compartilhado, como deve ser |
+| `utils/audit.js` | 8 | Esperado |
+| `services/session.js`, `utils/cpf.js`, `utils/totp.js` | 8 a 9 | Esperado |
+
+**Ajuste ao registro:** E-02 passa a citar 19 módulos de `src` importando `db.js`, não só os 7 serviços (as rotas e os jobs também). Achado novo:
+
+| ID | Achado | Princípio | Evidência | Sev. |
+|---|---|---|---|---|
+| E-23 | O helper de resultado `falha(status, erro)` (e `recusa`) está **copiado em 9 arquivos** com pequenas variações (`status` presente ou não, `body`, `extra`) | **Abstração**, **I** | `services/auth.js:23`, `adminUsers.js:27`, `adminProfessionals.js:22`, `profile.js:18`, `mfa.js:18`, `bookingChange.js:36` (como `recusa`), `schemas/profile.js:66`, `schemas/adminProfessionals.js:15`, `utils/adminHierarchy.js:42` | Baixa |
+
+## 9. Caminhos do requisito até o código (7.3)
+
+| Requisito | Componente que garante | Teste que prova | Lacuna |
+|---|---|---|---|
+| Sem dupla marcação | `repositories/agenda.travarEnvolvidos`, `services/bookingRules.validateBooking`, `UNIQUE (professional_id, active_slot)`, `utils/dbErrors` (409) | `race/booking-race`, `horario-unico`, `user-overlap`, `booking-duration` | Atendimento **sem profissional** tem `professional_id` nulo e escapa do `UNIQUE`; `applyBookingChange` só revalida quando há profissional e unidade. A confirmar se isso é aceito (legado) ou falha (7.4) |
+| Prioridade legal na fila e na agenda | `utils/booking-priority`, `services/waitlist.tentarPreencher` | `priority-booking`, `priority-quota`, `waitlist` | Regra copiada em 3 lugares (E-07) |
+| Fila de espera | `services/waitlist`, `routes/me.waitlist.routes` | `waitlist` | Duplicidade não atômica (E-18) |
+| Desativar profissional sem perder paciente | `services/adminProfessionals.atualizarProfissional` (transação, evento, aviso) | `professional-deactivation`, `admin-professionals-service` | Unidade não tem o mesmo tratamento (E-17) |
+| Sessão segura e MFA | `services/session`, `services/mfa`, `utils/totp`, `mfaAttempts`, `loginThrottle` | `session-service`, `refresh-prazo`, `mfa-service`, `mfa-replay*`, `login-throttle`, `race/mfa-replay-race` | Tokens em `localStorage` (E-21); contadores em memória (E-05) |
+| RBAC e hierarquia de admins | `middleware/capabilities`, `utils/adminHierarchy`, `services/adminUsers` | `capabilities`, `admin-hierarchy`, `admin-user-safety`, `admin-users-service` | Escopo do atendente ausente em `/staff/agenda/reports` e `/staff/booking-events` (já pendente no 3B) |
+| Trilha de auditoria íntegra | `utils/audit`, `middleware/audit`, triggers do `audit_log` | `audit-chain-gaps`, `audit-orphan`, `audit-lock-sinal`, `audit-details`, `race/audit-chain-race` | Paciente não audita (E-12); falha silenciosa sem ator (E-14); PII no `details` (E-15) |
+| LGPD: eliminação | `utils/privacy.anonymizeUser`, `services/profile.excluirConta` | `lgpd-anonymization`, `lgpd-delete-http` | Campos que sobram (E-10); dois "apagar" (E-11) |
+| LGPD: portabilidade e acesso | `services/profile.exportarDados`, `obterPerfil` | `profile-service`, `profile-update` | Exportação não é auditada; `GET /auth/me` sem máscara (E-22) |
+| LGPD: retenção | `scripts/purge-retention` | **nenhum teste encontrado** | Manual e incompleto (C-01) |
+| Lembretes | `jobs/reminders`, `utils/jobLock`, `services/mailer` | `reminders`, `reminder-delivery`, `job-lock`, `mailer` | Ciclo de 24 h contado da subida; coluna `read` sem uso (R-06) |
+| Interoperabilidade (RNDS, CNES, InfoDengue, CNS) | `services/rnds`, `cnes`, `infodengue`, `cns`, `routes/interop.routes` | **Nenhum arquivo em `server/test`**; só scripts manuais (`test-rnds.js`, `test-cns.js`, `sync-*.js`) | Sem teste automatizado: a camada "pronta, sem credenciamento" não tem rede de segurança |
+| Operação: prontidão, migrations, backup | `/health`, `/ready`, `scripts/migrate`, `scripts/backup` | `readiness-rate-limit`, `migrate-runner`, `boot-schema-guard`, `db-setup` | Restauração do backup sem teste automático |
+| Cobertura ponta a ponta | Playwright (`e2e/`: `login`, `patient`, `staff`, `admin`) | 28 casos | Nenhum caso de remarcação, fila ou desativação de profissional (a conferir na 7.4) |
+
+**Resposta à pergunta da 7.3:** a estrutura atual atende aos requisitos críticos de consistência, sessão, RBAC e auditoria, com prova por teste. Os requisitos **sem prova automática** são três: retenção LGPD, interoperabilidade e restauração de backup. As falhas de requisito (não só de estilo) estão em E-10, E-11, E-12, E-15 e E-21.
+
+## 10. Próximos passos da fase
+
+1. **7.3:** concluída (entidades, código sem uso, camadas, duplicações, comunidades, hubs e caminhos requisito → código). Falta apenas a aprovação deste registro.
 2. **7.4:** matriz de atributos de qualidade (consistência, segurança, contratos, desempenho, operação, observabilidade, testabilidade, evolução), incluindo a conferência contra `ROPA.md` e `RIPD.md`.
 3. **7.5:** fechar este registro, escrever os ADRs das decisões estruturais e entregar o plano de execução revisado para aprovação item a item.
