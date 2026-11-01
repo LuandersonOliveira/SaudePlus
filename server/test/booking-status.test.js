@@ -25,7 +25,7 @@ const {
   validateRescheduleReason,
 } = require('../src/utils/booking-status');
 const { registrarEvento, listarEventos } = require('../src/services/booking-events');
-const { applyBookingChange } = require('../src/utils/booking');
+const { applyBookingChange } = require('../src/services/bookingChange');
 
 let userId;
 let appointmentId;

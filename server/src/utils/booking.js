@@ -9,12 +9,7 @@
      para aquele serviço, atender no dia/horário e não ter conflito.
    ========================================================================== */
 
-const {
-  BOOKING_STATUS,
-  validateOutcome,
-  validateRescheduleReason,
-} = require('./booking-status');
-const { registrarEvento } = require('../services/booking-events');
+const { BOOKING_STATUS } = require('./booking-status');
 const {
   MAX_DAYS_AHEAD, AVAILABILITY_PAGE_DAYS, DURACAO_PADRAO, resolveAvailabilityWindow,
   parseDateTime, toDateStr, toMinutes, overlaps, validateScheduleWindow, duracaoDe, schedulePara,
@@ -29,7 +24,9 @@ const agenda = require('../repositories/agenda');
 // Desde o passo 7a do A1, o que é puro (tempo, duração, prioridade legal e a
 // geração dos horários livres de um dia) vive em booking-time/-priority/-slots;
 // este arquivo guarda as regras que juntam as duas coisas, e reexporta tudo para os
-// chamadores de sempre. Desde o 7b, o SQL de LEITURA mora em repositories/agenda.js.
+// chamadores de sempre. Desde o 7b, o SQL de LEITURA mora em repositories/agenda.js;
+// desde o 7c, a alteração por staff/admin (applyBookingChange) vive em services/bookingChange.js
+// (importe de lá: ele depende deste arquivo, e o contrário criaria um ciclo).
 
 const KINDS = ['consulta', 'exame'];
 
@@ -419,207 +416,6 @@ async function findAvailabilityByService(pool, opts) {
   return { tipo, name: servico, days, totalVagas, unidades, reason: null };
 }
 
-/*
- * Alteração de status/reagendamento por staff/admin (Fase 2, item 3).
- * Mesma lógica do PATCH /:kind/:id de staff.routes e admin.routes.
- * Não grava auditoria (Fase 3, item 2); devolve os dados para a rota registrar.
- *
- * opts = { kindKey: 'appointments'|'exams', id, body: {status, scheduled_at} }
- * Retorna { status, body } e, em sucesso, { audit: { entityType, details } }.
- */
-async function applyBookingChange(db, opts) {
-  const ownsConnection = typeof db.getConnection === 'function';
-  const conn = ownsConnection ? await db.getConnection() : db;
-  const meta = opts.kindKey === 'appointments'
-    ? { table: 'appointments', tipo: 'consulta', serviceColumn: 'specialty', entityType: 'appointment', kind: 'consulta' }
-    : opts.kindKey === 'exams'
-      ? { table: 'exams', tipo: 'exame', serviceColumn: 'exam_type', entityType: 'exam', kind: 'exame' }
-      : null;
-
-  const run = async (c) => {
-    if (!meta) return { status: 404, body: { error: 'Tipo inválido.' } };
-    const body = (opts && opts.body) || {};
-    const { status, scheduled_at } = body;
-    const temOutcome = Object.prototype.hasOwnProperty.call(body, 'outcome');
-    const temMotivo = Object.prototype.hasOwnProperty.call(body, 'reschedule_reason');
-    const updates = [];
-    const params = [];
-    const logParts = [];
-
-    if (status !== undefined) {
-      if (!BOOKING_STATUS.includes(status)) {
-        return { status: 400, body: { error: 'Status inválido.' } };
-      }
-      updates.push('status=?'); params.push(status); logParts.push(`status -> ${status}`);
-    }
-    if (temOutcome) {
-      const outcomeError = validateOutcome(body.outcome);
-      if (outcomeError) return { status: 400, body: { error: outcomeError } };
-      const outcome = body.outcome ? String(body.outcome).trim() : null;
-      updates.push('outcome=?'); params.push(outcome);
-      logParts.push(`desfecho -> ${outcome || 'limpo'}`);
-    }
-
-    const motivoFoiInformado = temMotivo;
-    let reason = temMotivo
-      ? (body.reschedule_reason ? String(body.reschedule_reason).trim() : null)
-      : null;
-    if (reason === null && (opts.autoReason || opts.defaultReason)) {
-      reason = opts.autoReason || opts.defaultReason;
-    }
-    if (temMotivo || reason !== null) {
-      // Motivo só entra como coluna quando o chamador o enviou ou há default.
-      if (temMotivo || (opts.autoReason || opts.defaultReason)) {
-        const reasonError = validateRescheduleReason(reason, {
-          required: false,
-        });
-        if (reasonError) return { status: 400, body: { error: reasonError } };
-      }
-    }
-
-    if (scheduled_at) {
-      const windowError = validateScheduleWindow(scheduled_at);
-      if (windowError) return { status: 400, body: { error: windowError } };
-      updates.push('scheduled_at=?'); params.push(scheduled_at);
-      logParts.push(`reagendado para ${scheduled_at}`);
-    }
-
-    // Motivo obrigatório ao reagendar (salvo quando há default/paciente). A
-    // exigência real depende do horário mudar de fato; uma gravação no mesmo
-    // horário (salvar sem mudar) não precisa de justificativa.
-    const motivoObrigatorio = opts.reasonRequired !== undefined
-      ? opts.reasonRequired
-      : !opts.autoReason && !opts.defaultReason;
-
-    // Coluna reschedule_reason: atualiza se motivo foi enviado ou há default.
-    if (temMotivo || (opts.defaultReason || opts.autoReason)) {
-      updates.push('reschedule_reason=?'); params.push(reason);
-      logParts.push(reason ? `motivo -> ${reason}` : 'motivo -> limpo');
-    }
-
-    if (!updates.length) return { status: 400, body: { error: 'Nada para atualizar.' } };
-
-    // Leitura/travamento do registro ATUAL antes da validação, para evitar
-    // corrida com outro reagendamento do mesmo item ou do mesmo utente.
-    const [[before]] = await c.query(
-      `SELECT id, status, scheduled_at, professional_id, unit_id, user_id,
-              ${meta.serviceColumn} AS service_name
-       FROM ${meta.table} WHERE id = ? FOR UPDATE`,
-      [opts.id]
-    );
-    if (!before) return { status: 404, body: { error: 'Registro não encontrado.' } };
-
-    const changedScheduled = Boolean(scheduled_at) && String(before.scheduled_at) !== String(scheduled_at);
-    if (changedScheduled && motivoObrigatorio && !motivoFoiInformado && !(opts.autoReason || opts.defaultReason)) {
-      return { status: 400, body: { error: 'Informe o motivo da remarcação.' } };
-    }
-    if (changedScheduled && (temMotivo || opts.autoReason || opts.defaultReason || motivoFoiInformado)) {
-      const reasonError = validateRescheduleReason(reason, { required: true });
-      if (reasonError) return { status: 400, body: { error: reasonError } };
-    }
-
-    await lockBookingActors(c, {
-      userId: before.user_id,
-      professionalId: before.professional_id,
-    });
-
-    // Se o registro tem profissional vinculado, revalida disponibilidade.
-    if (scheduled_at) {
-      if (before.professional_id && before.unit_id) {
-        const userPriority = await prioridadeDoUsuario(c, before.user_id);
-        const bookingError = await validateBooking(c, {
-          tipo: meta.tipo,
-          userId: before.user_id,
-          unitId: before.unit_id,
-          professionalId: before.professional_id,
-          serviceName: before.service_name,
-          scheduledAt: scheduled_at,
-          excludeId: opts.id,
-          userPriority,
-          currentScheduledAt: before.scheduled_at,
-        });
-        if (bookingError) return { status: 409, body: { error: bookingError } };
-
-        const duracao = await duracaoMinutos(c, {
-          unitId: before.unit_id,
-          professionalId: before.professional_id,
-          serviceName: before.service_name,
-          tipo: meta.tipo,
-          scheduledAt: scheduled_at,
-        });
-        updates.push('duration_minutes=?'); params.push(duracao);
-        logParts.push(`duracao -> ${duracao} min`);
-      }
-    }
-
-    const fromScheduled = before.scheduled_at;
-    const toScheduled = scheduled_at || before.scheduled_at;
-    const changedStatus = status !== undefined && status !== before.status;
-
-    params.push(opts.id);
-    const [result] = await c.query(
-      `UPDATE ${meta.table} SET ${updates.join(', ')} WHERE id=?`, params
-    );
-    if (result.affectedRows === 0) return { status: 404, body: { error: 'Registro não encontrado.' } };
-
-    // Eventos operacionais (append-only).
-    const actorUserId = opts.actorUserId || null;
-    try {
-      if (changedScheduled) {
-        await registrarEvento(c, {
-          kind: meta.kind,
-          bookingId: opts.id,
-          eventType: 'rescheduled',
-          fromScheduledAt: fromScheduled,
-          toScheduledAt: toScheduled,
-          fromProfessionalId: before.professional_id,
-          toProfessionalId: before.professional_id,
-          reason: reason || null,
-          actorUserId,
-        });
-      }
-      if (changedStatus) {
-        const eventType = status === 'cancelado' ? 'canceled' : 'status_changed';
-        await registrarEvento(c, {
-          kind: meta.kind,
-          bookingId: opts.id,
-          eventType,
-          fromScheduledAt: fromScheduled,
-          toScheduledAt: toScheduled,
-          fromProfessionalId: before.professional_id,
-          toProfessionalId: before.professional_id,
-          reason: reason || null,
-          actorUserId,
-        });
-      }
-    } catch (eventError) {
-      // Histórico não deve derrubar a atualização, salvo quando for best-effort.
-      if (opts.failOnEventError) throw eventError;
-    }
-
-    return {
-      status: 200,
-      body: { id: opts.id },
-      audit: { entityType: meta.entityType, details: logParts.join('; ') },
-    };
-  };
-
-  try {
-    if (ownsConnection) await conn.beginTransaction();
-    const result = await run(conn);
-    if (ownsConnection) {
-      if (result.status === 200) await conn.commit();
-      else await conn.rollback();
-    }
-    return result;
-  } catch (err) {
-    if (ownsConnection) await conn.rollback().catch(() => {});
-    throw err;
-  } finally {
-    if (ownsConnection) conn.release();
-  }
-}
-
 module.exports = {
   KINDS,
   TIPOS,
@@ -649,5 +445,4 @@ duracaoDe,
 DURACAO_PADRAO,
   getAvailability,
   findAvailabilityByService,
-  applyBookingChange,
 };

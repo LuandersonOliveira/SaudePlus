@@ -3,9 +3,10 @@ const crypto = require('crypto');
 const pool = require('../db');
 const { verifyToken, requireStaff } = require('../middleware/auth');
 const {
-  TIPOS, applyBookingChange, validateBooking, validateScheduleWindow,
+  TIPOS, validateBooking, validateScheduleWindow,
   duracaoMinutos, prioridadeDoUsuario, lockBookingActors,
 } = require('../utils/booking');
+const { applyBookingChange } = require('../services/bookingChange');
 const { listarEventos } = require('../services/booking-events');
 const { registrarEvento } = require('../services/booking-events');
 const { liberarVagaAposCancelamento } = require('../services/waitlist');

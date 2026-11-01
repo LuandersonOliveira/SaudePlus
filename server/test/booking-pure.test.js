@@ -221,7 +221,7 @@ test('utils/booking.js segue exportando tudo o que rotas e serviços importam', 
     'isPriorityUser', 'prioridadeDoUsuario', 'quotaPrioritaria', 'gradeDoDia', 'reservasDoDia', 'slotReservado',
     'BOOKING_STATUS', 'parseDateTime', 'toDateStr', 'validateScheduleWindow', 'lockBookingActors',
     'validateUserOverlap', 'validateBooking', 'duracaoServico', 'duracaoMinutos', 'duracaoDe',
-    'DURACAO_PADRAO', 'getAvailability', 'findAvailabilityByService', 'applyBookingChange',
+    'DURACAO_PADRAO', 'getAvailability', 'findAvailabilityByService',
   ];
   for (const n of nomes) assert.notEqual(booking[n], undefined, `booking.${n} sumiu da fachada`);
   assert.equal(booking.parseDateTime, T.parseDateTime, 'a fachada reexporta a MESMA função, não uma cópia');
