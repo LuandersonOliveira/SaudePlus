@@ -1,6 +1,6 @@
 # ADR-0007 — Integridade no banco: FKs e horário único por coluna gerada
 
-**Status:** **Proposta** (aguarda RFC-0001) · **Data:** 2026-11-01 · **Evidência:** POC-001 §1 e §3 · **Detalhe:** ESPEC-001 §2
+**Status:** **Parcialmente implementada** — item 1 (FKs + índice, B1) feito em 2026-11-01 (`server/scripts/migrate-booking-refs.js`, `server/test/booking-refs.test.js`, 9 testes); itens 2–3 (horário único, B2) seguem como **Proposta** · **Data:** 2026-11-01 · **Evidência:** POC-001 §1 e §3 · **Detalhe:** ESPEC-001 §2
 
 ## Contexto
 `appointments`/`exams` só têm FK para `user_id`. `unit_id`/`professional_id` aceitam ids inexistentes e não há índice em `unit_id`. A exclusividade de horário depende de `SELECT … FOR UPDATE` e de testes de corrida: eficaz, mas nenhum mecanismo impede um novo caminho de escrita de esquecê-lo.

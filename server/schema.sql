@@ -175,6 +175,12 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 -- ---------------------------------------------------------------------
 -- Consultas médicas agendadas pelo usuário
 -- ---------------------------------------------------------------------
+-- appointments e exams referenciam health_units e professionals, criadas mais abaixo.
+-- Com a checagem desligada o MySQL aceita a FK antes de o pai existir; ela volta
+-- a ser ligada logo depois de professionals (RFC-0001 / migrate:booking:refs).
+SET @fk_checks_antes = @@FOREIGN_KEY_CHECKS;
+SET FOREIGN_KEY_CHECKS = 0;
+
 CREATE TABLE IF NOT EXISTS appointments (
     id CHAR(36) NOT NULL PRIMARY KEY,
     user_id CHAR(36) NOT NULL,
@@ -204,10 +210,13 @@ CREATE TABLE IF NOT EXISTS appointments (
     reschedule_reason VARCHAR(255) NULL DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_appointments_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_appointments_unit FOREIGN KEY (unit_id) REFERENCES health_units (id) ON DELETE SET NULL,
+    CONSTRAINT fk_appointments_professional FOREIGN KEY (professional_id) REFERENCES professionals (id) ON DELETE SET NULL,
     INDEX idx_appointments_user (user_id),
     INDEX idx_appointments_scheduled (scheduled_at),
     INDEX idx_appointments_user_scheduled (user_id, scheduled_at),
     INDEX idx_appointments_prof_scheduled (professional_id, scheduled_at),
+    INDEX idx_appointments_unit_scheduled (unit_id, scheduled_at),
     INDEX idx_appointments_status_scheduled (status, scheduled_at)
 ) ENGINE = InnoDB;
 
@@ -279,10 +288,13 @@ CREATE TABLE IF NOT EXISTS exams (
     reschedule_reason VARCHAR(255) NULL DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_exams_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_exams_unit FOREIGN KEY (unit_id) REFERENCES health_units (id) ON DELETE SET NULL,
+    CONSTRAINT fk_exams_professional FOREIGN KEY (professional_id) REFERENCES professionals (id) ON DELETE SET NULL,
     INDEX idx_exams_user (user_id),
     INDEX idx_exams_scheduled (scheduled_at),
     INDEX idx_exams_user_scheduled (user_id, scheduled_at),
     INDEX idx_exams_prof_scheduled (professional_id, scheduled_at),
+    INDEX idx_exams_unit_scheduled (unit_id, scheduled_at),
     INDEX idx_exams_status_scheduled (status, scheduled_at)
 ) ENGINE = InnoDB;
 
@@ -481,6 +493,8 @@ CREATE TABLE IF NOT EXISTS professionals (
     CONSTRAINT fk_professionals_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL,
     UNIQUE KEY uq_professionals_user (user_id)
 ) ENGINE = InnoDB;
+
+SET FOREIGN_KEY_CHECKS = @fk_checks_antes;
 
 -- O que cada UNIDADE oferece (especialidade de consulta ou tipo de exame)
 CREATE TABLE IF NOT EXISTS unit_offers (

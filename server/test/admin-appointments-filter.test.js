@@ -75,6 +75,11 @@ test.before(async () => {
     { expiresIn: '10m' }
   );
 
+  // unit_id agora tem FK (RFC-0001/B1): as unidades do teste precisam existir.
+  for (const [id, nome] of [[UNIT_A, 'UBS Filtro A'], [UNIT_B, 'UBS Filtro B']]) {
+    await pool.query("INSERT INTO health_units (id, name, type) VALUES (?, ?, 'ubs')", [id, nome]);
+  }
+
   userId = await inserirUsuario();
 });
 
@@ -82,6 +87,7 @@ test.after(async () => {
   await pool.query('DELETE FROM appointments WHERE user_id = ?', [userId]).catch(() => {});
   await pool.query('DELETE FROM exams WHERE user_id = ?', [userId]).catch(() => {});
   await pool.query('DELETE FROM users WHERE id = ?', [userId]).catch(() => {});
+  await pool.query('DELETE FROM health_units WHERE id IN (?, ?)', [UNIT_A, UNIT_B]).catch(() => {});
   if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
   await new Promise((r) => server.close(r));
   await pool.end().catch(() => {});

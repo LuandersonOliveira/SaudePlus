@@ -96,7 +96,9 @@ test('a lista do doctor bate com o que o schema.sql cria', () => {
     'utf8'
   );
   for (const [tabela, coluna] of COLUNAS_ESPERADAS) {
-    const bloco = new RegExp(`CREATE TABLE[^;]*\\b${tabela}\\b[\\s\\S]*?\\) ENGINE`, 'i').exec(schema);
+    // Começa no nome da tabela recém-criada, não em qualquer menção a ela: um
+    // `REFERENCES professionals` dentro de appointments não é a criação de professionals.
+    const bloco = new RegExp(`CREATE TABLE(?: IF NOT EXISTS)?\\s+${tabela}\\b[\\s\\S]*?\\) ENGINE`, 'i').exec(schema);
     assert.ok(bloco, `schema.sql deveria criar ${tabela}`);
     assert.match(
       bloco[0],

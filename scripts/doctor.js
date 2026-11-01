@@ -49,6 +49,14 @@ const COLUNAS_ESPERADAS = [
   ['waitlist', 'status'],
   ['waitlist', 'record_id'],
 ];
+// Chaves estrangeiras que a migrate:booking:refs cria (RFC-0001, B1). Sem elas o banco volta a
+// aceitar unit_id/professional_id inexistentes e nada no app reclama.
+const FKS_ESPERADAS = [
+  ['appointments', 'fk_appointments_unit'],
+  ['appointments', 'fk_appointments_professional'],
+  ['exams', 'fk_exams_unit'],
+  ['exams', 'fk_exams_professional'],
+];
 const TABELAS_ESPERADAS = [
   'refresh_tokens',
   'password_reset_tokens',
@@ -221,6 +229,14 @@ async function checkMigrations(dbName, pool) {
   for (const t of TABELAS_ESPERADAS) {
     if (!temTabela.has(t)) faltando.push(`tabela ${t}`);
   }
+  const [fks] = await pool.query(
+    'SELECT table_name AS t, constraint_name AS c FROM information_schema.referential_constraints WHERE constraint_schema = ?',
+    [dbName]
+  );
+  const temFk = new Set(fks.map((r) => `${r.t}.${r.c}`));
+  for (const [t, c] of FKS_ESPERADAS) {
+    if (!temFk.has(`${t}.${c}`)) faltando.push(`FK ${t}.${c}`);
+  }
   return faltando;
 }
 
@@ -365,6 +381,7 @@ module.exports = {
   // fica verde em uma base quebrada — que é o que ele existe para evitar.
   COLUNAS_ESPERADAS,
   TABELAS_ESPERADAS,
+  FKS_ESPERADAS,
 };
 
 if (require.main === module) {

@@ -51,7 +51,9 @@ Chunk principal 555 kB (aviso do Vite acima de 500 kB); rotas por papel já são
 
 Resumo do modelo: `users` (40 colunas) concentra perfil, credenciais, MFA, consentimento e Gov.br; agendamento em `appointments`/`exams` (+ `booking_events`, `waitlist`); oferta em `health_units` → `unit_offers`, `professionals` → `professional_offers`/`work_schedules`/`schedule_blocks`; segurança em `refresh_tokens`, `password_reset_tokens`, `audit_log` (cadeia de hash).
 
-### B1 — Agendamentos sem integridade referencial para unidade e profissional (alta)
+### B1 — Agendamentos sem integridade referencial para unidade e profissional (alta) — **FEITO em 2026-11-01**
+**Implementado:** `migrate:booking:refs` (entra no `migrate:all`) + FKs/índices no `schema.sql` (4 FKs `ON DELETE SET NULL`, índice `(unit_id, scheduled_at)` nas duas tabelas); o `doctor` passou a conferir as FKs. Com órfãos a migração **para sem alterar nada** e lista os registros; `--fix-orphans` zera só o vínculo. Auditoria no banco de desenvolvimento: 0 órfãos (tabelas vazias). Testes: `server/test/booking-refs.test.js` (9) + suíte do servidor 370/372 e corrida 7/7. Texto original do achado abaixo.
+
 `appointments`/`exams` têm `unit_id` e `professional_id`, mas **só `user_id` tem FK** (`schema.sql`). Não há índice em `unit_id`. Também guardam `location`, `doctor`, `specialty` como texto livre copiado no momento do agendamento. Consequências: ids órfãos possíveis; renomear uma unidade não reflete nos agendamentos antigos (pode ser desejado como "foto", mas hoje não é decisão documentada); consultas por unidade fazem varredura.
 **Ação:** (1) auditar órfãos (`SELECT … WHERE unit_id IS NOT NULL AND unit_id NOT IN (SELECT id FROM health_units)`); (2) adicionar FKs `ON DELETE SET NULL` + `INDEX (unit_id, scheduled_at)`; (3) documentar que `location/doctor` são a "foto" do momento.
 
