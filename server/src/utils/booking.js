@@ -24,11 +24,12 @@ const {
   isPriorityUser, quotaPrioritaria, gradeDoDia, reservasDoDia, slotReservado,
 } = require('./booking-priority');
 const { gerarSlotsDoDia } = require('./booking-slots');
+const agenda = require('../repositories/agenda');
 
 // Desde o passo 7a do A1, o que é puro (tempo, duração, prioridade legal e a
 // geração dos horários livres de um dia) vive em booking-time/-priority/-slots;
-// este arquivo guarda o SQL e as regras que juntam as duas coisas, e reexporta
-// tudo para os chamadores de sempre.
+// este arquivo guarda as regras que juntam as duas coisas, e reexporta tudo para os
+// chamadores de sempre. Desde o 7b, o SQL de LEITURA mora em repositories/agenda.js.
 
 const KINDS = ['consulta', 'exame'];
 
@@ -45,96 +46,9 @@ function resolveTipo(opts) {
   return TIPOS[t] ? t : null;
 }
 
-async function prioridadeDoUsuario(pool, userId) {
-  if (!userId) return null;
-  const [rows] = await pool.query('SELECT priority FROM users WHERE id = ?', [userId]);
-  return rows.length ? rows[0].priority : null;
-}
-
-async function fetchBusyIntervals(pool, professionalId, fromStr, toStr, excludeId) {
-  const intervals = [];
-  for (const table of ['appointments', 'exams']) {
-    const [rows] = await pool.query(
-      `SELECT id, scheduled_at, duration_minutes FROM ${table}
-       WHERE professional_id = ? AND status IN ('pendente', 'confirmado')
-         AND scheduled_at BETWEEN ? AND ?`,
-      [professionalId, `${fromStr} 00:00:00`, `${toStr} 23:59:59`]
-    );
-    for (const row of rows) {
-      if (excludeId && row.id === excludeId) continue;
-      const start = parseDateTime(row.scheduled_at);
-      if (start) intervals.push({ start: start.getTime(), end: start.getTime() + duracaoDe(row) * 60000 });
-    }
-  }
-  const [blocks] = await pool.query(
-    `SELECT starts_at, ends_at FROM schedule_blocks
-     WHERE professional_id = ? AND starts_at <= ? AND ends_at >= ?`,
-    [professionalId, `${toStr} 23:59:59`, `${fromStr} 00:00:00`]
-  );
-  for (const row of blocks) {
-    const start = parseDateTime(row.starts_at);
-    const end = parseDateTime(row.ends_at);
-    if (start && end) intervals.push({ start: start.getTime(), end: end.getTime() });
-  }
-  return intervals;
-}
-
-// Versão em lote (Fase 1, item 1): carrega os intervalos ocupados de vários
-// profissionais com 3 queries no total — usada pelo /catalog/slots, que
-// agrega todas as unidades de uma vez.
-async function fetchBusyIntervalsBulk(pool, professionalIds, fromStr, toStr, excludeId) {
-  const byProf = new Map();
-  const ids = [...new Set((professionalIds || []).filter(Boolean))];
-  if (!ids.length) return byProf;
-  const ensure = (id) => {
-    if (!byProf.has(id)) byProf.set(id, []);
-    return byProf.get(id);
-  };
-
-  for (const table of ['appointments', 'exams']) {
-    const [rows] = await pool.query(
-      `SELECT professional_id, id, scheduled_at, duration_minutes FROM ${table}
-       WHERE professional_id IN (?) AND status IN ('pendente', 'confirmado')
-         AND scheduled_at BETWEEN ? AND ?`,
-      [ids, `${fromStr} 00:00:00`, `${toStr} 23:59:59`]
-    );
-    for (const row of rows) {
-      if (excludeId && row.id === excludeId) continue;
-      const start = parseDateTime(row.scheduled_at);
-      if (start) ensure(row.professional_id).push({ start: start.getTime(), end: start.getTime() + duracaoDe(row) * 60000 });
-    }
-  }
-  const [blocks] = await pool.query(
-    `SELECT professional_id, starts_at, ends_at FROM schedule_blocks
-     WHERE professional_id IN (?) AND starts_at <= ? AND ends_at >= ?`,
-    [ids, `${toStr} 23:59:59`, `${fromStr} 00:00:00`]
-  );
-  for (const row of blocks) {
-    const start = parseDateTime(row.starts_at);
-    const end = parseDateTime(row.ends_at);
-    if (start && end) ensure(row.professional_id).push({ start: start.getTime(), end: end.getTime() });
-  }
-  return byProf;
-}
-
-/*
- * Valida uma criação/edição de agendamento.
- * Retorna string de erro ou null quando liberado.
- *
- * opts = {
- *   tipo: 'consulta' | 'exame' (ou `kind` legado),
- *   unitId, professionalId (pode ser null p/ serviço "Outro"),
- *   serviceName, scheduledAt, excludeId (registro em edição)
- * }
- */
-async function agendasDoDia(pool, professionalId, unitId, when) {
-  const [rows] = await pool.query(
-    `SELECT start_time, end_time, slot_minutes FROM work_schedules
-     WHERE professional_id = ? AND unit_id = ? AND weekday = ? AND active = 1`,
-    [professionalId, unitId, when.getDay()]
-  );
-  return rows;
-}
+// Leituras da agenda: repositories/agenda.js. Os nomes antigos seguem exportados.
+const prioridadeDoUsuario = agenda.prioridadeDoUsuario;
+const lockBookingActors = agenda.travarEnvolvidos;
 
 /**
  * Duração declarada pelo serviço na unidade. NULL significa "use o slot da
@@ -143,13 +57,7 @@ async function agendasDoDia(pool, professionalId, unitId, when) {
  */
 async function duracaoServico(pool, { unitId, serviceName, tipo }) {
   if (!unitId || !serviceName || !tipo) return null;
-  const [[row]] = await pool.query(
-    `SELECT duration_minutes FROM unit_offers
-     WHERE unit_id = ? AND kind = ? AND name = ? AND active = 1`,
-    [unitId, tipo, serviceName]
-  );
-  const d = Number(row && row.duration_minutes);
-  return Number.isFinite(d) && d > 0 ? d : null;
+  return agenda.duracaoDaOferta(pool, { unitId, serviceName, tipo });
 }
 
 /**
@@ -163,24 +71,8 @@ async function duracaoMinutos(pool, { unitId, professionalId, serviceName, tipo,
   const when = parseDateTime(scheduledAt);
   if (!when) return DURACAO_PADRAO;
   const servico = await duracaoServico(pool, { unitId, serviceName, tipo });
-  const casa = schedulePara(await agendasDoDia(pool, professionalId, unitId, when), when, servico);
+  const casa = schedulePara(await agenda.agendasDoDia(pool, professionalId, unitId, when.getDay()), when, servico);
   return casa ? casa.duration : DURACAO_PADRAO;
-}
-
-/**
- * Trava utente e profissional na MESMA ordem em todas as requisições.
- * Sem isso, A agenda o profissional X do utente 1 enquanto B agenda o
- * profissional Y do utente 2: nenhuma das duas vê a outra e as duas passam.
- * A ordenação por id elimina o ciclo clássico de deadlock.
- */
-async function lockBookingActors(db, { userId, professionalId }) {
-  const alvos = [];
-  if (userId) alvos.push({ id: userId, tabela: 'users' });
-  if (professionalId) alvos.push({ id: professionalId, tabela: 'professionals' });
-  alvos.sort((a, b) => (a.id === b.id ? a.tabela.localeCompare(b.tabela) : a.id.localeCompare(b.id)));
-  for (const alvo of alvos) {
-    await db.query(`SELECT id FROM ${alvo.tabela} WHERE id = ? FOR UPDATE`, [alvo.id]);
-  }
 }
 
 async function validateUserOverlap(pool, { userId, scheduledAt, durationMinutes, excludeId }) {
@@ -193,26 +85,23 @@ async function validateUserOverlap(pool, { userId, scheduledAt, durationMinutes,
   const from = toDateStr(new Date(startMs - 24 * 3600 * 1000));
   const to = toDateStr(new Date(endMs + 24 * 3600 * 1000));
 
-  for (const table of ['appointments', 'exams']) {
-    const [rows] = await pool.query(
-      `SELECT id, scheduled_at, duration_minutes FROM ${table}
-       WHERE user_id = ? AND status IN ('pendente', 'confirmado')
-         AND scheduled_at BETWEEN ? AND ?`,
-      [userId, `${from} 00:00:00`, `${to} 23:59:59`]
-    );
-    for (const row of rows) {
-      if (excludeId && row.id === excludeId) continue;
-      const inicio = parseDateTime(row.scheduled_at);
-      if (!inicio) continue;
-      const fim = inicio.getTime() + duracaoDe(row) * 60000;
-      if (overlaps(startMs, endMs, inicio.getTime(), fim)) {
-        return 'Este utente já tem outro atendimento neste horário.';
-      }
-    }
+  const ocupados = await agenda.intervalosOcupadosDoUsuario(pool, userId, from, to, excludeId);
+  if (ocupados.some((iv) => overlaps(startMs, endMs, iv.start, iv.end))) {
+    return 'Este utente já tem outro atendimento neste horário.';
   }
   return null;
 }
 
+/*
+ * Valida uma criação/edição de agendamento.
+ * Retorna string de erro ou null quando liberado.
+ *
+ * opts = {
+ *   tipo: 'consulta' | 'exame' (ou `kind` legado),
+ *   unitId, professionalId (pode ser null p/ serviço "Outro"),
+ *   serviceName, scheduledAt, excludeId (registro em edição)
+ * }
+ */
 async function validateBooking(pool, opts) {
   const { unitId, professionalId, serviceName, scheduledAt, excludeId } = opts;
   const tipo = resolveTipo(opts);
@@ -222,16 +111,12 @@ async function validateBooking(pool, opts) {
   if (windowError) return windowError;
 
   if (!unitId) return 'Selecione a unidade de saúde.';
-  const [[unit]] = await pool.query('SELECT id, active FROM health_units WHERE id = ?', [unitId]);
+  const unit = await agenda.unidadePorId(pool, unitId);
   if (!unit) return 'Unidade de saúde não encontrada.';
   if (!Number(unit.active)) return 'Esta unidade de saúde está inativada.';
 
   // Serviço já cadastrado pela unidade?
-  const [offers] = await pool.query(
-    'SELECT id FROM unit_offers WHERE unit_id = ? AND kind = ? AND name = ? AND active = 1',
-    [unitId, tipo, serviceName || '']
-  );
-  const isRegisteredOffer = offers.length > 0;
+  const isRegisteredOffer = await agenda.unidadeOfereceServico(pool, { unitId, tipo, serviceName });
 
   if (!professionalId) {
     // Serviço "Outro"/personalizado: a unidade aloca o atendimento depois.
@@ -239,23 +124,21 @@ async function validateBooking(pool, opts) {
     return null;
   }
 
-  const [[prof]] = await pool.query('SELECT id, active FROM professionals WHERE id = ?', [professionalId]);
+  const prof = await agenda.profissionalPorId(pool, professionalId);
   if (!prof) return 'Profissional não encontrado.';
   if (!Number(prof.active)) return 'Este profissional está inativo.';
   if (!isRegisteredOffer) {
     return 'Este serviço não está vinculado à unidade escolhida.';
   }
 
-  const [links] = await pool.query(
-    'SELECT id FROM professional_offers WHERE professional_id = ? AND unit_id = ? AND kind = ? AND name = ?',
-    [professionalId, unitId, tipo, serviceName]
-  );
-  if (!links.length) return 'Este profissional não atende este serviço nesta unidade.';
+  if (!(await agenda.profissionalAtendeServico(pool, { professionalId, unitId, tipo, serviceName }))) {
+    return 'Este profissional não atende este serviço nesta unidade.';
+  }
 
   const when = parseDateTime(scheduledAt);
   if (!when) return 'Informe uma data e horário válidos.';
   const servicoDuracao = await duracaoServico(pool, { unitId, serviceName, tipo });
-  const schedules = await agendasDoDia(pool, professionalId, unitId, when);
+  const schedules = await agenda.agendasDoDia(pool, professionalId, unitId, when.getDay());
   const casa = schedulePara(schedules, when, servicoDuracao);
   if (!casa) return 'O profissional não atende neste dia e horário.';
 
@@ -277,7 +160,7 @@ async function validateBooking(pool, opts) {
   const slot = casa.duration;
 
   const dateStr = toDateStr(when);
-  const intervals = await fetchBusyIntervals(pool, professionalId, dateStr, dateStr, excludeId);
+  const intervals = await agenda.intervalosOcupados(pool, professionalId, dateStr, dateStr, excludeId);
   const startMs = when.getTime();
   const endMs = startMs + slot * 60000;
   for (const iv of intervals) {
@@ -310,30 +193,22 @@ async function getAvailability(pool, opts) {
 
   if (!unitId || !professionalId || !tipo) return empty;
 
-  const [[unit]] = await pool.query('SELECT active FROM health_units WHERE id = ?', [unitId]);
+  const unit = await agenda.unidadePorId(pool, unitId);
   if (!unit || !Number(unit.active)) {
     return { days: [], reason: 'A unidade escolhida está inativada.' };
   }
 
-  const [[prof]] = await pool.query('SELECT active FROM professionals WHERE id = ?', [professionalId]);
+  const prof = await agenda.profissionalPorId(pool, professionalId);
   if (!prof || !Number(prof.active)) {
     return { days: [], reason: 'O profissional escolhido está inativo.' };
   }
 
-  const [links] = await pool.query(
-    'SELECT id FROM professional_offers WHERE professional_id = ? AND unit_id = ? AND kind = ? AND name = ?',
-    [professionalId, unitId, tipo, serviceName || '']
-  );
-  if (!links.length) {
+  if (!(await agenda.profissionalAtendeServico(pool, { professionalId, unitId, tipo, serviceName }))) {
     return { days: [], reason: 'Este profissional não atende este serviço nesta unidade.' };
   }
   const servicoDuracao = await duracaoServico(pool, { unitId, serviceName, tipo });
 
-  const [schedules] = await pool.query(
-    `SELECT weekday, start_time, end_time, slot_minutes FROM work_schedules
-     WHERE professional_id = ? AND unit_id = ? AND active = 1`,
-    [professionalId, unitId]
-  );
+  const schedules = await agenda.agendasDaSemana(pool, professionalId, unitId);
   if (!schedules.length) {
     return { days: [], reason: 'Este profissional ainda não tem horários cadastrados nesta unidade.' };
   }
@@ -341,7 +216,7 @@ async function getAvailability(pool, opts) {
   const start = new Date(fromDate + 'T00:00:00');
   if (isNaN(start.getTime())) return empty;
   const rangeEnd = new Date(start.getTime() + (days - 1) * 24 * 3600 * 1000);
-  const intervals = await fetchBusyIntervals(
+  const intervals = await agenda.intervalosOcupados(
     pool, professionalId, toDateStr(start), toDateStr(rangeEnd), excludeId
   );
 
@@ -407,64 +282,23 @@ async function findAvailabilityByService(pool, opts) {
   const toStr = toDateStr(rangeEnd);
 
   // 1) unidades ativas que oferecem o serviço
-  const [unitRows] = await pool.query(
-    `SELECT u.id, u.name, u.type, u.neighborhood
-     FROM health_units u
-     JOIN unit_offers o ON o.unit_id = u.id
-     WHERE o.kind = ? AND o.name = ? AND o.active = 1 AND u.active = 1
-     ORDER BY u.name`,
-    [tipo, servico]
-  );
+  const unitRows = await agenda.unidadesQueOferecem(pool, { tipo, servico });
   if (!unitRows.length) {
     return { ...empty, reason: 'Nenhuma unidade oferece este serviço no momento.' };
   }
   const unitIds = unitRows.map((u) => u.id);
-  const [offerDurationRows] = await pool.query(
-    `SELECT unit_id, duration_minutes FROM unit_offers
-     WHERE kind = ? AND name = ? AND active = 1 AND unit_id IN (?)`,
-    [tipo, servico, unitIds]
-  );
-  const duracaoPorUnidade = new Map(
-    offerDurationRows
-      .filter((row) => Number(row.duration_minutes) > 0)
-      .map((row) => [row.unit_id, Number(row.duration_minutes)])
-  );
+  const duracaoPorUnidade = await agenda.duracoesDoServicoPorUnidade(pool, { tipo, servico, unitIds });
 
   // 2) profissionais ativos vinculados ao serviço nessas unidades
-  const [linkRows] = await pool.query(
-    `SELECT po.unit_id, po.professional_id, p.name AS professional_name, p.job_title
-     FROM professional_offers po
-     JOIN professionals p ON p.id = po.professional_id
-     WHERE po.kind = ? AND po.name = ? AND p.active = 1 AND po.unit_id IN (?)
-     ORDER BY p.name`,
-    [tipo, servico, unitIds]
-  );
+  const linkRows = await agenda.profissionaisDoServico(pool, { tipo, servico, unitIds });
   if (!linkRows.length) {
     return { ...empty, reason: 'Nenhum profissional atende este serviço no momento.' };
   }
 
-  // 3) horários desses vínculos (1 query)
-  //
-  // O filtro é pelo PAR (profissional, unidade), não só pelo profissional.
-  // Filtrar por professional_id IN (...) já exclui quem não tem nenhum
-  // vínculo, mas deixa passar o caso em que o profissional atende o serviço
-  // na unidade A e tem work_schedule na unidade B: o par (B, prof) entrava na
-  // grade sem existir em professional_offers, saía com nome vazio (o fallback
-  // `{ name: '', job: '' }`) e o POST devolvia 409 — "não atende este serviço
-  // nesta unidade". Ou seja, a tela oferecia horários que nunca funcionavam.
+  // 3) horários desses vínculos (1 query). O filtro é pelo PAR (profissional,
+  // unidade) — ver agendasDosVinculos no repositório.
   const profIds = [...new Set(linkRows.map((l) => l.professional_id))];
-  const [schedRows] = await pool.query(
-    `SELECT ws.professional_id, ws.unit_id, ws.weekday, ws.start_time, ws.end_time, ws.slot_minutes
-     FROM work_schedules ws
-     WHERE ws.active = 1
-       AND EXISTS (
-         SELECT 1 FROM professional_offers po
-          WHERE po.professional_id = ws.professional_id
-            AND po.unit_id = ws.unit_id
-            AND po.kind = ? AND po.name = ?
-       )`,
-    [tipo, servico]
-  );
+  const schedRows = await agenda.agendasDosVinculos(pool, { tipo, servico });
   const rulesByPair = new Map();
   for (const s of schedRows) {
     const st = toMinutes(s.start_time);
@@ -503,7 +337,7 @@ async function findAvailabilityByService(pool, opts) {
   pairs.sort((a, b) => (a.prof.name < b.prof.name ? -1 : a.prof.name > b.prof.name ? 1 : 0));
 
   // 4) ocupados em lote (1 query por tabela + 1 de bloqueios)
-  const busyByProf = await fetchBusyIntervalsBulk(pool, profIds, fromStr, toStr, (opts && opts.excludeId) || null);
+  const busyByProf = await agenda.intervalosOcupadosEmLote(pool, profIds, fromStr, toStr, (opts && opts.excludeId) || null);
 
   // 5) grade por unidade
   const nowMs = Date.now();

@@ -66,6 +66,7 @@ test('a coluna é exigida de verdade — o código referencia duration_minutes',
   const rota = fs.readFileSync(path.join(__dirname, '..', 'src', 'routes', 'me.booking.routes.js'), 'utf8');
   assert.match(rota, /columns\.push\('duration_minutes'\)/, 'o INSERT precisa gravar a duração');
 
-  const booking = fs.readFileSync(path.join(__dirname, '..', 'src', 'utils', 'booking.js'), 'utf8');
+  // O SQL de leitura dos horários ocupados mora em repositories/agenda.js desde o passo 7b do A1.
+  const booking = fs.readFileSync(path.join(__dirname, '..', 'src', 'repositories', 'agenda.js'), 'utf8');
   assert.match(booking, /duration_minutes FROM/, 'o cálculo de conflito precisa ler a duração');
 });
