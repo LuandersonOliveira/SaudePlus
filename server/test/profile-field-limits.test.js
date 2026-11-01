@@ -119,10 +119,11 @@ test('a validação existe no código e cobre a tabela de limites', () => {
   // acima de novo, e o 500 voltaria sem ninguém perceber.
   const fs = require('node:fs');
   const path = require('node:path');
-  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'routes', 'auth.routes.js'), 'utf8');
-  assert.match(src, /LIMITES|CAMPO_LIMITE|limite de/i, 'a rota precisa de uma tabela de limites por coluna');
+  // A tabela mora em schemas/profile.js desde o passo 5 do A1 (a rota só chama o serviço).
+  const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'schemas', 'profile.js'), 'utf8');
+  assert.match(src, /LIMITES|CAMPO_LIMITE|limite de/i, 'o esquema precisa de uma tabela de limites por coluna');
   for (const coluna of Object.keys(LIMITES)) {
-    assert.ok(src.includes(coluna), `a rota deveria conhecer o limite de ${coluna}`);
+    assert.ok(src.includes(coluna), `o esquema deveria conhecer o limite de ${coluna}`);
   }
 });
 
