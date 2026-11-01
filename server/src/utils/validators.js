@@ -38,19 +38,30 @@ function isValidCNS(value) {
   return false;
 }
 
-const emailSchema = z.string().trim().toLowerCase().email('Informe um e-mail válido.');
+const emailSchema = z.string({ error: 'Informe um e-mail válido.' }).trim().toLowerCase().email('Informe um e-mail válido.');
 
 const signupSchema = z.object({
   email: emailSchema,
-  password: z.string().min(6, 'A senha precisa ter ao menos 6 caracteres.'),
-  full_name: z.string().trim().min(1, 'Nome, e-mail e senha são obrigatórios.'),
-  birth_date: z.string().min(1, 'A data de nascimento é obrigatória.'),
-  cpf: z.string().refine(isValidCPF, 'CPF inválido. Confira os números digitados.'),
+  password: z.string({ error: 'A senha precisa ter ao menos 6 caracteres.' }).min(6, 'A senha precisa ter ao menos 6 caracteres.'),
+  full_name: z.string({ error: 'Nome, e-mail e senha são obrigatórios.' }).trim().min(1, 'Nome, e-mail e senha são obrigatórios.'),
+  birth_date: z.string({ error: 'A data de nascimento é obrigatória.' }).min(1, 'A data de nascimento é obrigatória.'),
+  cpf: z.string({ error: 'CPF inválido. Confira os números digitados.' }).refine(isValidCPF, 'CPF inválido. Confira os números digitados.'),
   cns: z.string().optional().nullable().refine(
     (v) => !v || digitsOnly(v) === '' || isValidCNS(v),
     'Cartão SUS (CNS) inválido. Confira os 15 números.'
   ),
 }).passthrough();
+
+/** Idade em anos completos a partir de 'AAAA-MM-DD'; null se a data não existir. */
+function ageInYears(birthDateStr) {
+  const birth = new Date(birthDateStr + 'T00:00:00');
+  if (isNaN(birth.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const m = now.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+  return age;
+}
 
 // Paginação padrão: ?page=&pageSize= (1-based, teto 100).
 // Quando a query pede página, a rota responde envelope {data,page,pageSize,total}.
@@ -125,7 +136,7 @@ function validateDate(value) {
 }
 
 module.exports = {
-  digitsOnly, isValidCPF, isValidCNS, emailSchema, signupSchema, parsePagination,
+  digitsOnly, isValidCPF, isValidCNS, emailSchema, signupSchema, ageInYears, parsePagination,
   VALID_GENDERS, VALID_PRIORITIES, VALID_RACES, VALID_BLOOD_TYPES, VALID_ZONES,
   validateEnum, validateDate,
 };

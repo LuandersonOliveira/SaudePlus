@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const pool = require('../db');
 const { verifyToken } = require('../middleware/auth');
 const {
-  digitsOnly, signupSchema, isValidCPF, isValidCNS,
+  digitsOnly, isValidCPF, isValidCNS,
   VALID_PRIORITIES, VALID_RACES, validateEnum, validateDate,
 } = require('../utils/validators');
 const {
@@ -16,6 +16,8 @@ const { govbrConfig, buildAuthorizeUrl, exchangeCode, fetchUserInfo } = require(
 const { randomSecret, verifyTotp, matchStep, replayBloqueia, otpauthUrl } = require('../utils/totp');
 const { cpfIgual, hmacCpf, ehCpfDuplicado, MENSAGEM_CPF_DUPLICADO } = require('../utils/cpf');
 const mailer = require('../services/mailer');
+const { validate } = require('../middleware/validate');
+const { signupBody, loginBody, mfaVerifyBody, mfaSetupBody, excluirContaBody } = require('../schemas/auth');
 const {
   hashRefreshToken, readRefreshRaw, setRefreshCookie, clearRefreshCookie,
   iniciarSessao, encerrarSessao, rotacionarSessao,
@@ -38,16 +40,6 @@ const VALID_ROLES = ['paciente', 'atendente'];
 // Validações de dados essenciais (TAREFAS V3, item 6.2).
 // CPF/CNS/e-mail centralizados em utils/validators.js (Fase 0, item 0.4).
 // --------------------------------------------------------------------------
-function ageInYears(birthDateStr) {
-  const birth = new Date(birthDateStr + 'T00:00:00');
-  if (isNaN(birth.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  const m = now.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
-  return age;
-}
-
 // --------------------------------------------------------------------------
 // Proteção contra força bruta no login (TAREFAS V3, item 6.3).
 // A lógica mora em utils/loginThrottle.js, com o relógio injetado — assim é
@@ -61,7 +53,7 @@ function clientIp(req) {
   return req.ip || (req.socket && req.socket.remoteAddress) || 'desconhecido';
 }
 
-router.post('/signup', async (req, res, next) => {
+router.post('/signup', validate(signupBody), async (req, res, next) => {
   try {
     const {
       email, password, full_name, role,
@@ -73,33 +65,8 @@ router.post('/signup', async (req, res, next) => {
       job_role,
     } = req.body || {};
 
-    // Validação padronizada (Fase 0, item 0.4): zod centraliza e-mail,
-    // senha, nome, nascimento, CPF (dígito) e CNS (checksum oficial).
-    const parsed = signupSchema.safeParse({
-      email, password, full_name, birth_date: birthDate, cpf, cns,
-    });
-    if (!parsed.success) {
-      const first = parsed.error.issues[0];
-      return res.status(400).json({ error: first ? first.message : 'Dados inválidos.' });
-    }
-    // Dados essenciais de saúde: sem eles o cadastro não serve para o posto.
-    const age = ageInYears(birthDate);
-    if (age === null || age < 0 || age > 130) {
-      return res.status(400).json({ error: 'Data de nascimento inválida.' });
-    }
-    if (priority !== undefined && priority !== null && priority !== '' && !VALID_PRIORITIES.includes(priority)) {
-      return res.status(400).json({ error: 'Prioridade de atendimento inválida.' });
-    }
-    if (race !== undefined && race !== null && race !== '' && !VALID_RACES.includes(race)) {
-      return res.status(400).json({ error: 'Cor/raça inválida.' });
-    }
-    if (age < 18 && !guardianName) {
-      return res.status(400).json({ error: 'Informe o nome do responsável legal para menores de 18 anos.' });
-    }
-    // Ponto de referência só é obrigatório na zona rural (item 1.7).
-    if (zone === 'rural' && !referencePoint) {
-      return res.status(400).json({ error: 'Na zona rural, o ponto de referência é obrigatório.' });
-    }
+    // Validação (e-mail, senha, nome, nascimento, CPF, CNS e regras de idade/prioridade/
+    // zona rural) feita por validate(signupBody) — ver schemas/auth.js.
 
     const assignedRole = VALID_ROLES.includes(role) ? role : 'paciente';
     // Atendente nasce pendente — precisa de ativação pelo admin antes de acessar dados de pacientes
@@ -159,12 +126,9 @@ router.post('/signup', async (req, res, next) => {
   }
 });
 
-router.post('/login', async (req, res, next) => {
+router.post('/login', validate(loginBody), async (req, res, next) => {
   try {
-    const { email, password } = req.body || {};
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Informe e-mail e senha.' });
-    }
+    const { email, password } = req.body;
 
     const normalizedEmail = String(email).toLowerCase().trim();
     // Chave por conta E por IP: um ataque a uma conta não tranca as demais
@@ -232,10 +196,9 @@ router.post('/login', async (req, res, next) => {
 });
 
 // POST /auth/mfa/verify — troca ticket MFA + código TOTP pela sessão completa.
-router.post('/mfa/verify', async (req, res, next) => {
+router.post('/mfa/verify', validate(mfaVerifyBody), async (req, res, next) => {
   try {
-    const { ticket, code } = req.body || {};
-    if (!ticket || !code) return res.status(400).json({ error: 'Informe o código do autenticador.' });
+    const { ticket, code } = req.body;
     let claim;
     try {
       claim = jwt.verify(ticket, process.env.JWT_SECRET);
@@ -355,12 +318,9 @@ router.post('/mfa/verify', async (req, res, next) => {
 //
 // Quem já tem MFA ativo precisa usar mfa/disable (também exige senha) antes:
 // esta rota nunca devolve o segredo vigente.
-router.post('/mfa/setup', verifyToken, async (req, res, next) => {
+router.post('/mfa/setup', verifyToken, validate(mfaSetupBody), async (req, res, next) => {
   try {
-    const { password } = req.body || {};
-    if (!password) {
-      return res.status(400).json({ error: 'Confirme sua senha para ativar o segundo fator.' });
-    }
+    const { password } = req.body;
 
     const [[user]] = await pool.query(
       'SELECT password_hash, totp_enabled FROM users WHERE id = ?',
@@ -759,12 +719,9 @@ router.get('/me/export', verifyToken, async (req, res, next) => {
 // DELETE /auth/me — eliminação (LGPD art. 18, VI) via anonimização.
 // Exige a senha no corpo (confirmação) e torna a conta inutilizável.
 // Histórico clínico vira estatística anônima; auditoria é preservada.
-router.delete('/me', verifyToken, async (req, res, next) => {
+router.delete('/me', verifyToken, validate(excluirContaBody), async (req, res, next) => {
   try {
-    const { password } = req.body || {};
-    if (!password) {
-      return res.status(400).json({ error: 'Confirme sua senha para excluir a conta.' });
-    }
+    const { password } = req.body;
     const [rows] = await pool.query('SELECT password_hash FROM users WHERE id = ?', [req.user.id]);
     if (!rows.length) return res.status(404).json({ error: 'Usuário não encontrado.' });
     const ok = await bcrypt.compare(password, rows[0].password_hash);
