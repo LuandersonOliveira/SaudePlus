@@ -20,13 +20,13 @@ export const can = (level: string | null | undefined, cap: Capability) => capsFo
 /** Cadastros aparece se houver ao menos uma sub-aba permitida. */
 export const canSeeCadastros = (level?: string | null) => can(level, 'users') || can(level, 'units') || can(level, 'diseases')
 
-export type SubTab = 'pessoas' | 'rede' | 'doencas'
+export type SubTab = 'pessoas' | 'rede' | 'profissionais' | 'doencas'
 
 /** Sub-abas de Cadastros que o nível enxerga, na ordem de exibição. */
 export function allowedSubTabs(level?: string | null): SubTab[] {
   const out: SubTab[] = []
   if (can(level, 'users')) out.push('pessoas')
-  if (can(level, 'units')) out.push('rede')
+  if (can(level, 'units')) out.push('rede', 'profissionais')
   if (can(level, 'diseases')) out.push('doencas')
   return out
 }

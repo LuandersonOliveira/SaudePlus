@@ -1,7 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { ComingSoon } from '@/components/ComingSoon'
 import { AdminLayout } from './AdminLayout'
 import { DoencasPage } from './diseases/DoencasPage'
+import { RedePage } from './network/RedePage'
+import { ProfissionaisPage } from './professionals/ProfissionaisPage'
 import { PessoasPage } from './people/PessoasPage'
 import { AdminAccountPage } from './pages/AccountPage'
 import { AtendimentosPage } from './pages/AtendimentosPage'
@@ -27,7 +28,8 @@ export default function AdminRoutes() {
               <Route path="pessoas" element={<PessoasPage />} />
             </Route>
             <Route element={<RequireCap cap="units" />}>
-              <Route path="rede" element={<ComingSoon title="Rede de saúde" />} />
+              <Route path="rede" element={<RedePage />} />
+              <Route path="profissionais" element={<ProfissionaisPage />} />
             </Route>
             <Route element={<RequireCap cap="diseases" />}>
               <Route path="doencas" element={<DoencasPage />} />

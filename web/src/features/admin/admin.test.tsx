@@ -91,11 +91,11 @@ describe('seções proibidas voltam ao Início', () => {
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/admin\/cadastros\/doencas$/))
     expect(screen.queryByRole('tab', { name: 'Pessoas' })).not.toBeInTheDocument()
   })
-  it('gestor vê as três sub-abas e a de Pessoas abre por padrão', async () => {
+  it('gestor vê as quatro sub-abas e a de Pessoas abre por padrão', async () => {
     mockApi(baseApi)
     renderAdmin('gestor', '/admin/cadastros')
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/admin/cadastros/pessoas'))
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Pessoas', 'Rede de saúde', 'Doenças e alertas'])
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Pessoas', 'Rede de saúde', 'Profissionais', 'Doenças e alertas'])
   })
 })
 

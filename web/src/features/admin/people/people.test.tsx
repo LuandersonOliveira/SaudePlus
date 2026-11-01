@@ -421,3 +421,33 @@ describe('acesso', () => {
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/admin$/))
   })
 })
+
+describe('Agenda/Vínculos do atendente', () => {
+  const profData = {
+    professionals: [{ id: 'pr9', name: 'Ana Atendente', active: 1, user_id: 'at1' }],
+    offers: [{ id: 'o1', professional_id: 'pr9', unit_id: 'u1', kind: 'consulta', name: 'Triagem', unit_name: 'UBS Centro' }],
+    schedules: [],
+    blocks: [],
+  }
+
+  it('só atendentes têm o item; abre o painel do profissional ligado à conta', async () => {
+    mockApi({ ...baseApi, 'GET /admin/professionals': profData, 'GET /health-units/manage': [] })
+    renderPeople()
+    await screen.findByText('6 usuários encontrados.')
+    expect(await menu('Maria Lima')).not.toContain('Agenda/Vínculos')
+    await userEvent.keyboard('{Escape}')
+    expect(await menu('Ana Atendente')).toContain('Agenda/Vínculos')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Agenda/Vínculos' }))
+    const dlg = await screen.findByRole('dialog')
+    expect(await within(dlg).findByText('Triagem')).toBeInTheDocument()
+  })
+
+  it('atendente sem profissional ligado mostra o aviso', async () => {
+    mockApi({ ...baseApi, 'GET /admin/professionals': { ...profData, professionals: [] }, 'GET /health-units/manage': [] })
+    renderPeople()
+    await screen.findByText('6 usuários encontrados.')
+    await menu('Ana Atendente')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Agenda/Vínculos' }))
+    expect(await screen.findByText(/Não há profissional vinculado a este usuário/)).toBeInTheDocument()
+  })
+})

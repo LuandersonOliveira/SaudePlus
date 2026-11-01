@@ -17,6 +17,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { errorMessage } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { can } from '../capabilities'
+import { AgendaDialog, type AgendaTarget } from '../professionals/AgendaDialog'
 import { cn } from '@/lib/utils'
 import { fmtDate } from '@/lib/validators'
 import { DeleteUserDialog } from './components/DeleteUserDialog'
@@ -38,9 +40,11 @@ const STATUS_OPTIONS: [string, string][] = [['pendente', 'Aguardando ativação'
 const asRole = (v: string | null): UserFilters['role'] => ((ROLES as readonly string[]).includes(v ?? '') ? (v as UserRole) : '')
 const asStatus = (v: string | null): UserFilters['status'] => ((STATUSES as readonly string[]).includes(v ?? '') ? (v as AccountStatus) : '')
 
-function UserRow({ u, onView, onEdit, onHistory, onDelete, manageable }: {
+function UserRow({ u, onView, onEdit, onHistory, onDelete, onAgenda, manageable }: {
   u: AdminUserRow
   manageable: boolean
+  /** Só atendentes com permissão de rede têm agenda para gerenciar. */
+  onAgenda?: () => void
   onView: () => void
   onEdit: () => void
   onHistory: () => void
@@ -71,6 +75,7 @@ function UserRow({ u, onView, onEdit, onHistory, onDelete, manageable }: {
           <DropdownMenuItem onSelect={onView}>Visualizar</DropdownMenuItem>
           {manageable && <DropdownMenuItem onSelect={onEdit}>Editar</DropdownMenuItem>}
           <DropdownMenuItem onSelect={onHistory}>Histórico</DropdownMenuItem>
+          {onAgenda && <DropdownMenuItem onSelect={onAgenda}>Agenda/Vínculos</DropdownMenuItem>}
           {manageable && (
             <>
               <DropdownMenuSeparator />
@@ -100,6 +105,7 @@ export function PessoasPage() {
   const [editId, setEditId] = useState<string | null>(null)
   const [del, setDel] = useState<{ id: string; name: string } | null>(null)
   const [hist, setHist] = useState<{ id: string; name: string } | null>(null)
+  const [agenda, setAgenda] = useState<AgendaTarget | null>(null)
 
   const list = useAdminUsers(filters)
   const rows = list.data?.pages.flatMap((p) => p.rows) ?? []
@@ -181,6 +187,7 @@ export function PessoasPage() {
                         setFormOpen(true)
                       }}
                       onHistory={() => setHist({ id: u.id, name: u.full_name || '' })}
+                      onAgenda={u.role === 'atendente' && can(session?.user.admin_level, 'units') ? () => setAgenda({ userId: u.id, name: u.full_name || u.email || '' }) : undefined}
                       onDelete={() => setDel({ id: u.id, name: u.full_name || u.email || '' })}
                     />
                   ))}
@@ -210,6 +217,7 @@ export function PessoasPage() {
       <UserFormDialog open={formOpen} editId={editId} onClose={() => setFormOpen(false)} />
       <DeleteUserDialog target={del} onClose={() => setDel(null)} />
       <UserHistoryDialog target={hist} onClose={() => setHist(null)} />
+      <AgendaDialog target={agenda} onClose={() => setAgenda(null)} />
     </>
   )
 }

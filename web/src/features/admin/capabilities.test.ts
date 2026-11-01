@@ -22,7 +22,7 @@ describe('capacidades por nível', () => {
     }
   })
   it('Cadastros e sub-abas seguem as capacidades', () => {
-    expect(allowedSubTabs('superadmin')).toEqual(['pessoas', 'rede', 'doencas'])
+    expect(allowedSubTabs('superadmin')).toEqual(['pessoas', 'rede', 'profissionais', 'doencas'])
     expect(allowedSubTabs('alertas')).toEqual(['doencas'])
     expect(allowedSubTabs('atendimento')).toEqual([])
     expect(canSeeCadastros('atendimento')).toBe(false)

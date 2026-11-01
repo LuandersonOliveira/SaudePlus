@@ -3,7 +3,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/lib/auth'
 import { allowedSubTabs, type SubTab } from '../capabilities'
 
-const LABEL: Record<SubTab, string> = { pessoas: 'Pessoas', rede: 'Rede de saúde', doencas: 'Doenças e alertas' }
+const LABEL: Record<SubTab, string> = { pessoas: 'Pessoas', rede: 'Rede de saúde', profissionais: 'Profissionais', doencas: 'Doenças e alertas' }
 
 /** Cadastros: sub-abas (só as que o nível enxerga) como rotas, para a URL guardar o lugar. */
 export function CadastrosPage() {
@@ -18,7 +18,7 @@ export function CadastrosPage() {
   return (
     <>
       <Tabs value={current}>
-        <TabsList aria-label="Cadastros">
+        <TabsList aria-label="Cadastros" className="max-w-full justify-start overflow-x-auto">
           {tabs.map((t) => (
             <TabsTrigger key={t} value={t} asChild>
               <NavLink to={`/admin/cadastros/${t}`}>{LABEL[t]}</NavLink>
