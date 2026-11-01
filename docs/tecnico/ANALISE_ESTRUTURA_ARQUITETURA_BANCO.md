@@ -10,7 +10,7 @@ Complementa `TECHNICAL_DEBT.md` (que lista defeitos já fechados) com a visão e
 | `server/` API | Node 24, Express 4, mysql2, Zod (1 arquivo), Nodemailer | ~7,6 mil linhas em `src/` | 62 arquivos / ~11 mil linhas (425 casos, `node --test`) |
 | `web/` front novo | React 19, Vite 8, TypeScript, Tailwind v4, shadcn/ui, React Query | ~160 arquivos | 336 casos (Vitest) |
 | `e2e/` | Playwright (Chromium) contra `npm run dev` | 4 specs / 28 testes | — |
-| raiz (legado) | 6 páginas HTML + `assets/` JS/CSS puros | `admin.html` ≈ 2,8 mil linhas | cobertos por testes estáticos no `server/test` |
+| raiz | (front HTML legado **removido** em 2026-11-01, ADR-0003); restam a demo `event-manager` e `assets/styles.css` | — | — |
 | Banco | MySQL, 16 tabelas | `schema.sql` 542 linhas + 14 scripts `migrate-*.js` | `schema-parity`, `boot-schema-guard`, `db-setup` |
 
 Pontos fortes (preservar): auditoria encadeada por hash; documentos (CPF/RG/CNS) cifrados em repouso; MFA TOTP com anti-replay; RBAC por capability testado; rate limit com teto próprio no `/ready`; testes de corrida de agendamento; dívida técnica documentada; paridade `schema.sql` × migrations testada.
@@ -41,9 +41,8 @@ Erros vão para `console.error` sem id de requisição, nível ou formato estrut
 Versionados sem necessidade: `server/scripts/temp_marked.js` (arquivo temporário), `migrate-supabase.js` (vestígio de outra plataforma), `.superpowers/…/progress.md`, `ROTEIRO_TESTE_ALUNOS.md` na raiz, ~2,7 MB de PDFs em `docs/` (binários no git incham o histórico). `graphify-out/` (3 MB gerado) ficou fora do commit.
 **Ação:** remover os dois scripts e o `.superpowers`; mover PDFs para um release/armazenamento de documentos; `graphify-out/` no `.gitignore`.
 
-### A7 — Dois front-ends no mesmo repositório (decisão pendente)
-O front legado (6 HTMLs + `assets/` + `scripts/serve-web.js`) continua no repo e sustenta ~200 casos de teste estáticos em `server/test` (`frontend-high`, `escaping`, `stylesheet`, `web-server`, `dev-stack`, parte de `doctor`, `admin-user-form`, `dashboard-multiprof`, `mfa-setup`). Com o React cobrindo todas as áreas e a suíte e2e nova passando, o legado é código duplicado a manter.
-**Ação:** aposentar (ver Fase 5). Os testes de XSS/escape do legado perdem o objeto; o React escapa por padrão (JSX); `dangerouslySetInnerHTML` aparece só em `components/ui/chart.tsx` (CSS de tema do gráfico, gerado pelo shadcn, sem dado de usuário).
+### A7 — Dois front-ends no mesmo repositório (**resolvido**, ADR-0003)
+O front legado (6 HTMLs + `assets/` + `scripts/serve-web.js`) sustentava ~200 casos de teste estáticos em `server/test`. Com o React cobrindo todas as áreas e o e2e novo passando, foi removido no commit `d5b799c` (reversível com `git revert`). Os testes de XSS/escape do legado perderam o objeto; o React escapa por padrão (JSX) e `dangerouslySetInnerHTML` aparece só em `components/ui/chart.tsx` (CSS de tema do gráfico, sem dado de usuário). Sugestão: lint que proíba novo uso.
 
 ### A8 — Bundle do front (baixa)
 Chunk principal 555 kB (aviso do Vite acima de 500 kB); rotas por papel já são `lazy`. Candidatos: separar `recharts` e `react-day-picker` em chunks próprios (`manualChunks`) e carregar o gráfico de Alertas sob demanda.
@@ -80,7 +79,7 @@ CPF/RG/CNS usam AES-256-GCM (correto), mas sem um *blind index* (HMAC do CPF). E
 
 ## 4. Segurança e dependências
 
-- `npm audit --omit=dev` no servidor acusava 4 vulnerabilidades (body-parser, qs, ip-address, **zod** — DoS por memória/laço). **Feito:** `npm audit fix` (somente `package-lock.json`, versões compatíveis); agora 0 em produção. Sobram 2 moderadas em `nodemon` (só desenvolvimento). Suíte do servidor: 423/425 (a falha é o teste do `doctor` ao rodar com banco descartável, artefato do ambiente de teste, não do código).
+- `npm audit --omit=dev` no servidor acusava 4 vulnerabilidades (body-parser, qs, ip-address, **zod** — DoS por memória/laço). **Feito:** `npm audit fix` (somente `package-lock.json`, versões compatíveis); agora 0 em produção. Sobram 2 moderadas em `nodemon` (só desenvolvimento). Suíte do servidor: 362/363 após a remoção do legado (a única falha é o teste do `doctor` ao rodar com banco descartável, artefato do ambiente de teste, não do código).
 - Front: `npm audit` = 0.
 - **Feito (Fase 5):** o link do e-mail de redefinição apontava para `/auth.html`, que não existe no front React; agora usa `/auth?tab=reset&token=…` (teste cobre).
 - Achados registrados nas fases anteriores (ainda abertos):
@@ -103,3 +102,15 @@ CPF/RG/CNS usam AES-256-GCM (correto), mas sem um *blind index* (HMAC do CPF). E
 | 8 | B2 índice único de horário, A5 request id/logs | S | defesa em profundidade e operação |
 
 S ≤ 1 dia · M 2–4 dias · L > 1 semana (estimativas de ordem de grandeza).
+
+## 6. Documentos derivados desta análise
+
+A análise gerou os instrumentos abaixo, todos em docs/tecnico/:
+
+| Tipo | Documento | Cobre |
+|---|---|---|
+| Request for Comments | [fc/RFC-0001-integridade-de-agendamento-e-identidade.md](rfc/RFC-0001-integridade-de-agendamento-e-identidade.md) | B1, B2, B3: proposta, alternativas, riscos, perguntas abertas |
+| Architecture Decision Records | [dr/](adr/README.md) (ADR-0001 a 0008) | 5 decisões já tomadas (front React, origem única, aposentar legado, e2e por API, credenciais de admin) e 3 propostas (CPF HMAC, integridade no banco, migrations numeradas) |
+| Especificação técnica | [especificacao/ESPEC-001-integridade-agendamento-e-cpf.md](especificacao/ESPEC-001-integridade-agendamento-e-cpf.md) | Modelo de dados, algoritmo, mudanças por arquivo, migração expand→backfill→contract, testes |
+| Proof of Concept | [poc/POC-001-integridade-agendamento-e-cpf.md](poc/POC-001-integridade-agendamento-e-cpf.md) + `server/scripts/poc-integridade.js` | 18/18 verificações em MySQL 8.0.42; busca por CPF 8,4 s → 11 ms |
+| Prós e contras | [PROS_E_CONTRAS.md](PROS_E_CONTRAS.md) | 6 decisões comparadas + quando usar RFC, ADR, especificação e PoC |
