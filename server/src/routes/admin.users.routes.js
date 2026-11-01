@@ -3,6 +3,7 @@ const pool = require('../db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { requireCapability, pode } = require('../middleware/capabilities');
 const { audit } = require('../middleware/audit');
+const { emailSchema } = require('../utils/validators');
 
 const router = express.Router();
 router.use(verifyToken, requireAdmin);
@@ -117,7 +118,7 @@ router.get('/:id',
   }
 });
 
-// PATCH /admin/users/:id — altera account_status e/ou job_role
+// PATCH /admin/users/:id — altera dados cadastrais, account_status e/ou job_role
 // Papel (role) só pode ser alterado diretamente no banco de dados.
 //
 // A rota exige 'users' (no router.use acima). Alterar o NÍVEL administrativo
@@ -126,14 +127,17 @@ router.get('/:id',
 // sim ativar uma conta e ajustar um cargo.
 router.patch('/:id', async (req, res, next) => {
   try {
-    const { account_status, job_role, admin_level, role, password, professional_id, unlink_professional } = req.body || {};
+    const {
+      account_status, job_role, admin_level, role, password,
+      professional_id, unlink_professional, full_name, email, mobile, phone,
+    } = req.body || {};
     // O motivo vai para a auditoria; o teto é o mesmo do sanitizeDetails.
     const reason = req.body && req.body.reason ? String(req.body.reason).slice(0, 1000) : '';
     const updates = [];
     const params = [];
 
     const [[currentUser]] = await pool.query(
-      'SELECT account_status, job_role, admin_level, role, email, full_name FROM users WHERE id = ? AND deleted_at IS NULL',
+      'SELECT account_status, job_role, admin_level, role, email, full_name, mobile, phone FROM users WHERE id = ? AND deleted_at IS NULL',
       [req.params.id]
     );
     if (!currentUser) return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -148,6 +152,58 @@ router.patch('/:id', async (req, res, next) => {
           error: 'Você não pode alterar uma conta de nível administrativo igual ou superior ao seu.',
         });
       }
+    }
+
+    // Credenciais de conta administrativa (e-mail de login e senha) equivalem a
+    // assumir a conta: e-mail novo + "esqueci a senha" dá acesso total. Por isso
+    // exigem a capability 'admins', como promover ou mudar nível. Sem isto, um
+    // gestor (tem 'users', não tem 'admins') tomava contas admin de nível menor.
+    // Só vale quando o e-mail REALMENTE muda: os formulários reenviam o e-mail atual a cada gravação,
+    // e isso não pode bloquear a edição de outros campos (celular, cargo…).
+    const trocaEmail = email !== undefined
+      && String(email ?? '').trim().toLowerCase() !== String(currentUser.email || '').trim().toLowerCase();
+    if (
+      currentUser.role === 'admin' &&
+      (trocaEmail || (password !== undefined && password !== '')) &&
+      !pode('admins', req.user)
+    ) {
+      return res.status(403).json({
+        error: 'Seu nível administrativo não permite alterar e-mail ou senha de administradores.',
+      });
+    }
+
+    // Dados cadastrais: o painel edita nome, e-mail e telefones no mesmo
+    // formulário que ativa a conta. Antes o PATCH ignorava esses campos em
+    // silêncio — o admin salvava e o valor antigo permanecia.
+    let novoNome;
+    let novoEmail;
+    if (full_name !== undefined) {
+      novoNome = String(full_name ?? '').trim();
+      if (novoNome.length < 2 || novoNome.length > 150) {
+        return res.status(400).json({ error: 'Nome deve ter entre 2 e 150 caracteres.' });
+      }
+      updates.push('full_name=?'); params.push(novoNome);
+    }
+    if (email !== undefined) {
+      const parsed = emailSchema.safeParse(email);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      novoEmail = parsed.data;
+      const [[emUso]] = await pool.query(
+        'SELECT id FROM users WHERE LOWER(email) = ? AND id <> ? LIMIT 1',
+        [novoEmail, req.params.id]
+      );
+      if (emUso) return res.status(409).json({ error: 'Este e-mail já está em uso por outra conta.' });
+      updates.push('email=?'); params.push(novoEmail);
+    }
+    for (const [campo, valor] of [['mobile', mobile], ['phone', phone]]) {
+      if (valor === undefined) continue;
+      const texto = String(valor ?? '').trim();
+      if (texto.length > 30) {
+        return res.status(400).json({ error: `Campo "${campo}" excede o tamanho máximo (30 caracteres).` });
+      }
+      updates.push(`${campo}=?`); params.push(texto || null);
     }
 
     if (account_status !== undefined) {
@@ -206,7 +262,10 @@ router.patch('/:id', async (req, res, next) => {
     const desativa = account_status !== undefined && account_status !== 'ativo';
     const mudaPapel = role !== undefined && role !== currentUser.role;
     const mudaSenha = password !== undefined && password !== '';
-    if (desativa || mudaPapel || mudaSenha) {
+    // Trocar o e-mail muda a identidade de login: a sessão antiga (emitida com
+    // o e-mail anterior) precisa morrer junto.
+    const mudaEmail = novoEmail !== undefined && novoEmail !== currentUser.email;
+    if (desativa || mudaPapel || mudaSenha || mudaEmail) {
       await revokeAccess(req.params.id);
     }
 
@@ -242,6 +301,10 @@ router.patch('/:id', async (req, res, next) => {
     }
 
     const changes = [];
+    if (novoNome !== undefined && novoNome !== currentUser.full_name) changes.push(`nome: ${currentUser.full_name||'-'}->${novoNome}`);
+    if (mudaEmail) changes.push(`email: ${currentUser.email||'-'}->${novoEmail}`);
+    if (mobile !== undefined && (String(mobile ?? '').trim() || null) !== (currentUser.mobile || null)) changes.push('celular alterado');
+    if (phone !== undefined && (String(phone ?? '').trim() || null) !== (currentUser.phone || null)) changes.push('telefone alterado');
     if (account_status !== undefined && account_status !== currentUser.account_status) changes.push(`status: ${currentUser.account_status}->${account_status}`);
     if (role !== undefined && role !== currentUser.role) changes.push(`role: ${currentUser.role}->${role}`);
     if (job_role !== undefined && job_role !== currentUser.job_role) changes.push(`cargo: ${currentUser.job_role||'-'}->${job_role||'-'}`);
@@ -260,14 +323,25 @@ router.patch('/:id', async (req, res, next) => {
 // POST /admin/users - criar novo usuário
 router.post('/', async (req, res, next) => {
   try {
-    const { full_name, email, password, role, account_status, job_role, admin_level, professional_id } = req.body || {};
+    const { full_name, email, password, role, account_status, job_role, admin_level, professional_id, mobile, phone } = req.body || {};
     if (!full_name || !email || !password) return res.status(400).json({ error: 'Nome, e-mail e senha são obrigatórios.' });
     if (String(password).length < 6) return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres.' });
+    const nome = String(full_name).trim();
+    if (nome.length < 2 || nome.length > 150) return res.status(400).json({ error: 'Nome deve ter entre 2 e 150 caracteres.' });
+    const parsedEmail = emailSchema.safeParse(email);
+    if (!parsedEmail.success) return res.status(400).json({ error: parsedEmail.error.issues[0].message });
+    const tel = (v) => { const t = String(v ?? '').trim(); return t || null; };
+    if ((tel(mobile) || '').length > 30 || (tel(phone) || '').length > 30) {
+      return res.status(400).json({ error: 'Telefone excede o tamanho máximo (30 caracteres).' });
+    }
     const r = role && SAFE_ROLES.includes(role) ? role : 'paciente';
     if (r === 'admin' && !pode('admins', req.user)) return res.status(403).json({ error: 'Sem permissão para criar administradores.' });
     const s = account_status && SAFE_STATUSES.includes(account_status) ? account_status : (r === 'atendente' ? 'pendente' : 'ativo');
-    const normalizedEmail = String(email).toLowerCase().trim();
-    const [[ex]] = await pool.query('SELECT id FROM users WHERE LOWER(email)=? AND deleted_at IS NULL', [normalizedEmail]);
+    const normalizedEmail = parsedEmail.data;
+    // A coluna `email` é UNIQUE global: e-mail de conta soft-deleted continua
+    // reservado. Filtrar `deleted_at` aqui deixava o INSERT estourar 500 em vez
+    // de responder 409.
+    const [[ex]] = await pool.query('SELECT id FROM users WHERE LOWER(email)=?', [normalizedEmail]);
     if (ex) return res.status(409).json({ error: 'E-mail já cadastrado.' });
 
     // Valida o vínculo ANTES de criar a conta: recusar depois deixaria um
@@ -283,9 +357,9 @@ router.post('/', async (req, res, next) => {
     const id = crypto.randomUUID();
     const hash = await bcrypt.hash(String(password), 10);
     await pool.query(
-      `INSERT INTO users (id, full_name, email, password_hash, role, account_status, job_role, admin_level)
-       VALUES (?,?,?,?,?,?,?,?)`,
-      [id, full_name.trim(), normalizedEmail, hash, r, s, job_role || null, r === 'admin' ? (admin_level || 'gestor') : null]
+      `INSERT INTO users (id, full_name, email, password_hash, role, account_status, job_role, admin_level, mobile, phone)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [id, nome, normalizedEmail, hash, r, s, job_role || null, r === 'admin' ? (admin_level || 'gestor') : null, tel(mobile), tel(phone)]
     );
 
     if (r === 'atendente') {
@@ -298,7 +372,7 @@ router.post('/', async (req, res, next) => {
           const pid = crypto.randomUUID();
           await pool.query(
             'INSERT INTO professionals (id, name, job_title, registry, active, user_id) VALUES (?,?,?,?,1,?)',
-            [pid, full_name.trim(), job_role || 'Atendente', null, id]
+            [pid, nome, job_role || 'Atendente', null, id]
           );
         }
       }
