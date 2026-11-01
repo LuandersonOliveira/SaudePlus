@@ -15,7 +15,8 @@
      capability 'admins' (só o superadmin a tem): e-mail novo + "esqueci a senha"
      equivale a assumir a conta.
    - Promover a admin, e definir nível, também exigem 'admins'; ninguém define um
-     nível abaixo do próprio.
+     nível ACIMA do próprio (escalonamento). Definir um nível igual ou abaixo é
+     permitido: o superadmin consegue atribuir gestor, atendimento ou alertas.
    - `podeAdmins` é o resultado de `pode('admins', actor)`, passado de fora para
      manter estas funções sem dependência.
    ========================================================================== */
@@ -82,14 +83,14 @@ function bloqueioDePapel({ actor, alvo, novoPapel, podeAdmins }) {
   return null;
 }
 
-/** Definir o nível de um admin: capability 'admins', nível conhecido e não abaixo do próprio. */
+/** Definir o nível de um admin: capability 'admins', nível conhecido e não ACIMA do próprio. */
 function bloqueioDeNivel({ actor, novoNivel, podeAdmins }) {
   if (!podeAdmins) {
     return recusa(403, 'Seu nível administrativo não permite alterar níveis de outros administradores.');
   }
   if (!SAFE_ADMIN_LEVELS.includes(novoNivel)) return recusa(400, 'Nível administrativo inválido.');
-  if ((LEVEL_RANK[novoNivel] ?? 0) < actorRank(actor)) {
-    return recusa(403, 'Você não pode definir um nível abaixo do seu.');
+  if ((LEVEL_RANK[novoNivel] ?? 0) > actorRank(actor)) {
+    return recusa(403, 'Você não pode definir um nível acima do seu.');
   }
   return null;
 }

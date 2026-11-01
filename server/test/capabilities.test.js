@@ -242,22 +242,20 @@ test('admin sem nível não pode nem ativar nem mudar nível', async () => {
   assert.equal(semNivel.status, 403, 'admin sem nível não pode gerenciar usuários');
 });
 
-test('superadmin pode atribuir nível — e a regra de rank o impede de rebaixar', async () => {
+test('superadmin pode atribuir qualquer nível — a regra de rank só barra nível ACIMA do ator', async () => {
   // Atribuir o MESMO nível passa…
   const mesmo = await patch('superadmin', { admin_level: 'superadmin' });
   assert.equal(mesmo.status, 200, `superadmin deveria poder: ${JSON.stringify(mesmo.body)}`);
   let [[row]] = await pool.query('SELECT admin_level FROM users WHERE id = ?', [criado]);
   assert.equal(row.admin_level, 'superadmin');
 
-  // …e atribuir um nível abaixo do próprio é barrado pela regra de rank.
-  // Regra pré-existente, mantida de propósito: só o superadmin cria
-  // superadmin, e quem não é superadmin não precisa criar nada abaixo de si.
+  // …e um nível abaixo do próprio também (o superadmin atribui gestor, atendimento ou alertas).
   const abaixo = await patch('superadmin', { admin_level: 'gestor' });
-  assert.equal(abaixo.status, 403);
-  assert.match(abaixo.body.error, /abaixo do seu/i);
-
+  assert.equal(abaixo.status, 200, JSON.stringify(abaixo.body));
   [[row]] = await pool.query('SELECT admin_level FROM users WHERE id = ?', [criado]);
-  assert.equal(row.admin_level, 'superadmin', 'o nível recusado não pode ter sido gravado');
+  assert.equal(row.admin_level, 'gestor');
+  // devolve ao estado do teste anterior
+  await patch('superadmin', { admin_level: 'superadmin' });
 });
 
 test('a rota de níveis usa a capability, não um if solto no controller', () => {

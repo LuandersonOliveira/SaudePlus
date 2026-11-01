@@ -22,7 +22,10 @@ const USUARIOS = [];
 const PROFISSIONAIS = [];
 let hash;
 
-test.before(async () => { hash = await bcrypt.hash(SENHA, 4); });
+test.before(async () => {
+  hash = await bcrypt.hash(SENHA, 4);
+  ATOR_SUPER = await conta({ role: 'admin', nivel: 'superadmin' });
+});
 test.after(async () => {
   for (const id of PROFISSIONAIS) await pool.query('DELETE FROM professionals WHERE id = ?', [id]).catch(() => {});
   await pool.query('DELETE FROM professionals WHERE user_id IN (?)', [USUARIOS.length ? USUARIOS : ['x']]).catch(() => {});
@@ -50,6 +53,7 @@ const linha = async (id) => (await pool.query('SELECT * FROM users WHERE id = ?'
 const profDe = async (userId) => (await pool.query('SELECT * FROM professionals WHERE user_id = ?', [userId]))[0][0];
 const superadmin = () => conta({ role: 'admin', nivel: 'superadmin' });
 const gestor = () => conta({ role: 'admin', nivel: 'gestor' });
+let ATOR_SUPER;
 const emailNovo = () => `novo-${crypto.randomUUID()}@test.local`;
 
 // ---------------------------------------------------------------------------
@@ -133,7 +137,7 @@ test('obterUsuario: documentos decifrados; chave ausente vira aviso; excluída o
 // ---------------------------------------------------------------------------
 
 test('criarUsuario: paciente por padrão, atendente nasce pendente com profissional criado e vinculado', async () => {
-  const p = await svc.criarUsuario({ body: { full_name: ' Paula Paciente ', email: ` ${emailNovo().toUpperCase()} `, password: 'segredo1' }, podeAdmins: false });
+  const p = await svc.criarUsuario({ actor: ATOR_SUPER, body: { full_name: ' Paula Paciente ', email: ` ${emailNovo().toUpperCase()} `, password: 'segredo1' }, podeAdmins: false });
   assert.equal(p.ok, true);
   USUARIOS.push(p.id);
   const up = await linha(p.id);
@@ -141,7 +145,7 @@ test('criarUsuario: paciente por padrão, atendente nasce pendente com profissio
   assert.equal(await bcrypt.compare('segredo1', up.password_hash), true);
   assert.match(p.auditoria, /criado: .* role=paciente status=ativo/);
 
-  const a = await svc.criarUsuario({ body: { full_name: 'Alice Atendente', email: emailNovo(), password: 'segredo1', role: 'atendente', job_role: 'Recepção' }, podeAdmins: false });
+  const a = await svc.criarUsuario({ actor: ATOR_SUPER, body: { full_name: 'Alice Atendente', email: emailNovo(), password: 'segredo1', role: 'atendente', job_role: 'Recepção' }, podeAdmins: false });
   USUARIOS.push(a.id);
   assert.equal((await linha(a.id)).account_status, 'pendente');
   const pa = await profDe(a.id);
@@ -149,26 +153,26 @@ test('criarUsuario: paciente por padrão, atendente nasce pendente com profissio
 });
 
 test('criarUsuario: papel desconhecido vira paciente; admin exige a capability; nível inválido → 400', async () => {
-  const x = await svc.criarUsuario({ body: { full_name: 'Xavier', email: emailNovo(), password: 'segredo1', role: 'rei' }, podeAdmins: false });
+  const x = await svc.criarUsuario({ actor: ATOR_SUPER, body: { full_name: 'Xavier', email: emailNovo(), password: 'segredo1', role: 'rei' }, podeAdmins: false });
   USUARIOS.push(x.id);
   assert.equal((await linha(x.id)).role, 'paciente');
 
-  assert.deepEqual(await svc.criarUsuario({ body: { full_name: 'Yara', email: emailNovo(), password: 'segredo1', role: 'admin' }, podeAdmins: false }),
+  assert.deepEqual(await svc.criarUsuario({ actor: ATOR_SUPER, body: { full_name: 'Yara', email: emailNovo(), password: 'segredo1', role: 'admin' }, podeAdmins: false }),
     { ok: false, status: 403, error: 'Sem permissão para criar administradores.' });
-  const nivelRuim = await svc.criarUsuario({ body: { full_name: 'Zeca', email: emailNovo(), password: 'segredo1', role: 'admin', admin_level: 'rei' }, podeAdmins: true });
+  const nivelRuim = await svc.criarUsuario({ actor: ATOR_SUPER, body: { full_name: 'Zeca', email: emailNovo(), password: 'segredo1', role: 'admin', admin_level: 'rei' }, podeAdmins: true });
   assert.deepEqual([nivelRuim.status, nivelRuim.error], [400, 'Nível administrativo inválido.']);
 
-  const adm = await svc.criarUsuario({ body: { full_name: 'Wanda Admin', email: emailNovo(), password: 'segredo1', role: 'admin' }, podeAdmins: true });
+  const adm = await svc.criarUsuario({ actor: ATOR_SUPER, body: { full_name: 'Wanda Admin', email: emailNovo(), password: 'segredo1', role: 'admin' }, podeAdmins: true });
   USUARIOS.push(adm.id);
   assert.equal((await linha(adm.id)).admin_level, 'gestor', 'sem nível informado, gestor');
 });
 
 test('criarUsuario: e-mail repetido (inclusive de conta EXCLUÍDA) → 409', async () => {
   const existente = await conta();
-  const dup = await svc.criarUsuario({ body: { full_name: 'Dupla', email: existente.email.toUpperCase(), password: 'segredo1' }, podeAdmins: false });
+  const dup = await svc.criarUsuario({ actor: ATOR_SUPER, body: { full_name: 'Dupla', email: existente.email.toUpperCase(), password: 'segredo1' }, podeAdmins: false });
   assert.deepEqual([dup.status, dup.error], [409, 'E-mail já cadastrado.']);
   await pool.query('UPDATE users SET deleted_at = NOW() WHERE id = ?', [existente.id]);
-  assert.equal((await svc.criarUsuario({ body: { full_name: 'Dupla', email: existente.email, password: 'segredo1' }, podeAdmins: false })).status, 409, 'o e-mail excluído segue reservado');
+  assert.equal((await svc.criarUsuario({ actor: ATOR_SUPER, body: { full_name: 'Dupla', email: existente.email, password: 'segredo1' }, podeAdmins: false })).status, 409, 'o e-mail excluído segue reservado');
 });
 
 test('criarUsuario: vínculo inválido NÃO deixa usuário órfão (inativo, inexistente ou já de outro)', async () => {
@@ -177,13 +181,13 @@ test('criarUsuario: vínculo inválido NÃO deixa usuário órfão (inativo, ine
   const inativo = await profissional({ ativo: 0 });
   for (const [pid, msg] of [[inativo, /não encontrado ou inativo/], [crypto.randomUUID(), /não encontrado ou inativo/], [comDono, /já vinculado/]]) {
     const email = emailNovo();
-    const r = await svc.criarUsuario({ body: { full_name: 'Sem Vaga', email, password: 'segredo1', role: 'atendente', professional_id: pid }, podeAdmins: false });
+    const r = await svc.criarUsuario({ actor: ATOR_SUPER, body: { full_name: 'Sem Vaga', email, password: 'segredo1', role: 'atendente', professional_id: pid }, podeAdmins: false });
     assert.equal(r.status, 400);
     assert.match(r.error, msg);
     assert.equal((await pool.query('SELECT 1 FROM users WHERE email = ?', [email]))[0].length, 0, 'a conta não foi criada');
   }
   const livre = await profissional();
-  const ok = await svc.criarUsuario({ body: { full_name: 'Com Vaga', email: emailNovo(), password: 'segredo1', role: 'atendente', professional_id: livre }, podeAdmins: false });
+  const ok = await svc.criarUsuario({ actor: ATOR_SUPER, body: { full_name: 'Com Vaga', email: emailNovo(), password: 'segredo1', role: 'atendente', professional_id: livre }, podeAdmins: false });
   USUARIOS.push(ok.id);
   assert.equal((await profDe(ok.id)).id, livre, 'vincula o profissional informado em vez de criar outro');
 });
@@ -240,10 +244,11 @@ test('atualizarUsuario: validações por campo e proteções da própria conta',
   assert.equal((await tenta({ account_status: 'voando' })).error, 'Status inválido.');
   assert.equal((await tenta({ role: 'rei' })).error, 'Papel inválido.');
   assert.equal((await tenta({ password: '123' })).error, 'Senha deve ter pelo menos 6 caracteres.');
-  // Admin editando a PRÓPRIA conta esbarra antes na hierarquia (nível igual ao seu): 403.
-  // (As mensagens de "própria conta" só seriam alcançáveis por um ator que não fosse admin.)
-  assert.equal((await tenta({ account_status: 'inativo' }, ator.id)).status, 403);
-  assert.equal((await tenta({ role: 'paciente' }, ator.id)).status, 403);
+  // Conta própria: mensagem clara (400), checada ANTES da hierarquia de nível igual (que daria 403).
+  assert.deepEqual(await tenta({ account_status: 'inativo' }, ator.id), { ok: false, status: 400, error: 'Você não pode alterar o status da própria conta.' });
+  assert.deepEqual(await tenta({ role: 'paciente' }, ator.id), { ok: false, status: 400, error: 'Você não pode alterar o próprio papel.' });
+  // …e os outros campos da própria conta continuam sob a hierarquia (admin de nível igual a si mesmo: 403).
+  assert.equal((await tenta({ job_role: 'x' }, ator.id)).status, 403);
   const outro = await conta();
   const uso = await tenta({ email: outro.email.toUpperCase() });
   assert.deepEqual([uso.status, uso.error], [409, 'Este e-mail já está em uso por outra conta.']);
@@ -261,10 +266,15 @@ test('atualizarUsuario: promover/rebaixar e nível seguem a hierarquia, e recusa
   const ok = await svc.atualizarUsuario({ actor: sup, id: alvo.id, body: { role: 'admin', admin_level: 'superadmin' }, podeAdmins: true });
   assert.equal(ok.ok, true, JSON.stringify(ok));
   assert.deepEqual([(await linha(alvo.id)).role, (await linha(alvo.id)).admin_level], ['admin', 'superadmin']);
-  // Regra atual (a ser revisada, ver relatório do passo 8b): ninguém define nível ABAIXO do próprio,
-  // nem o superadmin. Fica travada aqui para uma mudança futura ser deliberada.
-  const rebaixa = await svc.atualizarUsuario({ actor: sup, id: (await conta()).id, body: { admin_level: 'alertas' }, podeAdmins: true });
-  assert.deepEqual([rebaixa.status, rebaixa.error], [403, 'Você não pode definir um nível abaixo do seu.']);
+  // O superadmin atribui níveis abaixo do próprio (a regra bloqueia só o nível ACIMA do ator).
+  const outro = await conta();
+  const abaixo = await svc.atualizarUsuario({ actor: sup, id: outro.id, body: { admin_level: 'alertas' }, podeAdmins: true });
+  assert.equal(abaixo.ok, true, JSON.stringify(abaixo));
+  assert.equal((await linha(outro.id)).admin_level, 'alertas');
+  // Nível acima do ator: quem tem 'admins' mas não é o topo (hipótese, hoje só o superadmin tem) é barrado.
+  const gerente = await gestor();
+  const acima = await svc.atualizarUsuario({ actor: gerente, id: (await conta()).id, body: { admin_level: 'superadmin' }, podeAdmins: true });
+  assert.deepEqual([acima.status, acima.error], [403, 'Você não pode definir um nível acima do seu.']);
   const invalido = await svc.atualizarUsuario({ actor: sup, id: (await conta()).id, body: { admin_level: 'rei' }, podeAdmins: true });
   assert.equal(invalido.status, 400);
   // e o alvo já virou superadmin (nível igual ao do ator): daí em diante, é intocável

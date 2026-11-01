@@ -67,7 +67,7 @@ router.patch('/:id', async (req, res, next) => {
 router.post('/', validate(criarUsuarioBody), async (req, res, next) => {
   try {
     const podeAdmins = pode('admins', req.user);
-    const r = await svc.criarUsuario({ body: req.body, podeAdmins });
+    const r = await svc.criarUsuario({ actor: req.user, body: req.body, podeAdmins });
     if (!r.ok) return recusar(res, r);
     await req.audit('admin_create_user', 'user', r.id, r.auditoria);
     res.status(201).json({ ok: true, id: r.id });

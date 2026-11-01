@@ -138,6 +138,14 @@ async function atualizarUsuario({ actor, id, body, podeAdmins }) {
     const atual = await usuarios.paraEdicao(conn, id, { travar: true });
     if (!atual) return falha(404, NAO_ENCONTRADO);
 
+    // Conta própria: ninguém muda o próprio status nem o próprio papel (evita se trancar para
+    // fora ou se promover/rebaixar). Vem ANTES da hierarquia: admin editando a si mesmo tem nível
+    // "igual", e o 403 genérico escondia a razão real.
+    if (id === actor.id) {
+      if (accountStatus !== undefined) return falha(400, 'Você não pode alterar o status da própria conta.');
+      if (role !== undefined) return falha(400, 'Você não pode alterar o próprio papel.');
+    }
+
     const porHierarquia = H.bloqueioPorHierarquia(actor, atual);
     if (porHierarquia) return falha(porHierarquia.status, porHierarquia.error);
 
@@ -175,13 +183,11 @@ async function atualizarUsuario({ actor, id, body, podeAdmins }) {
 
     if (accountStatus !== undefined) {
       if (!H.SAFE_STATUSES.includes(accountStatus)) return falha(400, 'Status inválido.');
-      if (id === actor.id) return falha(400, 'Você não pode alterar o status da própria conta.');
       sets.push('account_status=?'); params.push(accountStatus);
     }
     if (jobRole !== undefined) { sets.push('job_role=?'); params.push(jobRole || null); }
     if (role !== undefined) {
       if (!H.SAFE_ROLES.includes(role)) return falha(400, 'Papel inválido.');
-      if (id === actor.id) return falha(400, 'Você não pode alterar o próprio papel.');
       const porPapel = H.bloqueioDePapel({ actor, alvo: atual, novoPapel: role, podeAdmins });
       if (porPapel) return falha(porPapel.status, porPapel.error);
       sets.push('role=?'); params.push(role);
@@ -253,7 +259,7 @@ async function atualizarUsuario({ actor, id, body, podeAdmins }) {
  * Cria uma conta. O corpo já passou por validate(criarUsuarioBody).
  * Atendente ganha profissional: o informado (se livre) ou um criado com o nome dele.
  */
-async function criarUsuario({ body, podeAdmins }) {
+async function criarUsuario({ actor, body, podeAdmins }) {
   const {
     full_name: fullName, email, password, role, account_status: accountStatus,
     job_role: jobRole, admin_level: adminLevel, professional_id: professionalId, mobile, phone,
@@ -264,8 +270,11 @@ async function criarUsuario({ body, podeAdmins }) {
 
   const porCriacao = H.bloqueioDeCriacaoDeAdmin(papel, podeAdmins);
   if (porCriacao) return falha(porCriacao.status, porCriacao.error);
-  if (papel === 'admin' && adminLevel && !H.SAFE_ADMIN_LEVELS.includes(adminLevel)) {
-    return falha(400, 'Nível administrativo inválido.');
+  // O nível do novo admin (gestor, se não informado) segue a mesma regra do PATCH: conhecido
+  // e nunca acima do de quem cria.
+  if (papel === 'admin') {
+    const porNivel = H.bloqueioDeNivel({ actor, novoNivel: adminLevel || 'gestor', podeAdmins });
+    if (porNivel) return falha(porNivel.status, porNivel.error);
   }
   const status = accountStatus && H.SAFE_STATUSES.includes(accountStatus)
     ? accountStatus

@@ -105,15 +105,17 @@ test('bloqueioDeNivel: ordem das recusas é capability → nível válido → n�
   assert.deepEqual(H.bloqueioDeNivel({ actor: admin('superadmin'), novoNivel: 'rei', podeAdmins: true })?.status, 400);
 });
 
-test('bloqueioDeNivel: ninguém define um nível abaixo do próprio (matriz)', () => {
+test('bloqueioDeNivel: ninguém define um nível ACIMA do próprio; igual ou abaixo pode (matriz)', () => {
   for (const ator of NIVEIS) {
     for (const nivel of NIVEIS) {
       const r = H.bloqueioDeNivel({ actor: admin(ator), novoNivel: nivel, podeAdmins: true });
-      const abaixo = H.rankDe(nivel) < H.rankDe(ator);
-      assert.equal(Boolean(r), abaixo, `${ator} define ${nivel}`);
-      if (r) assert.deepEqual(r, { status: 403, error: 'Você não pode definir um nível abaixo do seu.' });
+      const acima = H.rankDe(nivel) > H.rankDe(ator);
+      assert.equal(Boolean(r), acima, `${ator} define ${nivel}`);
+      if (r) assert.deepEqual(r, { status: 403, error: 'Você não pode definir um nível acima do seu.' });
     }
   }
+  // o superadmin atribui qualquer nível
+  for (const nivel of NIVEIS) assert.equal(H.bloqueioDeNivel({ actor: admin('superadmin'), novoNivel: nivel, podeAdmins: true }), null, nivel);
 });
 
 test('bloqueioDeCriacaoDeAdmin: só admin exige a capability', () => {
