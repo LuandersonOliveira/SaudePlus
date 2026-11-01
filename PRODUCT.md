@@ -31,11 +31,11 @@ Restrições duras (usuário vinculou): vanilla HTML/CSS/JS sem build + identida
 
 ## Brand Commitments
 
-Nome Saúde+, marca `brand-dot` radial verde-lagoa + anel `primary-100`, paleta lagoa (`--primary #0F7A6B`, `--primary-600 #0B5C50`, `--accent #E0622E` terracota com moderação), voz simples sem juridiquês (privacy.html declara não revisada por advogado), assinatura ondulação hero ("a lagoa"). Não redesenhar do zero sem aprovação.
+Nome Saúde+, marca `brand-dot` radial verde-lagoa + anel `primary-100`, paleta lagoa (`--primary #0F7A6B`, `--primary-600 #0B5C50`, `--accent #E0622E` terracota com moderação), voz simples sem juridiquês (a página /privacy declara não revisada por advogado), assinatura ondulação hero ("a lagoa"). Não redesenhar do zero sem aprovação.
 
 ## Evidence on Hand
 
-- `index.html` (hero, como-funciona 3 passos, recursos, trust), `auth.html` (login + wizard 2 passos + MFA), `assets/styles.css` (design system), `assets/ui.js` (helpers compartilhados), `assets/api.js` (sessão Bearer)
+- `web/src/pages` (landing: hero, como-funciona 3 passos, recursos, trust; `/auth`: login + wizard 2 passos + MFA), `web/src/index.css` (tokens da paleta lagoa) + `web/src/components/ui` (shadcn), `web/src/lib/api.ts` (sessão Bearer)
 - `GET /public/stats` e `GET /public/dpo` reais para prova social e encarregado (não usados na landing hoje — lacuna)
 - `docs/planos/PLANO_UIUX.md`, `docs/planos/PLANO_MELHORIAS.md`, `docs/tecnico/PROJETO_COMPLETO.md`, `ROTEIRO_TESTE_ALUNOS.md`
 - Ausências que não devem ser fabricadas: depoimentos reais de pacientes, números assistenciais verificados, telefones/horários das unidades (seed não confirmada — README avisa validar antes de divulgar)

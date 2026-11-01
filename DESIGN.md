@@ -62,6 +62,8 @@ components:
     padding: "20px"
 ---
 
+> **Nota (2026-11):** o front HTML descrito abaixo (`assets/styles.css`, `assets/ui.js`, `admin.html` etc.) foi aposentado. A implementação vigente é o app React em `web/`: os tokens da paleta lagoa estão em `web/src/index.css` e os componentes são shadcn/ui (`web/src/components/ui`). Os princípios, a paleta e as regras de acessibilidade abaixo continuam valendo; trechos que citam `assets/*` ou `*.html` são históricos. `assets/styles.css` só permanece para a demo `event-manager-demo.html`.
+
 ## Overview
 
 Sistema incumbente vanilla (sem build) para rede municipal. Assinatura: a "lagoa" — gradiente `primary-100 → bg` + ondulação em `radial-gradient` no hero, `brand-dot` radial com anel. Público baixa-familiaridade digital: contraste alto, fonte 16px, passos curtos. Modos: `index` Persuade, `auth` Persuade→Operate, painéis Operate com `app-shell` 256px rail.

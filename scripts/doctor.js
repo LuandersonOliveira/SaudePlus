@@ -16,9 +16,6 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const SERVER_DIR = path.join(ROOT, 'server');
 
-// Painéis que definem o helper esc() e interpolam em onclick.
-const ARQUIVOS_ESC = ['admin.html', 'atendente.html', 'dashboard.html'];
-
 // Colunas/tabelas que o código toca mas que dependem de migration.
 //
 // A lista precisa acompanhar TODA migration nova. Uma coluna que falta aqui
@@ -107,50 +104,10 @@ function secretsProblems(env) {
 }
 
 /**
- * Acusa `onclick="…${esc(x)}…"` nos painéis: o esc() do projeto não
- * escapava apóstrofo, e um nome como "Maria d'Ávila" virava SyntaxError
- * dentro do atributo onclick — o botão morria sem erro visível.
- */
-function escapingProblems(arquivos) {
-  const achados = [];
-  for (const file of ARQUIVOS_ESC) {
-    const html = arquivos[file];
-    if (typeof html !== 'string') continue;
-
-    const usos = html.match(/onclick\s*=\s*"[^"]*\$\{esc\(/g);
-    if (!usos || !usos.length) continue; // a página não interpola esc() em onclick
-
-    // O sinal que importa é a classe de caracteres do .replace dentro de esc():
-    // é ela que decide se o apóstrofo sobrevive. Procurar pela entidade
-    // &#39; em algum lugar do arquivo erra — o mapa pode vir antes ou depois
-    // da função, e o mapa sozinho não prova nada.
-    const def = /function esc\([\s\S]{0,400}?\.replace\(\s*\/\s*\[([^\]]*)\]\s*\//.exec(html);
-    const classe = def ? def[1] : '';
-    const cobreApostrofo = /'|\x27|u0027/i.test(classe);
-    if (def && cobreApostrofo) continue; // já corrigido
-
-    // Conta todas as interpolações de esc() na página (não só a primeira de
-    // cada onclick) — o número é informativo, mas precisa ser exato para
-    // dizer quanto trabalho falta.
-    const total = (html.match(/\$\{esc\(/g) || []).length;
-    const porque = !def
-      ? 'não encontrei a definição de esc() com .replace(/[…]/)'
-      : 'a classe de caracteres do .replace não inclui o apóstrofo';
-
-    achados.push({
-      file,
-      count: total,
-      detail: `${porque} e há ${total} interpolação(ões) de esc()`,
-    });
-  }
-  return achados;
-}
-
-/**
  * O CORS bate com a URL que o front realmente anuncia?
  *
  * Este é o defeito que impediu o login de funcionar e que nenhuma fase
- * anterior pegou: `serve-web.js` anunciava `http://127.0.0.1:8080`, o `.env`
+ * anterior pegou: o servidor estático anunciava `http://127.0.0.1:8080`, o `.env`
  * liberava `http://localhost:8080`, e a API vive em `localhost:4000`. Abrir a
  * página pelo host anunciado produzia 403 "Origem não permitida" em todo fetch,
  * que o navegador mostra como "Failed to fetch" — sem mensagem no servidor,
@@ -187,7 +144,7 @@ function dpoWarning(env) {
   const email = String(env.DPO_EMAIL || '').trim();
   if (name && email) return null;
   const faltando = [!name && 'DPO_NAME', !email && 'DPO_EMAIL'].filter(Boolean).join(' e ');
-  return `${faltando} vazio(s): privacy.html mostrará o contato do encarregado como "indisponível no momento"`;
+  return `${faltando} vazio(s): a página de privacidade mostrará o contato do encarregado como "indisponível no momento"`;
 }
 
 /** Chave de throttle de login: ip normalizado + e-mail normalizado. */
@@ -374,22 +331,6 @@ async function main() {
   if (webLivre) ok('porta 8080', 'livre (front pode subir)');
   else aviso('porta 8080', 'ocupada — o front já parece estar rodando');
 
-  // Frontend: escape de apóstrofo nos onclick dos painéis. É um defeito de
-  // código, não de ambiente: não bloqueia `npm run dev`, mas deixa botões
-  // ("Abrir histórico") sem ação para quem tem nome com apóstrofo.
-  const arquivos = {};
-  for (const f of ARQUIVOS_ESC) {
-    try { arquivos[f] = fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch { /* ausente */ }
-  }
-  const problemasEsc = escapingProblems(arquivos);
-  if (problemasEsc.length === 0) {
-    ok('frontend-escaping', 'esc() escapa apóstrofo nos três painéis');
-  } else {
-    for (const p of problemasEsc) {
-      aviso(`frontend-escaping ${p.file}`, `${p.detail} — botões com nome acentuado ficam sem ação`);
-    }
-  }
-
   console.log('');
   if (fixes.length) {
     console.log(`${BOLD}Para corrigir:${RESET}`);
@@ -414,7 +355,6 @@ async function main() {
 module.exports = {
   nodeOk,
   secretsProblems,
-  escapingProblems,
   dpoWarning,
   parsePairs,
   main,

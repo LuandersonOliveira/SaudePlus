@@ -1,7 +1,7 @@
 import { request } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 /**
  * Sessões criadas UMA vez para a suíte inteira, por API (sem passar pela tela de login).

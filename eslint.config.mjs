@@ -24,6 +24,8 @@ export default [
       'test-results/**',
       'playwright-report/**',
       'server/backups/**',
+      // O front React tem lint próprio (oxlint, `npm --prefix web run lint`) e o build gera bundles.
+      'web/**',
       // `marked` vendorizado: o próprio arquivo avisa "DO NOT EDIT THIS
       // FILE / generated from files in ./src/". Não é código nosso — seguir
       // o estilo dele não diz nada sobre o nosso.

@@ -151,26 +151,6 @@ test('mfa/setup sem token é 401 antes de qualquer coisa', async () => {
   assert.equal(res.status, 401);
 });
 
-test('o front envia a senha no mfa/setup (não corpo vazio)', () => {
-  // Se alguém voltar a chamar apiPost('/auth/mfa/setup', {}), o botão passa a
-  // devolver 400 e o usuário não consegue ativar o segundo fator. A tela usa
-  // o modal de senha já existente (o DESIGN.md proíbe prompt nativo).
-  const fs = require('node:fs');
-  const html = fs.readFileSync(path.join(ROOT, 'dashboard.html'), 'utf8');
-  assert.ok(
-    /apiPost\('\/auth\/mfa\/setup',\s*\{\s*password:\s*\w+\s*\}\)/.test(html),
-    'dashboard.html deveria mandar { password } em mfa/setup'
-  );
-  assert.ok(
-    /startMfaSetup[\s\S]{0,900}askPassword\(/.test(html),
-    'startMfaSetup deveria pedir a senha com o modal antes de chamar a API'
-  );
-  assert.ok(
-    !/apiPost\('\/auth\/mfa\/setup',\s*\{\s*\}\)/.test(html),
-    'dashboard.html não pode chamar mfa/setup com corpo vazio'
-  );
-});
-
 test('mfa/disable continua exigindo a senha', async () => {
   const u = await criarUsuario();
   await rota('/auth/mfa/setup', u, { password: SENHA });

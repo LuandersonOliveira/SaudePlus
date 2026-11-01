@@ -8,7 +8,6 @@ const assert = require('node:assert/strict');
 const {
   nodeOk,
   secretsProblems,
-  escapingProblems,
   dpoWarning,
   parsePairs,
   COLUNAS_ESPERADAS,
@@ -54,44 +53,6 @@ test('secretsProblems aceita DATA_ENCRYPTION_KEY vazia em dev sem quebrar o setu
   // precisa aparecer no relatório para não passar despercebida.
   const problemas = secretsProblems({ JWT_SECRET: 'b'.repeat(64), ADMIN_PASSWORD: 'senha1234' });
   assert.deepEqual(problemas.map((p) => p.name), ['DATA_ENCRYPTION_KEY']);
-});
-
-// Fixtures que espelham a forma real dos painéis: um bloco <script> com a
-// definição de esc() e os botões que a chamam dentro de onclick=.
-const ESC_BROKEN = `
-  function esc(s) { return (s ?? '').toString().replace(/[&<>"]/g, c => MAP[c]); }
-  <button onclick="showHistory('\${u.id}','\${esc(u.full_name)}')">Abrir histórico</button>
-  <button onclick="viewUser('\${esc(u.id)}')">Abrir perfil</button>
-`;
-
-const ESC_FIXED = `
-  const ESC_MAP = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-  function esc(s) { return (s ?? '').toString().replace(/[&<>"']/g, c => ESC_MAP[c]); }
-  <button onclick="showHistory('\${u.id}','\${esc(u.full_name)}')">Abrir histórico</button>
-  <button onclick="viewUser('\${esc(u.id)}')">Abrir perfil</button>
-`;
-
-test('escapingProblems acusa onclick com esc() sem escapar apóstrofo', () => {
-  const achados = escapingProblems({ 'admin.html': ESC_BROKEN });
-  assert.equal(achados.length, 1);
-  assert.equal(achados[0].file, 'admin.html');
-  assert.equal(achados[0].count, 2, 'conta as duas interpolações de esc()');
-});
-
-test('escapingProblems não acusa quando o esc já cobre o apóstrofo', () => {
-  assert.deepEqual(escapingProblems({ 'admin.html': ESC_FIXED }), []);
-});
-
-test('escapingProblems avalia cada painel que usa esc() em onclick', () => {
-  for (const file of ['admin.html', 'atendente.html', 'dashboard.html']) {
-    assert.equal(escapingProblems({ [file]: ESC_BROKEN }).length, 1, `${file} deveria ser avaliado`);
-  }
-});
-
-test('escapingProblems só avalia os arquivos de painel', () => {
-  // index.html e privacy.html não têm o helper esc() — não acusar.
-  assert.deepEqual(escapingProblems({ 'index.html': ESC_BROKEN }), []);
-  assert.deepEqual(escapingProblems({ 'privacy.html': ESC_BROKEN }), []);
 });
 
 test('dpoWarning avisa quando o encarregado não está configurado', () => {
@@ -224,41 +185,6 @@ test('o doctor percebe que o CORS não cobre a URL do front', () => {
     { webHost: 'localhost', webPort: 8080 }
   );
   assert.ok(extras && /127\.0\.0\.1:8080/.test(extras), 'origem extra deveria ser apontada');
-});
-
-test('serve-web anuncia a mesma origem que o CORS espera', () => {
-  // Trava o acoplamento: se alguém voltar a anunciar 127.0.0.1, este teste
-  // falha — porque o bug volta junto.
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const src = fs.readFileSync(path.join(__dirname, '..', '..', 'scripts', 'serve-web.js'), 'utf8');
-  const m = /WEB_HOST\s*\|\|\s*'([^']+)'/.exec(src);
-  assert.ok(m, 'serve-web deveria ter um host padrão explícito');
-  assert.equal(m[1], 'localhost', "o host padrão precisa ser 'localhost' — é o que o CORS e a API esperam");
-
-  const { corsProblem } = require('../../scripts/doctor');
-  assert.equal(
-    corsProblem({ CORS_ORIGIN: 'http://localhost:8080' }, { webHost: m[1], webPort: 8080 }),
-    null,
-    'o host padrão do front tem que satisfazer o CORS padrão'
-  );
-});
-
-test('a URL que o front usa para a API é a mesma em todo o projeto', () => {
-  // assets/api.js, README e serve-web têm que falar da mesma API, senão o
-  // navegador chama uma porta e a outra ponta não responde.
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const raiz = path.join(__dirname, '..', '..');
-  const api = fs.readFileSync(path.join(raiz, 'assets', 'api.js'), 'utf8');
-  assert.match(api, /DEFAULT_BASE\s*=\s*'http:\/\/localhost:4000'/);
-
-  const serve = fs.readFileSync(path.join(raiz, 'scripts', 'serve-web.js'), 'utf8');
-  assert.match(serve, /localhost:4000/);
-  assert.ok(
-    !/127\.0\.0\.1:4000/.test(serve),
-    'serve-web não deve anunciar 127.0.0.1 como se fosse a API'
-  );
 });
 
 test('npm run setup instala as dependências da RAIZ, não só as do server', () => {

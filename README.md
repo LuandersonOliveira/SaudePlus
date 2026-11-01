@@ -38,35 +38,34 @@
 
   | Papel              | Onde                         | Capacidades                                                                                                                                                                                                                                                                                          |
   | ------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | **Paciente** | `dashboard.html` | Navegação em **sidebar fixa** à esquerda (vira barra rolável no celular): Início (resumo + próximos eventos + lembretes), **Agendar** (alternador Consulta/Exame, escolhe o **serviço** e vê direto os cartões de unidades/dias com **vagas livres de verdade**, **resumo antes de confirmar**, **rascunho automático**), **Meus agendamentos** (consultas + exames com editar/cancelar/reagendar), Alertas da região, **Minha conta** (perfil com barra de progresso, dados LGPD, MFA, privacidade e DPO) |
-  | **Atendente** | `atendente.html` | Navegação em **sidebar fixa** à esquerda (vira barra rolável no celular): Fila do dia (pendentes de hoje, com contador na aba), **Agendamentos** (consultas + exames recentes), Buscar paciente (por nome/e-mail + histórico), confirmar / cancelar / reagendar, **Minha conta** (perfil com barra de progresso, dados LGPD, privacidade e DPO) |
-  | **Admin (gestão)** | `admin.html` | Navegação em **sidebar fixa** à esquerda (vira barra rolável no celular): Início (stats + CSV + recentes), Atendimentos (agenda de hoje + recentes), Cadastros (Pessoas / Rede de saúde / Doenças), Auditoria (quem fez o quê e quando) e **Minha conta** (dados do próprio admin + LGPD + privacidade + DPO). **Visão filtrada por `admin_level`** com badge do nível |
-  | **Público**        | `index.html`, `privacy.html` | Landing com Como funciona + Recursos, Política de Privacidade em linguagem simples (sem juridiquês, **não revisada por advogado** — ver aviso no topo do arquivo)                                                                                                                                    |
+  | **Paciente** | `/dashboard` | Navegação em **sidebar fixa** à esquerda (vira barra rolável no celular): Início (resumo + próximos eventos + lembretes), **Agendar** (alternador Consulta/Exame, escolhe o **serviço** e vê direto os cartões de unidades/dias com **vagas livres de verdade**, **resumo antes de confirmar**, **rascunho automático**), **Meus agendamentos** (consultas + exames com editar/cancelar/reagendar), Alertas da região, **Minha conta** (perfil com barra de progresso, dados LGPD, MFA, privacidade e DPO) |
+  | **Atendente** | `/atendente` | Navegação em **sidebar fixa** à esquerda (vira barra rolável no celular): Fila do dia (pendentes de hoje, com contador na aba), **Agendamentos** (consultas + exames recentes), Buscar paciente (por nome/e-mail + histórico), confirmar / cancelar / reagendar, **Minha conta** (perfil com barra de progresso, dados LGPD, privacidade e DPO) |
+  | **Admin (gestão)** | `/admin` | Navegação em **sidebar fixa** à esquerda (vira barra rolável no celular): Início (stats + CSV + recentes), Atendimentos (agenda de hoje + recentes), Cadastros (Pessoas / Rede de saúde / Profissionais / Doenças e alertas), Auditoria (quem fez o quê e quando) e **Minha conta** (dados do próprio admin + LGPD + privacidade + DPO). **Visão filtrada por `admin_level`** com badge do nível |
+  | **Público**        | `/`, `/privacy` | Landing com Como funciona + Recursos, Política de Privacidade em linguagem simples (sem juridiquês, **não revisada por advogado** — ver aviso no topo do arquivo)                                                                                                                                    |
 
-  Cadastro (`auth.html`): wizard em 2 passos — 1) Você (tipo + nome, nascimento, CPF, celular) e 2) Acesso (e-mail + senha). O resto (documentos extras, endereço, perfil de saúde) vai para a seção **Minha conta** depois do 1º login, com barra de progresso.
+  Cadastro (`/auth`): wizard em 2 passos — 1) Você (tipo + nome, nascimento, CPF, celular) e 2) Acesso (e-mail + senha). O resto (documentos extras, endereço, perfil de saúde) vai para a seção **Minha conta** depois do 1º login, com barra de progresso.
   Conta de atendente nasce com `account_status = 'pendente'` e só opera após ativação pelo admin.
-  Login redireciona automaticamente por papel (`redirectByRole()` em `assets/api.js`).
+  Login redireciona automaticamente por papel (`homeForRole()` em `web/src/lib/session.ts`).
 
-  ## Páginas do frontend
+  ## Frontend (`web/`)
 
-  | Arquivo             | Rota / acesso                        | Descrição                                                                                                                                                                                                                                                                                                                                  |
-  | ------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-  | `index.html`        | pública                              | Landing: hero, `#como-funciona` (3 passos), `#recursos` (consultas/exames/alertas). Se já logado, redireciona por papel                                                                                                                                                                                                                    |
-  | `auth.html`         | pública                              | Abas Entrar / Criar conta. Login (`POST /auth/login`) + wizard de cadastro (`POST /auth/signup`)                                                                                                                                                                                                                                           |
-  | `dashboard.html` | `requireAuth()` + papel `paciente` | **Sidebar** com rodapé (badge Paciente + nome + e-mail + Sair): Início, Agendar (Consulta/Exame), Meus agendamentos, Alertas, **Minha conta** (perfil, LGPD, MFA, privacidade, DPO). Consome `/me/*`, `/catalog/*`, `/diseases`, `/auth/me`, `/auth/me/export`, `/public/dpo` |
-  | `atendente.html` | `requireRole(['atendente','admin'])` | **Sidebar** com rodapé (badge Atendente + nome + cargo + e-mail + Sair): Fila do dia (contador na aba), Agendamentos, Buscar paciente, **Minha conta** (perfil, LGPD, privacidade, DPO). Consome `/staff/*`, `/auth/me`, `/auth/me/export`, `/public/dpo` |
-  | `admin.html` | `requireRole(['admin'])` | **Sidebar** com rodapé (badge do `admin_level` + e-mail + Sair): Início, Atendimentos, Cadastros (Pessoas / Rede / Doenças), Auditoria, **Minha conta** (perfil, LGPD, privacidade, DPO). Consome `/admin/*`, `/admin/users/*`, `/admin/professionals/*`, `/health-units/manage`, `/auth/me`, `/auth/me/export`, `/public/dpo` |
-  | `privacy.html`      | pública                              | Política de Privacidade LGPD simplificada                                                                                                                                                                                                                                                                                                  |
-  | `assets/styles.css` | —                                    | Design system (Inter, cards, tabs, badges, grids, topbar e sidebar/rail)                                                                                                                                                                                                                                                                   |
-  | `assets/api.js`     | —                                    | Cliente HTTP + sessão. `API_BASE` padrão `http://localhost:4000`; `apiGet/Post/Put/Patch/Delete`, `authLogin/authSignup/signOut/getSession/requireAuth/requireRole/isAdmin/redirectByRole`, `fmtDate`, `toast`. Sessão em `localStorage` (`saude_token` / `saude_user`), cabeçalho `Authorization: Bearer <JWT>` em toda chamada protegida |
+  React 19 + Vite + TypeScript, Tailwind v4 e shadcn/ui (Radix), React Query, react-hook-form + Zod e Recharts. Cada papel tem sua área, carregada sob demanda:
 
-  > Se a API não estiver em `http://localhost:4000`, defina `window.API_BASE` no `<head>`
-  > de cada HTML **antes** de `<script defer src="assets/api.js">`.
+  | Rota | Acesso | O que tem |
+  | ---- | ------ | --------- |
+  | `/` | pública | Landing: hero, como funciona (3 passos), recursos |
+  | `/auth` | pública | Entrar / Criar conta (wizard de 2 passos) / recuperar senha / verificação em duas etapas (MFA) |
+  | `/privacy` | pública | Política de Privacidade LGPD simplificada (âncora `#dpo`) |
+  | `/dashboard/*` | paciente | Início, Agendar (vagas reais, lista de espera, revisão antes de confirmar), Meus agendamentos, Alertas, Minha conta (perfil, LGPD, MFA, privacidade, DPO) |
+  | `/atendente/*` | atendente | Fila do dia, Agenda (calendário), Agendamentos, Buscar paciente, Minha conta |
+  | `/admin/*` | admin (visão por `admin_level`) | Início, Atendimentos, Cadastros (Pessoas, Rede de saúde, Profissionais, Doenças e alertas), Auditoria, Minha conta |
+
+  Código em `web/src`: `features/{admin,patient,staff}` (uma pasta por papel), `components/ui` (shadcn), `lib/` (cliente HTTP, sessão, validadores). Em desenvolvimento o Vite (:8080) faz proxy de `/api` para a API (:4000); a sessão fica em `localStorage` (`saude_token`, `saude_user`, `saude_refresh`) e toda chamada protegida leva `Authorization: Bearer <JWT>`. Testes: `npm run test:web` (Vitest) e `npm run test:e2e` (Playwright contra `npm run dev`).
 
   ## Arquitetura
 
   ```text
-  Navegador (HTML + assets/api.js)
+  Navegador (React, web/)
     │ fetch + Authorization: Bearer <JWT>
     v
   API Express (server/src/app.js + routes/*)
@@ -92,15 +91,10 @@
 
   ```text
   saude-plus/
-  ├── index.html          # landing pública
-  ├── auth.html           # login + wizard de cadastro (2 passos) + seção Minha conta no dashboard
-  ├── dashboard.html      # painel do paciente (sidebar: início, agendar, agendamentos, alertas, minha conta)
-  ├── atendente.html      # painel do atendente (sidebar: fila do dia, agendamentos, busca paciente, minha conta)
-  ├── admin.html          # painel do admin (sidebar: stats, atendimentos, cadastros, auditoria, minha conta)
-  ├── privacy.html        # política de privacidade (linguagem simples)
-  ├── assets/
-  │   ├── styles.css      # design system
-  │   └── api.js          # cliente HTTP + sessão + helpers
+  ├── web/                # front React (Vite + TypeScript); o build sai em web/dist
+  ├── e2e/                # Playwright: login, admin, atendente, paciente
+  ├── assets/             # event-manager (calendário isolado) + styles.css e fonte da demo
+  ├── event-manager-demo.html  # página de demonstração do event-manager (abrir direto no navegador)
   ├── ROTEIRO_TESTE_ALUNOS.md  # roteiro de teste em sala
   ├── docs/               # governanca/ (LGPD/ISO 27001), planos/, tecnico/, referencia/ (ver "Documentação extra")
   └── server/
@@ -284,14 +278,14 @@
   | Var                                                           | Exemplo                                 | Para quê                                                          |
   | ------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
   | `PORT`                                                        | `4000`                                  | Porta da API                                                      |
-  | `CORS_ORIGIN`                                                 | `http://localhost:8080`                 | Deve bater **exatamente** com a URL do front. `npm run doctor` compara com o que o `serve-web.js` anuncia: se divergirem, todo `fetch` do navegador volta 403 e aparece como "Failed to fetch" no login, sem nada no terminal |
+  | `CORS_ORIGIN`                                                 | `http://localhost:8080`                 | Deve bater **exatamente** com a URL do front. `npm run doctor` compara com a URL do front (`localhost:8080`): se divergirem, todo `fetch` do navegador volta 403 e aparece como "Failed to fetch" no login, sem nada no terminal |
   | `TRUST_PROXY_HOPS`                                            | `0`                                     | Atrás de nginx/Cloudflare: nº de proxies (1 para um nginx). Sem isso o rate limit e o lockout de login vêm do IP do proxy |
   | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | `localhost / 3306 / root / *** / saude` | Conexão MySQL                                                     |
   | `JWT_SECRET` | string longa aleatória | Assinatura dos tokens (nunca commitar o real) |
   | `JWT_EXPIRES_IN` | `15m` | Validade do access token (curto, padrão RNDS; o front renova sozinho via refresh) |
   | `JWT_REFRESH_EXPIRES_IN` | `30d` | Validade do refresh token (rotativo, revogável via `POST /auth/logout`) |
   | `DATA_ENCRYPTION_KEY` | hex 64 chars | Chave AES-256 da cripto em coluna (CPF/RG/CNS). **Sem ela o app não sobe** — ver "Gravar em texto puro" abaixo |
-  | `DPO_NAME` / `DPO_EMAIL` | `...` | Encarregado LGPD exibido em `privacy.html` via `GET /public/dpo` |
+  | `DPO_NAME` / `DPO_EMAIL` | `...` | Encarregado LGPD exibido em `/privacy` via `GET /public/dpo` |
   | `RETENTION_INACTIVE_YEARS` | `5` | Anos sem login até anonimização (`purge:retention`) |
   | `CNES_MUNICIPIO_CODE` / `INFODENGUE_GEOCODE` | `260850` / `2608503` | Município IBGE (syncs; sem credencial) |
   | `RNDS_ENV` / `RNDS_UF` / `RNDS_CERT_PFX_PATH` / `RNDS_CERT_PASS` | `homologacao` / `pe` / `...` | Barramento RNDS (exige e-CNPJ + credenciamento) |
@@ -324,7 +318,7 @@
 
   ```bash
   npm run dev:api    # só a API (scripts/run-local.js: carrega o .env e libera texto puro)
-  npm run dev:web    # só o front estático
+  npm run dev:web    # só o front (Vite, :8080)
   ```
 
   O `dev:api` **não** tem auto-reload: ele roda `node` direto. Para recarregar
@@ -332,11 +326,7 @@
   — mas ele não passa pelo `run-local.js`, então só funciona depois de
   `npm run db:setup` e com `ALLOW_PLAINTEXT_DEV` no ambiente (veja abaixo).
 
-  O front é servido por `scripts/serve-web.js`, que só entrega as seis páginas e
-  `assets/` — qualquer outro caminho responde 404. **Não troque por `npx serve .`**
-  nem por `http-server`: servido a partir da raiz do repositório, exporia
-  `server/.env` (senha do MySQL, `JWT_SECRET`, `DATA_ENCRYPTION_KEY`) e
-  `server/backups/`.
+  Em desenvolvimento o front é o Vite (`web/`), que faz proxy de `/api` para a API. Não sirva a raiz do repositório com `npx serve .`/`http-server`: exporia `server/.env` (senha do MySQL, `JWT_SECRET`, `DATA_ENCRYPTION_KEY`) e `server/backups/`.
 
   Acesse **`http://localhost:8080`** — e só essa. O endereço importa porque é
   ele que o navegador manda no cabeçalho `Origin`, e é contra ele que a API
@@ -366,20 +356,13 @@
   (consulta de CEP no cadastro). `APP_BASE_URL` é o endereço público usado no
   link do e-mail de redefinição de senha (`/auth?tab=reset&token=…`).
 
-  ### Rota antiga sem extensão
-
-  O navegador pode ter `localhost:8080/admin` salvo no histórico (a URL antiga,
-  de quando as páginas eram rotas e não arquivos). O servidor responde **301**
-  para `/admin.html` — o mesmo vale para `/auth`, `/dashboard`, `/atendente`,
-  `/index` e `/privacy`. Qualquer outro caminho continua 404.
-
   Acesse `http://localhost:8080`.
 
   Fluxo de verificação rápida:
 
-  1. `auth.html` → Criar conta (paciente fictício) → login → cai em `dashboard.html`.
+  1. `/auth` → Criar conta (paciente fictício) → login → cai em `/dashboard`.
   2. Agendar consulta + exame → aparecem em Minha agenda / Próximos eventos.
-  3. Login com `ADMIN_EMAIL` → cai em `admin.html` → Visão geral lista dados de todos.
+  3. Login com `ADMIN_EMAIL` → cai em `/admin` → Visão geral lista dados de todos.
   4. Admin cadastra alerta em Doenças → paciente vê em Alertas após recarregar.
 
   ## Scripts disponíveis
@@ -390,8 +373,7 @@
   | ------ | -------- |
   | `npm run setup` | Instala as dependências, cria o banco, aplica todas as migrations e cria o admin. Idempotente. |
   | `npm run doctor` | Diagnóstico do ambiente: Node, `.env`, MySQL, migrations pendentes, porta 4000/8080 livre, e se falta `DATA_ENCRYPTION_KEY`. |
-  | `npm run dev` | Sobe a API (:4000) e o front **React** (`web/`, Vite, :8080) juntos. As páginas ainda não migradas (atendente, dashboard, admin) **não abrem** neste modo. |
-  | `npm run dev:legacy` | API (:4000) + front antigo em HTML (:8080, `serve-web.js`). É o que o `npm run test:e2e` usa até a migração terminar. |
+  | `npm run dev` | Sobe a API (:4000) e o front **React** (`web/`, Vite, :8080) juntos. É também o que o `npm run test:e2e` usa. |
   | `npm run dev:api` / `npm run dev:web` | Sobe um lado só (`dev:web` = Vite). O `dev:api` libera texto puro de propósito (modo local). |
   | `npm run build:web` / `npm run test:web` | Build de produção e testes (Vitest) do app React. |
 | `npm run start:api` | Sobe **só a API**, no modo fechado: sem `DATA_ENCRYPTION_KEY` ela recusa iniciar. É o caminho de produção. |
@@ -480,7 +462,7 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   - **Conta:** `account_status` (`ativo`/`inativo`/`pendente`); login bloqueia `inativo` e `pendente`; exclusão é soft delete e não retorna em listagens, stats, histórico nem CSV.
   - **Recuperação de senha:** `POST /auth/password/forgot` responde sempre igual (não revela e-mail), grava apenas o SHA-256 do token de uso único; sem SMTP a pendência fica registrada em vez de fingir envio. `POST /auth/password/reset` consome o token e revoga sessões antigas.
   - **Medidas administrativas:** desativar, excluir, trocar papel/senha ou rebaixar um admin revoga refresh tokens e resets pendentes; promover a `admin` exige capability `admins`.
-  - **LGPD — Fase 1:** CPF/RG/CNS cifrados no banco (AES-256-GCM, `utils/crypto.js`; chave em `DATA_ENCRYPTION_KEY`, futuro KMS/Vault); consentimento registrado no signup (`privacy_version`, `consent_at`, `consent_ip`); direitos exercíveis pelo titular — portabilidade (`GET /auth/me/export` + botão no dashboard), eliminação via anonimização (`DELETE /auth/me` com senha + botão no dashboard); visualização de documentos pelo admin auditada (`admin_view_user_docs`); expurgo automático de inativas +5 anos (`purge:retention`); DPO público (`GET /public/dpo` + `privacy.html` com bases legais art. 11). Governança em `docs/governanca/ROPA.md`, `docs/governanca/RIPD.md`, `docs/governanca/RESPOSTA_INCIDENTES.md`. Antes de uso com população ainda faltam: HTTPS/HSTS, DPO nomeado de verdade (`DPO_NAME/DPO_EMAIL` ainda vazios), revisão jurídica da `privacy.html` pela Procuradoria e KMS/Vault.
+  - **LGPD — Fase 1:** CPF/RG/CNS cifrados no banco (AES-256-GCM, `utils/crypto.js`; chave em `DATA_ENCRYPTION_KEY`, futuro KMS/Vault); consentimento registrado no signup (`privacy_version`, `consent_at`, `consent_ip`); direitos exercíveis pelo titular — portabilidade (`GET /auth/me/export` + botão em Minha conta), eliminação via anonimização (`DELETE /auth/me` com senha + botão em Minha conta); visualização de documentos pelo admin auditada (`admin_view_user_docs`); expurgo automático de inativas +5 anos (`purge:retention`); DPO público (`GET /public/dpo` + `/privacy` com bases legais art. 11). Governança em `docs/governanca/ROPA.md`, `docs/governanca/RIPD.md`, `docs/governanca/RESPOSTA_INCIDENTES.md`. Antes de uso com população ainda faltam: HTTPS/HSTS, DPO nomeado de verdade (`DPO_NAME/DPO_EMAIL` ainda vazios), revisão jurídica da página `/privacy` pela Procuradoria e KMS/Vault.
 
   ## Segurança da informação (Aulas 1–8 de auditoria)
 
@@ -494,24 +476,24 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   | **Autenticidade** | **MFA TOTP** (RFC 6238, sem dependências) para admin/atendente · Gov.br (Fase 2.3) |
   | **Não repúdio** | Trilha verificável + `audit_view_user_docs` + log sanitizado (CPF parcial, sem token) |
 
-  **Trilha tamper-evident:** cada linha carrega `entry_hash = SHA-256(prev_hash|ator|ação|entidade|detalhes|momento)`. Adulterar, remover ou reinserir uma linha quebra o elo seguinte — e a verificação aponta **qual** linha. Botão **Verificar integridade** em `admin.html → Auditoria`.
+  **Trilha tamper-evident:** cada linha carrega `entry_hash = SHA-256(prev_hash|ator|ação|entidade|detalhes|momento)`. Adulterar, remover ou reinserir uma linha quebra o elo seguinte — e a verificação aponta **qual** linha. Botão **Verificar integridade** em `/admin/auditoria`.
 
-  - Ativar MFA: `dashboard.html → Início → Verificação em duas etapas` → cadastre o segredo no Google/Microsoft Authenticator → digite o código.
+  - Ativar MFA: `/dashboard/conta → Verificação em duas etapas` → cadastre o segredo no Google/Microsoft Authenticator → digite o código.
   - docs: `docs/governanca/PSI.md` (política/normas/procedimentos), `docs/governanca/GOVERNANCA.md` (três linhas, RACI, matriz de risco, PDCA), `docs/governanca/SOA_27001.md` (93 controles mapeados), `docs/governanca/TRILHA_AUDITORIA.md` (tipos, abordagens, kit SQL do auditor), `docs/governanca/DIREITO_TI.md` (LGPD, Marco Civil, art. 154-A CP).
 
   ## Lembretes automáticos e auditoria
 
   - **Job de lembretes** (`server/src/jobs/reminders.js`): roda no boot da API + a cada 24h. Busca `appointments/exams` com status `pendente|confirmado` para amanhã e cria `reminders` na véspera (dedupe por `user_id + title + remind_at`). Paciente só lê (`GET /me/reminders`).
-  - **Auditoria** (`server/src/utils/audit.js` + tabela `audit_log`): registra confirmar/cancelar/reagendar (staff e admin), CRUD de doenças, gestão de usuários. Visível em `admin.html → Auditoria` e `GET /admin/audit-log`.
+  - **Auditoria** (`server/src/utils/audit.js` + tabela `audit_log`): registra confirmar/cancelar/reagendar (staff e admin), CRUD de doenças, gestão de usuários. Visível em `/admin/auditoria` e `GET /admin/audit-log`.
 
   ## Teste em sala de aula
 
   Guia passo a passo com dados fictícios em **`ROTEIRO_TESTE_ALUNOS.md`**:
 
   0. Checklist (MySQL, `.env`, `npm run setup`, `npm run doctor`, `npm run dev`, `CORS_ORIGIN`).
-  1. Papel aluno (conta → login → `dashboard.html` → consulta + exame → Próximos eventos → Sair).
-  2. Papel admin (login seed → `admin.html` → Visão geral com dados de todos → Histórico por e-mail → cadastrar alerta → aluno vê em Alertas).
-  3. Teste de segurança (A não vê B; aluno digitando `admin.html` cai em `dashboard.html` com aviso; DevTools mostra `Authorization: Bearer`; deslogado digitando `dashboard.html` cai em `auth.html`).
+  1. Papel aluno (conta → login → `/dashboard` → consulta + exame → Próximos eventos → Sair).
+  2. Papel admin (login seed → `/admin` → Visão geral com dados de todos → Histórico por e-mail → cadastrar alerta → aluno vê em Alertas).
+  3. Teste de segurança (A não vê B; aluno digitando `/admin` cai em `/dashboard`; DevTools mostra `Authorization: Bearer`; deslogado digitando `/dashboard` cai em `/auth`).
 
   > Use sempre nomes/e-mails inventados — nunca dado real de saúde em ambiente de dev.
 
@@ -608,10 +590,10 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
 | Sintoma                           | Causa provável / solução                                                                                |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `Failed to fetch` no console      | API fora do ar, ou `CORS_ORIGIN` no `.env` ≠ URL do front (inclui porta). Rode `npm run doctor` — ele verifica os dois lados |
-| `GET /server/.env` devolve 404    | **Comportamento correto.** O front é servido por allowlist (`scripts/serve-web.js`); `server/` nunca é servido. Foi assim que a auditoria provou que o `.env` não está exposto |
+| `GET /server/.env` devolve 404    | **Comportamento correto.** O Vite (dev) e o Express (produção, só `web/dist`) nunca servem `server/`. Foi assim que a auditoria provou que o `.env` não está exposto |
 | Login dá **"Failed to fetch"**     | A URL do front não bate com `CORS_ORIGIN`: abra em `http://localhost:8080` (não `127.0.0.1:8080`). `npm run doctor` compara as duas e diz qual está errada |
 | Página abre mas fica vazia         | Mesma causa do item acima — o 403 do CORS não aparece no terminal. Confira `npm run doctor` → linha `cors` |
-| Abro `/admin` e dá "Rota não encontrada" | É uma URL antiga salva no histórico do navegador. O servidor responde 301 para `/admin.html`; se persistir, limpe o histórico ou digite a URL completa |
+| Abro `/admin` e dá "Rota não encontrada" | Em produção, falta ligar `SERVE_WEB=1` (e rodar `npm run build:web`): sem isso o Express só serve a API e as páginas do React não existem. Em dev, use `npm run dev` e abra `http://localhost:8080` |
 | Login não pede o segundo fator    | `migrate:interop` não rodou (sem `users.totp_enabled`, o MFA desliga em silêncio). Rode `npm run db:migrate` |
 | "Muitos intentos de login"        | Lockout por conta: 5 tentativas por `ip|email` travam por 15 min. Espere ou ajuste `TRUST_PROXY_HOPS` se está atrás de proxy |
 | `Token inválido ou expirado`      | Access expira em 15 min — o front renova sozinho; se persistir, logar de novo                         |

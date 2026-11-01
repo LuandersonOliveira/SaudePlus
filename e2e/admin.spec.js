@@ -44,7 +44,7 @@ test.describe('navegação', () => {
 });
 
 test.describe('Cadastros > Rede de saúde', () => {
-  test('cadastra, edita e desativa uma unidade; o catálogo do paciente acompanha', async ({ page, request }) => {
+  test('cadastra, edita e desativa uma unidade; o catálogo do paciente acompanha', async ({ page }) => {
     const nome = `UBS PW ${sufixo}`;
     await page.goto('/admin/cadastros/rede');
     const form = page.getByRole('form', { name: 'Cadastrar unidade de saúde' });

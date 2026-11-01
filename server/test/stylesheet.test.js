@@ -155,14 +155,3 @@ test('o veredito pega o bug original (auto-teste do próprio teste)', () => {
   const preludio = limpo.slice(0, limpo.indexOf('{')).trim();
   assert.equal(preludio, '@font-face');
 });
-
-test('toda página que usa .sr-only tem a regra que a esconde', () => {
-  const paginas = ['index.html', 'auth.html', 'dashboard.html', 'admin.html', 'atendente.html'];
-  const temRegra = /\.sr-only\s*\{/.test(css);
-  assert.ok(temRegra, '.sr-only ausente: todo skip-link apareceria como link visível no topo');
-  for (const p of paginas) {
-    const html = fs.readFileSync(path.resolve(__dirname, '..', '..', p), 'utf8');
-    const usos = (html.match(/class="[^"]*\bsr-only\b/g) || []).length;
-    assert.ok(usos > 0, `${p} deveria ter ao menos um rótulo sr-only`);
-  }
-});
