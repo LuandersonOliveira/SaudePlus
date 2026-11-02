@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposta para aprovação item a item (nenhum item iniciado) |
+| **Status** | Em andamento: onda 1, item 1.1 concluído (ver Andamento) |
 | **Criada em** | 2026-11-01 |
 | **Origem** | Fase 7 (`SYSTEM_DESIGN.md`, `SYSTEM_DESIGN_ACHADOS.md`) |
 | **Substitui** | A ordem antiga dos itens pendentes da Fase 6: 3B (`staff.routes.js`), `admin.routes.js`, A5, B4 e demais pequenos |
@@ -114,3 +114,10 @@ Escritos ao iniciar a onda correspondente, com a decisão em aberto:
 - Nenhuma rota com SQL direto.
 - ROPA e RIPD coerentes com o código.
 - Servidor, web e e2e verdes ao fim de cada onda.
+
+## Andamento
+
+| Item | Situação | Commit | Observação |
+|---|---|---|---|
+| 1.1 | **Concluído** (2026-11-02) | `cf4c26b` | E-10 e E-11 resolvidos. Servidor 578/580 (única falha: "doctor confere o MESMO banco", artefato do runner), corrida 7/7, web 339/339, `tsc` e lint limpos, e2e 28/28. O script `anonimizar:excluidos` achou 0 contas no banco `saude`. Pendência pequena: atendente que se elimina por `DELETE /auth/me` mantém `professionals.user_id` apontando para a conta anonimizada (o caminho do admin já solta o vínculo) |
+| 1.2 | Próximo | | `details` da auditoria sem dado pessoal; inclui a linha "excluído: e-mail (nome)" que o item 1.1 ainda grava |

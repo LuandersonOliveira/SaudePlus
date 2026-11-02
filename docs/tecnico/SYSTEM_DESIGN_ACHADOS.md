@@ -69,8 +69,8 @@ Vêm da seção 8 do `SYSTEM_DESIGN.md`. Aqui só a classificação.
 
 | ID | Classe | Achado | Princípio | Evidência | Sev. |
 |---|---|---|---|---|---|
-| E-10 | Editar | `anonymizeUser` não zera `govbr_sub`, `consent_ip`, `totp_secret` e `totp_enabled`. O `govbr_sub` e o IP continuam identificando a pessoa | **Encapsulamento** da regra de eliminação | `utils/privacy.js:46-56` | Alta |
-| E-11 | Editar | Há dois "apagar" com efeitos diferentes: o do admin só preenche `deleted_at` e mantém todos os dados pessoais | **Abstração** (um conceito, duas implementações) | `repositories/usuarios.js:114`; `utils/privacy.js` | Alta |
+| E-10 | Editar (**resolvido** em `cf4c26b`) | `anonymizeUser` não zera `govbr_sub`, `consent_ip`, `totp_secret` e `totp_enabled`. O `govbr_sub` e o IP continuam identificando a pessoa | **Encapsulamento** da regra de eliminação | `utils/privacy.js:46-56` | Alta |
+| E-11 | Editar (**resolvido** em `cf4c26b`) | Há dois "apagar" com efeitos diferentes: o do admin só preenche `deleted_at` e mantém todos os dados pessoais | **Abstração** (um conceito, duas implementações) | `repositories/usuarios.js:114`; `utils/privacy.js` | Alta |
 | E-12 | Editar | O paciente cria, cancela e reagenda sem linha no `audit_log`, e criar e cancelar também não geram `booking_events` | **S** (a rota decide e executa) | `routes/me.booking.routes.js` (sem `audit`; evento só na linha 276) | Alta |
 | E-13 | Editar | `appointments.location` vem do corpo da requisição do paciente e não é conferido contra `unit_id` | **Encapsulamento** (dado derivado tratado como entrada) | `routes/me.booking.routes.js:64` e `:116` | Média |
 | E-14 | Editar | `audit_log.actor_id` e `entity_id` são `NOT NULL`: auditoria sem ator ou sem id falha no `INSERT`, e a ação fica sem registro (só `console.error`) | **Abstração** | `utils/audit.js:96-192`, `schema.sql:473-476` | Média |
