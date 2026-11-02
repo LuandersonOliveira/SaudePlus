@@ -35,7 +35,8 @@ export function DeleteUserDialog({ target, onClose }: { target: { id: string; na
         <AlertDialogHeader>
           <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
           <AlertDialogDescription>
-            O usuário será ocultado (soft-delete). Ele não poderá mais acessar o sistema.
+            Os dados pessoais deste usuário serão apagados de forma definitiva (anonimização) e a conta não poderá ser
+            recuperada. Para apenas bloquear o acesso, de forma reversível, edite o usuário e deixe a conta inativa.
             <span className="mt-2 block font-semibold text-foreground">{target?.name}</span>
           </AlertDialogDescription>
         </AlertDialogHeader>

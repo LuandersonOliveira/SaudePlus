@@ -332,7 +332,7 @@ test('atualizarUsuario: vínculo atendente ↔ profissional segue o papel final'
 // exclusão
 // ---------------------------------------------------------------------------
 
-test('excluirUsuario: soft delete, solta o profissional, derruba o acesso; respeita a hierarquia', async () => {
+test('excluirUsuario: ANONIMIZA (ADR-0009), solta o profissional, derruba o acesso; respeita a hierarquia', async () => {
   const ger = await gestor();
   assert.equal((await svc.excluirUsuario({ actor: ger, id: ger.id })).error, 'Você não pode excluir a própria conta.');
   assert.equal((await svc.excluirUsuario({ actor: ger, id: crypto.randomUUID() })).status, 404);
@@ -340,12 +340,29 @@ test('excluirUsuario: soft delete, solta o profissional, derruba o acesso; respe
   assert.equal((await svc.excluirUsuario({ actor: ger, id: par.id })).status, 403);
 
   const at = await conta({ role: 'atendente', extra: { nome: 'Sai Fora' } });
+  await pool.query(
+    "UPDATE users SET govbr_sub = 'sub-teste', consent_ip = '10.0.0.9', totp_secret = 'segredo', totp_enabled = 1, mobile = '81999990000' WHERE id = ?",
+    [at.id]
+  );
   const prof = await profissional({ userId: at.id });
   const sessao = await issueRefreshToken(at.id);
   const r = await svc.excluirUsuario({ actor: ger, id: at.id });
   assert.equal(r.ok, true);
   assert.match(r.auditoria, /^excluído: .*\(Sai Fora\)$/);
-  assert.ok((await linha(at.id)).deleted_at);
+  const depois = await linha(at.id);
+  assert.ok(depois.deleted_at);
+  assert.equal(depois.full_name, 'Titular removido', 'o nome some');
+  assert.equal(depois.email, `removido_${at.id}@removido.local`, 'o e-mail deixa de identificar');
+  assert.equal(depois.account_status, 'inativo');
+  for (const coluna of ['mobile', 'phone', 'govbr_sub', 'consent_ip', 'totp_secret', 'cpf', 'cpf_hmac', 'job_role']) {
+    assert.equal(depois[coluna], null, `${coluna} precisa ser zerado`);
+  }
+  assert.equal(Number(depois.totp_enabled), 0);
+  const [[trilha]] = await pool.query(
+    "SELECT actor_id FROM audit_log WHERE action = 'lgpd_delete' AND entity_id = ? ORDER BY seq DESC LIMIT 1",
+    [at.id]
+  );
+  assert.equal(trilha.actor_id, ger.id, 'a eliminação consta em nome de quem a pediu (o admin)');
   assert.equal((await pool.query('SELECT user_id FROM professionals WHERE id = ?', [prof]))[0][0].user_id, null);
   const [[rt]] = await pool.query('SELECT revoked FROM refresh_tokens WHERE token_hash = ?', [require('../src/services/session').hashRefreshToken(sessao.raw)]);
   assert.equal(Number(rt.revoked), 1);

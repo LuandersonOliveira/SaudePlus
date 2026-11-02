@@ -2,7 +2,8 @@
    Saúde+ — SQL de `users` para a gestão administrativa (A1 da Fase 6, passo 8b).
 
    Cada função recebe `db` primeiro: o pool OU a conexão da transação em curso.
-   Conta excluída é SOFT delete (`deleted_at`): continua na tabela, e o e-mail dela
+   Conta excluída é ANONIMIZADA (ADR-0009, utils/privacy): a linha continua na tabela com
+   `deleted_at` preenchido e sem dado pessoal, e o e-mail dela (`removido_<id>@removido.local`)
    continua reservado (UNIQUE global), por isso `emailExiste` NÃO filtra `deleted_at`.
    ========================================================================== */
 
@@ -111,10 +112,6 @@ async function nomeECargo(db, id) {
   return u;
 }
 
-async function excluirLogicamente(db, id) {
-  await db.query('UPDATE users SET deleted_at = NOW() WHERE id = ?', [id]);
-}
-
 /**
  * Derruba as sessões e os links de redefinição pendentes do usuário.
  *
@@ -136,5 +133,5 @@ async function contatos(db, ids) {
 
 module.exports = {
   contatos, listar, detalhe, paraEdicao, paraExclusao, emailEmUsoPorOutro, emailExiste,
-  atualizar, inserir, nomeECargo, excluirLogicamente, revogarAcesso,
+  atualizar, inserir, nomeECargo, revogarAcesso,
 };

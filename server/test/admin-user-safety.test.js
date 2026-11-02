@@ -49,8 +49,8 @@ test('excluir, desativar, rebaixar ou trocar senha revoga sessão e reset penden
   assert.match(USERS_SVC, /if \(desativa \|\| mudaPapel \|\| trocaSenha \|\| mudaEmail\) await usuarios\.revogarAcesso\(conn, id\)/);
   assert.match(
     USERS_SVC,
-    /await usuarios\.excluirLogicamente\(conn, id\);\s*\n\s*await usuarios\.revogarAcesso\(conn, id\);/,
-    'o soft delete precisa revogar o acesso na mesma transação'
+    /await anonimizarNaTransacao\(conn, id\);\s*\n\s*await usuarios\.revogarAcesso\(conn, id\);/,
+    'a anonimização (ADR-0009) precisa revogar o acesso na mesma transação'
   );
   assert.match(
     USERS,

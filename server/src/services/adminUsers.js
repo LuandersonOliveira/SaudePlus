@@ -20,6 +20,7 @@ const { emTransacao: emTransacaoCom } = require('../utils/transacao');
 const H = require('../utils/adminHierarchy');
 const usuarios = require('../repositories/usuarios');
 const profissionais = require('../repositories/profissionais');
+const { anonimizarNaTransacao, registrarEliminacao } = require('../utils/privacy');
 const {
   erroDoNome, erroDaSenha, validarEmail, normalizarTelefone, erroDoTelefone,
 } = require('../schemas/adminUsers');
@@ -317,20 +318,30 @@ async function criarUsuario({ actor, body, podeAdmins }) {
   return { ok: true, id, auditoria: `criado: ${normalizedEmail} role=${papel} status=${status}` };
 }
 
-/** Exclusão lógica (soft delete): solta o profissional, marca `deleted_at` e derruba o acesso. */
+/**
+ * Exclusão de conta pelo admin = ANONIMIZAÇÃO (ADR-0009): o mesmo caminho do titular.
+ * Numa transação só: solta o profissional, anonimiza (zera os identificadores, cancela o
+ * futuro, revoga sessões e links de redefinição) e derruba o acesso. A linha na trilha
+ * (`lgpd_delete`, em nome do admin) sai depois do commit.
+ *
+ * A auditoria devolvida guarda o e-mail e o nome ANTES de anonimizar (para a trilha
+ * administrativa saber quem foi). Isso é dado pessoal em `details`, tratado no item 1.2.
+ */
 async function excluirUsuario({ actor, id }) {
   if (id === actor.id) return falha(400, 'Você não pode excluir a própria conta.');
-  return emTransacao(async (conn) => {
+  const r = await emTransacao(async (conn) => {
     const alvo = await usuarios.paraExclusao(conn, id);
     if (!alvo) return falha(404, NAO_ENCONTRADO);
     const bloqueio = H.bloqueioDeExclusao(actor, alvo);
     if (bloqueio) return falha(bloqueio.status, bloqueio.error);
 
     await profissionais.desvincularUsuario(conn, id);
-    await usuarios.excluirLogicamente(conn, id);
+    await anonimizarNaTransacao(conn, id);
     await usuarios.revogarAcesso(conn, id);
     return { ok: true, auditoria: `excluído: ${alvo.email} (${alvo.full_name})` };
   });
+  if (r.ok) await registrarEliminacao(id, { reason: 'exclusão administrativa', actorId: actor.id });
+  return r;
 }
 
 module.exports = { listarUsuarios, obterUsuario, atualizarUsuario, criarUsuario, excluirUsuario };

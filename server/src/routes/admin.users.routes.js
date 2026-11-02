@@ -76,7 +76,8 @@ router.post('/', validate(criarUsuarioBody), async (req, res, next) => {
   }
 });
 
-// DELETE /admin/users/:id — exclusão lógica (soft delete)
+// DELETE /admin/users/:id — exclusão = anonimização, irreversível (ADR-0009). Para algo
+// reversível, o admin usa PATCH com account_status = 'inativo'.
 router.delete('/:id', async (req, res, next) => {
   try {
     const r = await svc.excluirUsuario({ actor: req.user, id: req.params.id });

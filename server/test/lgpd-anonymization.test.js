@@ -29,6 +29,7 @@ const { anonymizeUser } = require('../src/utils/privacy');
 function poolFalso({ falharNa = null } = {}) {
   const registro = {
     escritas: [],
+    sqls: [],
     begun: 0,
     commit: 0,
     rollback: 0,
@@ -46,6 +47,7 @@ function poolFalso({ falharNa = null } = {}) {
       if (/^\s*SELECT/i.test(txt)) return [[{ id: 'u1', email: 'alvo@x.local' }]];
       escritas += 1;
       registro.escritas.push(txt.slice(0, 60).replace(/\s+/g, ' '));
+      registro.sqls.push(txt.replace(/\s+/g, ' '));
       if (falharNa === escritas) {
         const e = new Error('deadlock_simulado');
         e.code = 'ER_LOCK_DEADLOCK';
@@ -93,6 +95,35 @@ test('a transação cobre TODAS as escritas, inclusive revogação de tokens', a
   for (const esperado of ['UPDATE users SET', 'appointments', 'exams', 'refresh_tokens']) {
     assert.ok(todas.includes(esperado), `faltou "${esperado}" dentro da transação: ${todas}`);
   }
+});
+
+// ADR-0009 (E-10): o que ainda identificava ou guardava segredo depois da anonimização.
+test('zera também govbr_sub, IP do consentimento e o segundo fator (ADR-0009)', async () => {
+  const { pool, registro } = poolFalso();
+  await anonymizeUser(pool, 'u1');
+
+  const update = registro.sqls.find((s) => /^UPDATE users SET/.test(s));
+  assert.ok(update, 'deveria haver um UPDATE users');
+  for (const coluna of ['govbr_sub = NULL', 'consent_ip = NULL', 'totp_secret = NULL', 'totp_enabled = 0', 'totp_last_step = NULL']) {
+    assert.ok(update.includes(coluna), `faltou "${coluna}" na anonimização: ${update}`);
+  }
+});
+
+test('revoga também os links de redefinição de senha pendentes (ADR-0009)', async () => {
+  const { pool, registro } = poolFalso();
+  await anonymizeUser(pool, 'u1');
+  assert.ok(
+    registro.sqls.some((s) => /^UPDATE password_reset_tokens SET used_at/.test(s)),
+    `faltou invalidar password_reset_tokens: ${registro.sqls.join(' | ')}`
+  );
+});
+
+test('preserva deleted_at quando a conta já tinha sido excluída antes', async () => {
+  // O script de correção anonimiza contas que o admin já "excluiu": a data original da exclusão não pode ser sobrescrita.
+  const { pool, registro } = poolFalso();
+  await anonymizeUser(pool, 'u1');
+  const update = registro.sqls.find((s) => /^UPDATE users SET/.test(s));
+  assert.match(update, /deleted_at = COALESCE\(deleted_at, CURRENT_TIMESTAMP\)/);
 });
 
 test('usuário inexistente não abre transação nem mexe em nada', async () => {
