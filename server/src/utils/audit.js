@@ -22,6 +22,10 @@ const SENSITIVE_PATTERNS = [
   /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, // CPF formatado
 ];
 
+// E-mail identifica a pessoa. A trilha é imutável e a anonimização a preserva (ADR-0012), então
+// as rotas nem devem passar e-mail ao `details`; isto só pega o que escapar.
+const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)+/gi;
+
 // Teto do details. O schema.sql já declara TEXT, então na prática 1000 nunca
 // é atingido — mas um banco com a migration 005b não aplicada ainda tem
 // VARCHAR(255), e é aí que o insert estourava. Ver o fallback em logAction.
@@ -34,6 +38,7 @@ function sanitizeDetails(details) {
   SENSITIVE_PATTERNS.forEach((re) => {
     text = text.replace(re, '[redigido]');
   });
+  text = text.replace(EMAIL_PATTERN, '[e-mail]');
   // CPF só com dígitos (11 seguidos) vira máscara parcial: mantém 3+2 finais.
   text = text.replace(/(?<!\d)(\d{3})(\d{3})(\d{3})(\d{2})(?!\d)/g, '$1.***.***-$4');
   return text.slice(0, DETAILS_MAX);

@@ -143,7 +143,7 @@ test('criarUsuario: paciente por padrão, atendente nasce pendente com profissio
   const up = await linha(p.id);
   assert.deepEqual([up.role, up.account_status, up.admin_level, up.full_name], ['paciente', 'ativo', null, 'Paula Paciente']);
   assert.equal(await bcrypt.compare('segredo1', up.password_hash), true);
-  assert.match(p.auditoria, /criado: .* role=paciente status=ativo/);
+  assert.match(p.auditoria, /^criado: role=paciente status=ativo$/);
 
   const a = await svc.criarUsuario({ actor: ATOR_SUPER, body: { full_name: 'Alice Atendente', email: emailNovo(), password: 'segredo1', role: 'atendente', job_role: 'Recepção' }, podeAdmins: false });
   USUARIOS.push(a.id);
@@ -219,7 +219,7 @@ test('atualizarUsuario: campos, auditoria e revogação de acesso', async () => 
 
   const r1 = await svc.atualizarUsuario({ actor: ator, id: alvo.id, body: { full_name: 'Nome Novo', mobile: '', job_role: 'Cargo X', reason: 'pedido do titular' }, podeAdmins: true });
   assert.equal(r1.ok, true);
-  assert.match(r1.auditoria, /^nome: Nome Velho->Nome Novo; celular alterado; cargo: -+>Cargo X/);
+  assert.match(r1.auditoria, /^nome alterado; celular alterado; cargo: -+>Cargo X/);
   assert.match(r1.auditoria, /motivo: pedido do titular/);
   const u1 = await linha(alvo.id);
   assert.deepEqual([u1.full_name, u1.mobile, u1.job_role], ['Nome Novo', null, 'Cargo X']);
@@ -348,7 +348,7 @@ test('excluirUsuario: ANONIMIZA (ADR-0009), solta o profissional, derruba o aces
   const sessao = await issueRefreshToken(at.id);
   const r = await svc.excluirUsuario({ actor: ger, id: at.id });
   assert.equal(r.ok, true);
-  assert.match(r.auditoria, /^excluído: .*\(Sai Fora\)$/);
+  assert.match(r.auditoria, /^excluído \(anonimização\): role=atendente$/);
   const depois = await linha(at.id);
   assert.ok(depois.deleted_at);
   assert.equal(depois.full_name, 'Titular removido', 'o nome some');

@@ -289,7 +289,7 @@ function createStaffBooking(tipo) {
       conn = null;
 
       await req.audit('staff_create', tipo === 'consulta' ? 'appointment' : 'exam', id,
-        `${tipo} para ${patient.full_name} em ${scheduled_at} (${duracao} min)`);
+        `${tipo} em ${scheduled_at} (${duracao} min) para o paciente ${user_id}`);
       res.status(201).json({ id, duration_minutes: duracao });
     } catch (err) {
       if (conn) {

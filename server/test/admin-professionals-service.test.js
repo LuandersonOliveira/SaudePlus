@@ -105,7 +105,7 @@ test('criarProfissional: grava, devolve entidade e linha de auditoria com o moti
   const r = await svc.criarProfissional({ name: '  Dra. Carla ', job_title: 'Pediatra', registry: 'CRM 9' }, 'novo concurso');
   PROFS.push(r.id);
   assert.equal(r.entidade, 'professional');
-  assert.equal(r.auditoria, 'profissional "Dra. Carla"; motivo: novo concurso');
+  assert.equal(r.auditoria, 'profissional criado; motivo: novo concurso');
   const [[row]] = await pool.query('SELECT name, job_title, registry, active FROM professionals WHERE id = ?', [r.id]);
   assert.deepEqual([row.name, row.job_title, row.registry, Number(row.active)], ['Dra. Carla', 'Pediatra', 'CRM 9', 1]);
 });
@@ -239,7 +239,7 @@ test('atualizarProfissional: grava os campos e descreve a mudança com o motivo'
   const r = await svc.atualizarProfissional({ id, body: { name: ' Depois ', job_title: 'Clínico', registry: '' }, reason: 'correção', actorId: null });
   assert.equal(r.ok, true);
   assert.equal(r.moved, 0);
-  assert.equal(r.auditoria, 'nome -> Depois; cargo -> Clínico; registro -> não informado; motivo: correção');
+  assert.equal(r.auditoria, 'nome alterado; cargo -> Clínico; registro alterado; motivo: correção');
   const [[row]] = await pool.query('SELECT name, job_title, registry FROM professionals WHERE id = ?', [id]);
   assert.deepEqual([row.name, row.job_title, row.registry], ['Depois', 'Clínico', null]);
 });

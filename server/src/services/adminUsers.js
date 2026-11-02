@@ -236,8 +236,9 @@ async function atualizarUsuario({ actor, id, body, podeAdmins }) {
     });
 
     const mudancas = [];
-    if (novoNome !== undefined && novoNome !== atual.full_name) mudancas.push(`nome: ${atual.full_name || '-'}->${novoNome}`);
-    if (mudaEmail) mudancas.push(`email: ${atual.email || '-'}->${novoEmail}`);
+    // Nome e e-mail identificam a pessoa e a trilha é imutável (ADR-0012): registra QUE mudou, não o valor.
+    if (novoNome !== undefined && novoNome !== atual.full_name) mudancas.push('nome alterado');
+    if (mudaEmail) mudancas.push('e-mail alterado');
     if (mobile !== undefined && normalizarTelefone(mobile) !== (atual.mobile || null)) mudancas.push('celular alterado');
     if (phone !== undefined && normalizarTelefone(phone) !== (atual.phone || null)) mudancas.push('telefone alterado');
     if (accountStatus !== undefined && accountStatus !== atual.account_status) mudancas.push(`status: ${atual.account_status}->${accountStatus}`);
@@ -315,7 +316,7 @@ async function criarUsuario({ actor, body, podeAdmins }) {
     return { ok: true };
   });
   if (!r.ok) return r;
-  return { ok: true, id, auditoria: `criado: ${normalizedEmail} role=${papel} status=${status}` };
+  return { ok: true, id, auditoria: `criado: role=${papel} status=${status}` };
 }
 
 /**
@@ -324,8 +325,7 @@ async function criarUsuario({ actor, body, podeAdmins }) {
  * futuro, revoga sessões e links de redefinição) e derruba o acesso. A linha na trilha
  * (`lgpd_delete`, em nome do admin) sai depois do commit.
  *
- * A auditoria devolvida guarda o e-mail e o nome ANTES de anonimizar (para a trilha
- * administrativa saber quem foi). Isso é dado pessoal em `details`, tratado no item 1.2.
+ * A auditoria devolvida NÃO leva nome nem e-mail (ADR-0012): quem foi está no id da entidade.
  */
 async function excluirUsuario({ actor, id }) {
   if (id === actor.id) return falha(400, 'Você não pode excluir a própria conta.');
@@ -338,7 +338,7 @@ async function excluirUsuario({ actor, id }) {
     await profissionais.desvincularUsuario(conn, id);
     await anonimizarNaTransacao(conn, id);
     await usuarios.revogarAcesso(conn, id);
-    return { ok: true, auditoria: `excluído: ${alvo.email} (${alvo.full_name})` };
+    return { ok: true, auditoria: `excluído (anonimização): role=${alvo.role}` };
   });
   if (r.ok) await registrarEliminacao(id, { reason: 'exclusão administrativa', actorId: actor.id });
   return r;

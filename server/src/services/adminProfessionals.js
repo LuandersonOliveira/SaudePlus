@@ -30,7 +30,7 @@ async function criarProfissional(body, reason) {
   const id = await profissionais.inserir(pool, v.dados);
   return {
     ok: true, id, entidade: 'professional',
-    auditoria: `profissional "${v.dados.name}"${V.sufixoMotivo(reason)}`,
+    auditoria: `profissional criado${V.sufixoMotivo(reason)}`,
   };
 }
 
@@ -94,7 +94,7 @@ async function atualizarProfissional({ id, body, reason, actorId }) {
     if (name !== undefined) {
       const v = String(name).trim();
       if (!v) return falha(400, 'Nome do profissional é obrigatório.');
-      if (v !== atual.name) { sets.push('name=?'); params.push(v); detalhes.push(`nome -> ${v}`); }
+      if (v !== atual.name) { sets.push('name=?'); params.push(v); detalhes.push('nome alterado'); }
     }
     if (jobTitle !== undefined) {
       sets.push('job_title=?'); params.push(jobTitle || null);
@@ -102,7 +102,7 @@ async function atualizarProfissional({ id, body, reason, actorId }) {
     }
     if (registry !== undefined) {
       sets.push('registry=?'); params.push(registry || null);
-      detalhes.push(`registro -> ${registry || 'não informado'}`);
+      detalhes.push('registro alterado'); // o número do conselho identifica a pessoa (ADR-0012)
     }
 
     const desativando = active !== undefined && !Number(active) && Number(atual.active) === 1;
