@@ -511,7 +511,8 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
   | `PLANO_MELHORIAS.md` | Diagnóstico backend/segurança/dado + plano em fases (atualizado 2026-10-26) |
   | `PLANO_UIUX.md` | Diagnóstico visual/UX/acessibilidade + refactor do admin/dashboard |
   | `PLANO_AGENDA_OPERACIONAL.md` | Plano da agenda operacional (recepção/admin) — Fases 0–3 implementadas |
-  | `PLANO_FASE_7_SYSTEM_DESIGN.md` | **Fase 7 (planejada):** atualização do grafo e análise de *system design*; decide o que editar, remover ou criar |
+  | `PLANO_FASE_7_SYSTEM_DESIGN.md` | **Fase 7 (concluída):** atualização do grafo e análise de *system design*; resultado em `docs/tecnico/SYSTEM_DESIGN.md` e `SYSTEM_DESIGN_ACHADOS.md` |
+  | `PLANO_FASE_8_EXECUCAO_POS_SYSTEM_DESIGN.md` | **Fase 8 (proposta):** execução em cinco ondas do que a Fase 7 decidiu, com aprovação item a item |
   | `PROJETO_DO_ZERO.md` | Visão de produto e roadmap de Sprints Scrum; apêndice aponta para `REQUISITOS_REFERENCIA.md` para o estado atual |
   | `TAREFAS_SIMPLES_V3.md` (+ `.html`/`.pdf` gerados por `build-pdf.js`) | Checklist vivo para o time, com painel de status V2→V3 |
   | `TAREFAS_SIMPLES_V2.md` (+ `.pdf`) | **Substituído pela V3** — mantido só como histórico do pedido original |

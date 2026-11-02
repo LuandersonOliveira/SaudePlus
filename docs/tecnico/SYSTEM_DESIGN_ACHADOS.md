@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Rascunho para revisão (7.3 e 7.4 concluídas; falta a 7.5) |
+| **Status** | Concluído (7.3 a 7.5). Execução em PLANO_FASE_8_EXECUCAO_POS_SYSTEM_DESIGN.md |
 | **Criado em** | 2026-11-01 |
 | **Commit de referência** | `2459db0` |
 | **Régua** | 4 pilares da POO e SOLID (`PLANO_FASE_7_SYSTEM_DESIGN.md`, seção 2.1) |
@@ -235,7 +235,17 @@ Documentos lidos inteiros: `ROPA.md`, `RIPD.md`, `TRILHA_AUDITORIA.md`.
 | E-25 | Editar | Não há como o admin ver o consentimento (T8): ou se cria a consulta, ou o ROPA deixa de dizer que o admin acessa | `repositories/usuarios.js:46-62` (`detalhe` não seleciona as colunas) | Baixa |
 | E-27 | Editar (documentos) | Atualizar o ROPA e o RIPD: tabelas faltantes, SMTP e ViaCEP, `race` e `priority` como dado sensível, campos que a eliminação não zera, número de tabelas, MFA, risco residual da sessão | Linhas da tabela acima | Média |
 
-## 12. Próximos passos da fase
+## 12. Decisões do responsável (7.5, 2026-11-01)
 
-1. **7.3 e 7.4:** concluídas. Falta a aprovação deste registro.
-2. **7.5:** priorizar os achados (hoje 29 `Editar`, 6 `Criar`, 7 `Remover` e 7 `Manter`), fechar este registro, escrever os ADRs das decisões estruturais e entregar o plano de execução revisado para aprovação item a item.
+| Achado | Decisão | ADR |
+|---|---|---|
+| E-10, E-11 | Admin anonimiza; um só caminho de eliminação; `anonymizeUser` zera `govbr_sub`, `consent_ip`, `totp_secret`, `totp_enabled` | 0009 |
+| E-24 | MFA obrigatório para atendente e admin, bloqueando até configurar | 0010 |
+| E-21 | Refresh só em cookie HttpOnly; access token só em memória | 0011 |
+| E-15, R-06 | `details` da auditoria sem dado pessoal; criar "marcar como lido" | 0012 |
+
+Os demais achados seguem as recomendações do plano de execução e dependem de aprovação item a item. Decisões ainda abertas: Gov.br como segundo fator e recuperação do MFA (ADR-0010), desativação de unidade (E-17), atendimento sem profissional (seção 9) e estado em memória (E-05).
+
+## 13. Próximos passos
+
+A execução está em `docs/planos/PLANO_FASE_8_EXECUCAO_POS_SYSTEM_DESIGN.md`, em cinco ondas: LGPD e segurança, agenda sem duplicação, estrutura (o antigo 3B), operação, higiene e documentos.

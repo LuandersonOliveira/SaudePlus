@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Planejada (não iniciada) |
+| **Status** | Concluída em 2026-11-01 (análise e plano de execução entregues; sem mudança de código). A execução está na Fase 8 |
 | **Criada em** | 2026-11-01 |
 | **Depende de** | Fase 6 (análise de estrutura) e A1/A2/A3/A4 concluídos; baseline de e2e verde |
 | **Decide** | O que **editar**, **remover** ou **criar** no projeto a partir do que a análise mostrar |
@@ -116,6 +116,6 @@ Cada achado da 7.5 anota qual princípio viola ou cumpre. A refatoração só é
 - [x] Critério de projeto definido: 4 pilares da POO e SOLID (seção 2.1)
 - [x] 7.3 Consultas ao grafo: nós centrais, comunidades, violações de camada, código sem uso, duplicações, caminhos requisito → código (`SYSTEM_DESIGN_ACHADOS.md`, seções 3 a 9)
 - [x] 7.4 Matriz requisito × componente × evidência (`SYSTEM_DESIGN_ACHADOS.md`, seções 10 e 11)
-- [ ] 7.5 Registro de achados classificado (remover / editar / criar / manter)
-- [ ] 7.5 ADRs das decisões estruturais
-- [ ] Plano revisado entregue para aprovação item a item
+- [x] 7.5 Registro de achados classificado (remover / editar / criar / manter): 49 achados
+- [x] 7.5 ADRs das decisões estruturais: 0009 a 0012 aceitos; 0013 a 0016 serão escritos com as ondas 2 a 4
+- [x] Plano revisado entregue para aprovação item a item (PLANO_FASE_8_EXECUCAO_POS_SYSTEM_DESIGN.md)
