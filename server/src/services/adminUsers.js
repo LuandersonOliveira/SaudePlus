@@ -21,6 +21,7 @@ const H = require('../utils/adminHierarchy');
 const usuarios = require('../repositories/usuarios');
 const profissionais = require('../repositories/profissionais');
 const { anonimizarNaTransacao, registrarEliminacao } = require('../utils/privacy');
+const { exigeMfa } = require('./session');
 const {
   erroDoNome, erroDaSenha, validarEmail, normalizarTelefone, erroDoTelefone,
 } = require('../schemas/adminUsers');
@@ -344,4 +345,29 @@ async function excluirUsuario({ actor, id }) {
   return r;
 }
 
-module.exports = { listarUsuarios, obterUsuario, atualizarUsuario, criarUsuario, excluirUsuario };
+/**
+ * Redefine o segundo fator de um atendente ou admin que perdeu o aparelho (ADR-0010). Só superadmin
+ * (capability `admins`, decidida na rota) e com a SENHA DELE: um token roubado não basta. Zera o MFA e derruba as
+ * sessões e os links de redefinição; no próximo login a conta volta a configurar o MFA. Conta própria não
+ * (outro superadmin ou o terminal resolve): quem redefine não pode ser quem perdeu o acesso.
+ */
+async function redefinirMfa({ actor, id, password }) {
+  if (id === actor.id) {
+    return falha(400, 'Para a sua própria conta, peça a outro superadmin ou use o procedimento de terminal.');
+  }
+  return emTransacao(async (conn) => {
+    const ator = await usuarios.paraRedefinirMfa(conn, actor.id);
+    const senhaConfere = ator && (await bcrypt.compare(String(password), ator.password_hash || '').catch(() => false));
+    if (!senhaConfere) return falha(401, 'Senha incorreta.');
+
+    const alvo = await usuarios.paraRedefinirMfa(conn, id);
+    if (!alvo) return falha(404, NAO_ENCONTRADO);
+    if (!exigeMfa(alvo)) return falha(400, 'Só atendente e admin têm o segundo fator obrigatório.');
+
+    await usuarios.zerarSegundoFator(conn, id);
+    await usuarios.revogarAcesso(conn, id);
+    return { ok: true, auditoria: `segundo fator redefinido (role=${alvo.role})` };
+  });
+}
+
+module.exports = { listarUsuarios, obterUsuario, atualizarUsuario, criarUsuario, excluirUsuario, redefinirMfa };

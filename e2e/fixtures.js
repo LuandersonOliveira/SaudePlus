@@ -1,10 +1,64 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test as base, expect } from '@playwright/test';
+import { totpNow, zerarUltimoPasso } from './totp.js';
 
 const AUTH = resolve(__dirname, '.auth');
 const FRONT = process.env.E2E_BASE_URL || 'http://localhost:8080';
 const API = process.env.E2E_API_BASE_URL || 'http://localhost:4000';
+
+/**
+ * Abre uma sessão por API para a conta do descritor: login e, se a conta tem MFA, a verificação do código.
+ * Devolve o access token, o usuário e o valor do cookie de refresh daquela sessão.
+ */
+async function abrirSessao(api, descritor) {
+  const { email } = descritor.login;
+  if (descritor.totp) await zerarUltimoPasso(email);
+
+  let res = await api.post('/auth/login', { data: descritor.login });
+  if (!res.ok()) throw new Error(`[e2e] login de ${email} devolveu ${res.status()}`);
+  let corpo = await res.json();
+  if (corpo.mfa_required) {
+    if (!descritor.totp) throw new Error(`[e2e] ${email} exige MFA e o descritor não tem o segredo`);
+    res = await api.post('/auth/mfa/verify', { data: { ticket: corpo.mfa_ticket, code: totpNow(descritor.totp.secret) } });
+    if (!res.ok()) throw new Error(`[e2e] verificação MFA de ${email} devolveu ${res.status()}`);
+    corpo = await res.json();
+  }
+  const setCookie = res.headersArray().find((h) => h.name.toLowerCase() === 'set-cookie' && h.value.startsWith('saude_refresh='));
+  if (!setCookie) throw new Error('[e2e] a sessão não devolveu o cookie de refresh');
+  return { token: corpo.token, user: corpo.user, refresh: setCookie.value.split(';')[0].slice('saude_refresh='.length) };
+}
+
+function lerDescritor(papel) {
+  const arquivo = papel ? stateOf(papel) : undefined;
+  if (!arquivo) return null;
+  try {
+    const d = JSON.parse(readFileSync(arquivo, 'utf8'));
+    return d && d.login ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Sessão por API de um papel (usada por testes que precisam do token, por exemplo para criar uma conta). */
+export async function sessaoPorApi(playwright, papel) {
+  const descritor = lerDescritor(papel);
+  if (!descritor) throw new Error(`[e2e] sem descritor de sessão para "${papel}"`);
+  const api = await playwright.request.newContext({ baseURL: API });
+  try {
+    return { ...(await abrirSessao(api, descritor)), login: descritor.login };
+  } finally {
+    await api.dispose();
+  }
+}
+
+/** Código TOTP válido AGORA para o papel (zera o replay do passo antes). Para o formulário de login na tela. */
+export async function codigoMfa(papel) {
+  const descritor = lerDescritor(papel);
+  if (!descritor || !descritor.totp) throw new Error(`[e2e] "${papel}" não tem segredo de MFA no descritor`);
+  await zerarUltimoPasso(descritor.login.email);
+  return totpNow(descritor.totp.secret);
+}
 
 /**
  * `test` com UMA SESSÃO NOVA POR TESTE (ADR-0011).
@@ -13,8 +67,8 @@ const API = process.env.E2E_API_BASE_URL || 'http://localhost:4000';
  * app recupera a sessão com `POST /auth/refresh`, e isso GIRA o refresh token. Um storageState
  * compartilhado entre testes reapresentaria um token já girado, e o servidor trata o reuso como roubo
  * e revoga a sessão inteira. Então o globalSetup valida as contas e guarda só um descritor
- * (`.auth/<papel>.json`: credencial + usuário), e este fixture faz um login por API por teste e monta
- * o storageState com o cookie daquela sessão.
+ * (`.auth/<papel>.json`: credencial, segredo do MFA e usuário), e este fixture abre uma sessão por API
+ * por teste e monta o storageState com o cookie daquela sessão.
  *
  * Um login por teste cabe nos limites (o runner eleva RATE_LIMIT_AUTH_MAX), e só login com erro
  * conta para o bloqueio por IP.
@@ -25,40 +79,26 @@ export const test = base.extend({
   papel: [undefined, { option: true }],
 
   storageState: async ({ storageState, papel, playwright }, use) => {
-    const arquivo = papel ? stateOf(papel) : undefined;
-    let descritor = null;
-    if (arquivo) {
-      try {
-        descritor = JSON.parse(readFileSync(arquivo, 'utf8'));
-      } catch {
-        descritor = null;
-      }
-    }
-    if (!descritor || !descritor.login) return use(storageState);
+    const descritor = lerDescritor(papel);
+    if (!descritor) return use(storageState);
 
     const api = await playwright.request.newContext({ baseURL: API });
     try {
-      const res = await api.post('/auth/login', { data: descritor.login });
-      if (!res.ok()) throw new Error(`[e2e] login de ${descritor.login.email} devolveu ${res.status()}`);
-      const corpo = await res.json();
-      const setCookie = res.headersArray().find((h) => h.name.toLowerCase() === 'set-cookie' && h.value.startsWith('saude_refresh='));
-      if (!setCookie) throw new Error('[e2e] o login não devolveu o cookie de refresh');
-      const valor = setCookie.value.split(';')[0].slice('saude_refresh='.length);
+      const sessao = await abrirSessao(api, descritor);
       const origem = new URL(FRONT);
       await use({
         // O navegador chama /api/auth/* (proxy do Vite), então o cookie vale nesse Path.
         cookies: [{
-          name: 'saude_refresh', value: valor, domain: origem.hostname, path: '/api/auth',
+          name: 'saude_refresh', value: sessao.refresh, domain: origem.hostname, path: '/api/auth',
           httpOnly: true, secure: false, sameSite: 'Lax', expires: Math.floor(Date.now() / 1000) + 3600,
         }],
-        origins: [{ origin: origem.origin, localStorage: [{ name: 'saude_user', value: JSON.stringify(corpo.user) }] }],
+        origins: [{ origin: origem.origin, localStorage: [{ name: 'saude_user', value: JSON.stringify(sessao.user) }] }],
       });
     } finally {
       await api.dispose();
     }
   },
 });
-
 export { expect };
 /** Arquivo de descritor de um papel, ou `undefined` se o setup não conseguiu criá-lo (os specs usam para pular). */
 export function stateOf(nome) {

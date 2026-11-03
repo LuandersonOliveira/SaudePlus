@@ -8,6 +8,8 @@ export interface SessionUser {
   /** Nível administrativo (só para role=admin). */
   admin_level?: string | null
   email?: string
+  /** Sessão RESTRITA: atendente/admin que ainda não ativou o segundo fator (ADR-0010). */
+  mfa_setup?: boolean
   role: Role
   [key: string]: unknown
 }

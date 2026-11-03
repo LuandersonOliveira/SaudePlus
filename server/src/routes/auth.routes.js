@@ -7,7 +7,7 @@ const {
 } = require('../schemas/auth');
 const {
   readRefreshRaw, setRefreshCookie, clearRefreshCookie,
-  iniciarSessao, encerrarSessao, rotacionarSessao,
+  iniciarSessao, encerrarSessao, rotacionarSessao, signAccessToken,
 } = require('../services/session');
 const {
   verificarSegundoFator, iniciarCadastroMfa, ativarMfa, desativarMfa,
@@ -91,7 +91,8 @@ router.post('/mfa/enable', verifyToken, async (req, res, next) => {
     const r = await ativarMfa({ userId: req.user.id, code: (req.body || {}).code });
     if (!r.ok) return res.status(r.status).json({ error: r.error });
     await req.audit('mfa_enable', 'user', req.user.id, 'segundo fator ativado');
-    res.json({ ok: true });
+    // Token novo, sem a marca de sessão restrita (ADR-0010): o front troca o antigo por este.
+    res.json({ ok: true, token: signAccessToken(r.payload), user: r.payload });
   } catch (err) {
     next(err);
   }

@@ -113,7 +113,10 @@ test('ciclo de vida: setup exige a senha, ativar exige o código, desativar exig
   assert.equal(Number(gravado.totp_enabled), 0, 'ainda não ativo');
 
   assert.equal((await ativarMfa({ userId: u.id, code: '000000' })).status, 401);
-  assert.deepEqual(await ativarMfa({ userId: u.id, code: totpNow(setup.secret) }), { ok: true });
+  const ativado = await ativarMfa({ userId: u.id, code: totpNow(setup.secret) });
+  assert.equal(ativado.ok, true);
+  assert.equal(ativado.payload.id, u.id, 'devolve o payload do usuário, sem a marca de sessão restrita (ADR-0010)');
+  assert.ok(!ativado.payload.mfa_setup);
   assert.equal(Number((await pool.query('SELECT totp_enabled FROM users WHERE id = ?', [u.id]))[0][0].totp_enabled), 1);
 
   const denovo = await iniciarCadastroMfa({ userId: u.id, email: u.email, password: SENHA });
@@ -141,7 +144,10 @@ test('segredo CIFRADO no banco funciona de ponta a ponta (setup → ativar → v
   assert.ok(bruto.totp_secret.startsWith('enc:v1:'));
   assert.ok(!bruto.totp_secret.includes(setup.secret), 'o segredo em claro não aparece no valor gravado');
 
-  assert.deepEqual(await ativarMfa({ userId: u.id, code: totpNow(setup.secret) }), { ok: true });
+  const ativado = await ativarMfa({ userId: u.id, code: totpNow(setup.secret) });
+  assert.equal(ativado.ok, true);
+  assert.equal(ativado.payload.id, u.id, 'devolve o payload do usuário, sem a marca de sessão restrita (ADR-0010)');
+  assert.ok(!ativado.payload.mfa_setup);
   const r = await verificarSegundoFator({ ticket: criarTicketMfa(u.id), code: totpNow(setup.secret, Date.now() + 30000) });
   assert.equal(r.ok, true, JSON.stringify(r));
 });

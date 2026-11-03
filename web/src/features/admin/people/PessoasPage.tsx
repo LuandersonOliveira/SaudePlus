@@ -22,10 +22,11 @@ import { AgendaDialog, type AgendaTarget } from '../professionals/AgendaDialog'
 import { cn } from '@/lib/utils'
 import { fmtDate } from '@/lib/validators'
 import { DeleteUserDialog } from './components/DeleteUserDialog'
+import { ResetMfaDialog } from './components/ResetMfaDialog'
 import { UserFormDialog } from './components/UserFormDialog'
 import { UserHistoryDialog } from './components/UserHistoryDialog'
 import { UserViewDialog } from './components/UserViewDialog'
-import { canManage, ROLE_LABEL, summaryText } from './logic'
+import { canManage, canResetMfa, ROLE_LABEL, summaryText } from './logic'
 import { useAdminUsers } from './queries'
 import { ROLES, STATUSES, type AccountStatus, type AdminUserRow, type UserFilters, type UserRole } from './types'
 
@@ -40,9 +41,11 @@ const STATUS_OPTIONS: [string, string][] = [['pendente', 'Aguardando ativação'
 const asRole = (v: string | null): UserFilters['role'] => ((ROLES as readonly string[]).includes(v ?? '') ? (v as UserRole) : '')
 const asStatus = (v: string | null): UserFilters['status'] => ((STATUSES as readonly string[]).includes(v ?? '') ? (v as AccountStatus) : '')
 
-function UserRow({ u, onView, onEdit, onHistory, onDelete, onAgenda, manageable }: {
+function UserRow({ u, onView, onEdit, onHistory, onDelete, onAgenda, onResetMfa, manageable }: {
   u: AdminUserRow
   manageable: boolean
+  /** Só superadmin, em atendente/admin que não seja ele mesmo. */
+  onResetMfa?: () => void
   /** Só atendentes com permissão de rede têm agenda para gerenciar. */
   onAgenda?: () => void
   onView: () => void
@@ -76,6 +79,7 @@ function UserRow({ u, onView, onEdit, onHistory, onDelete, onAgenda, manageable 
           {manageable && <DropdownMenuItem onSelect={onEdit}>Editar</DropdownMenuItem>}
           <DropdownMenuItem onSelect={onHistory}>Histórico</DropdownMenuItem>
           {onAgenda && <DropdownMenuItem onSelect={onAgenda}>Agenda/Vínculos</DropdownMenuItem>}
+          {onResetMfa && <DropdownMenuItem onSelect={onResetMfa}>Redefinir segundo fator</DropdownMenuItem>}
           {manageable && (
             <>
               <DropdownMenuSeparator />
@@ -105,6 +109,7 @@ export function PessoasPage() {
   const [editId, setEditId] = useState<string | null>(null)
   const [del, setDel] = useState<{ id: string; name: string } | null>(null)
   const [hist, setHist] = useState<{ id: string; name: string } | null>(null)
+  const [resetMfa, setResetMfa] = useState<{ id: string; name: string } | null>(null)
   const [agenda, setAgenda] = useState<AgendaTarget | null>(null)
 
   const list = useAdminUsers(filters)
@@ -189,6 +194,7 @@ export function PessoasPage() {
                       onHistory={() => setHist({ id: u.id, name: u.full_name || '' })}
                       onAgenda={u.role === 'atendente' && can(session?.user.admin_level, 'units') ? () => setAgenda({ userId: u.id, name: u.full_name || u.email || '' }) : undefined}
                       onDelete={() => setDel({ id: u.id, name: u.full_name || u.email || '' })}
+                      onResetMfa={canResetMfa(actor, u) ? () => setResetMfa({ id: u.id, name: u.full_name || u.email || '' }) : undefined}
                     />
                   ))}
                 </ul>
@@ -216,6 +222,7 @@ export function PessoasPage() {
       <UserViewDialog id={viewId} onClose={() => setViewId(null)} />
       <UserFormDialog open={formOpen} editId={editId} onClose={() => setFormOpen(false)} />
       <DeleteUserDialog target={del} onClose={() => setDel(null)} />
+      <ResetMfaDialog target={resetMfa} onClose={() => setResetMfa(null)} />
       <UserHistoryDialog target={hist} onClose={() => setHist(null)} />
       <AgendaDialog target={agenda} onClose={() => setAgenda(null)} />
     </>

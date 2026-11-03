@@ -258,7 +258,7 @@
   # edite o .env com suas credenciais MySQL, um JWT_SECRET forte e a DATA_ENCRYPTION_KEY
   npm install
   npm run migrate                     # migrations pendentes, em ordem (registradas em schema_migrations)
-  npm run seed:admin                  # cria o admin definido no .env
+  npm run seed:admin                  # cria o admin definido no .env (no 1º login ele configura o MFA: ADR-0010)
   npm start
   ```
 
@@ -429,6 +429,8 @@ dia por algo que ninguém pode corrigir é um portão que ninguém lê.
 | `migrate:cpf:rehash` | `node migrations/0002_cpf_hmac.js --rehash` | Recalcula todos os `cpf_hmac` após trocar a `CPF_HMAC_KEY` (recria o `UNIQUE` ao fim) |
   | `backup` | `node scripts/backup.js [--dir] [--keep=7]` | **Aulas 1/6:** dump `mysqldump` → gzip → SHA-256 + manifesto, com retenção |
   | `purge:retention` | `node scripts/purge-retention.js [--apply]` | **Fase 1:** sem `--apply` só lista contas inativas +5 anos; com `--apply` anonimiza + limpa refresh tokens +90 dias |
+  | `mfa:reset` | `node scripts/mfa-reset.js --email <e-mail> [--apply]` | **ADR-0010:** zera o segundo fator de um atendente/admin que perdeu o aparelho (sem `--apply` só simula); derruba sessões; na próxima entrada a conta configura o MFA de novo |
+  | `anonimizar:excluidos` | `node scripts/anonimizar-excluidos.js [--apply]` | **ADR-0009:** anonimiza contas excluídas pelo admin antes da anonimização (simulação por padrão) |
   | `sync:cnes` | `node scripts/sync-cnes.js [--apply]` | **Fase 2:** CNES → `health_units` (dry-run default; `CNES_MUNICIPIO_CODE=260850`) |
   | `sync:alerts` | `node scripts/sync-alerts.js [--apply]` | **Fase 2:** InfoDengue → `diseases` (só `source='infodengue'`) |
   | `test:rnds` | `node scripts/test-rnds.js` | **Fase 2:** builders/validador FHIR offline (sem rede) |

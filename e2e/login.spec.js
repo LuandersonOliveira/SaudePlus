@@ -1,4 +1,4 @@
-import { test, expect, stateOf, vigiar } from './fixtures.js';
+import { test, expect, codigoMfa, stateOf, vigiar } from './fixtures.js';
 
 /**
  * Login, sessão e guardas de rota do front React — com navegador de verdade.
@@ -9,7 +9,11 @@ import { test, expect, stateOf, vigiar } from './fixtures.js';
  */
 const ADMIN = { email: process.env.ADMIN_EMAIL || 'admin@saude.app', password: process.env.ADMIN_PASSWORD || '' };
 
-async function entrar(page, email, senha) {
+/**
+ * Entra pelo formulário. Com `papel` informado a conta tem MFA (atendente e admin, ADR-0010): depois da
+ * senha vem o código, que o teste calcula a partir do segredo guardado no setup.
+ */
+async function entrar(page, email, senha, papel) {
   await page.goto('/auth');
   await page.getByLabel('E-mail').fill(email);
   await page.getByLabel('Senha').fill(senha);
@@ -17,13 +21,20 @@ async function entrar(page, email, senha) {
     page.waitForResponse((r) => r.url().includes('/auth/login') && r.request().method() === 'POST'),
     page.getByRole('button', { name: 'Entrar', exact: true }).click(),
   ]);
+  if (papel && res.status() === 200) {
+    await page.getByLabel('Código').fill(await codigoMfa(papel));
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/auth/mfa/verify') && r.request().method() === 'POST'),
+      page.getByRole('button', { name: 'Verificar e entrar' }).click(),
+    ]);
+  }
   return res.status();
 }
 
 test.describe('login', () => {
   test('admin entra e cai no painel de admin com o e-mail visível', async ({ page }) => {
     test.skip(!ADMIN.password, 'ADMIN_PASSWORD não está no ambiente');
-    expect(await entrar(page, ADMIN.email, ADMIN.password)).toBe(200);
+    expect(await entrar(page, ADMIN.email, ADMIN.password, 'admin')).toBe(200);
     await expect(page).toHaveURL(/\/admin$/);
     await expect(page.getByText(ADMIN.email).first()).toBeVisible();
   });
@@ -44,7 +55,7 @@ test.describe('login', () => {
 
   test('a sessão sobrevive ao recarregar e "Sair" a derruba', async ({ page }) => {
     test.skip(!ADMIN.password, 'ADMIN_PASSWORD não está no ambiente');
-    await entrar(page, ADMIN.email, ADMIN.password);
+    await entrar(page, ADMIN.email, ADMIN.password, 'admin');
     await expect(page).toHaveURL(/\/admin$/);
     await page.reload();
     await expect(page).toHaveURL(/\/admin$/);

@@ -2,6 +2,7 @@ import { request } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
 import { writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { totpNow } from './totp.js';
 
 /**
  * Sessões criadas UMA vez para a suíte inteira, por API (sem passar pela tela de login).
@@ -24,8 +25,26 @@ const TENTATIVAS_MAX = 34; // 17 min: o limitador GLOBAL da API é 300 req/15min
 
 // Descritor da conta (ver fixtures.js): cada teste faz o PRÓPRIO login, porque o refresh token gira a cada uso
 // e um storageState compartilhado reapresentaria um token já girado (ADR-0011). O arquivo está em .auth/, ignorado pelo git.
-function descritor(email, password, data) {
-  return { login: { email, password }, user: data.user };
+function descritor(email, password, data, totp) {
+  return { login: { email, password }, user: data.user, ...(totp ? { totp } : {}) };
+}
+
+// ADR-0010: atendente e admin só usam o painel com o segundo fator ativo. O setup faz o que a tela de
+// configuração faz (setup com a senha, enable com o código) e guarda o segredo no descritor: cada teste
+// entra com login + código. Exige banco descartável: uma conta que já tem MFA não tem o segredo conhecido.
+async function configurarMfa(ctx, email, password) {
+  const entrada = await login(ctx, email, password);
+  if (entrada.mfa_required) {
+    throw new Error(` já tem MFA ativo e o segredo é desconhecido: rode o e2e em banco descartável`);
+  }
+  const auth = { Authorization: `Bearer ${entrada.token}` };
+  const setup = await ctx.post('/auth/mfa/setup', { headers: auth, data: { password } });
+  if (!setup.ok()) throw new Error(`mfa/setup de ${email} devolveu ${setup.status()}`);
+  const { secret } = await setup.json();
+  const enable = await ctx.post('/auth/mfa/enable', { headers: auth, data: { code: totpNow(secret) } });
+  if (!enable.ok()) throw new Error(`mfa/enable de ${email} devolveu ${enable.status()}`);
+  const liberada = await enable.json();
+  return { secret, token: liberada.token, user: liberada.user };
 }
 
 async function login(ctx, email, password) {
@@ -90,8 +109,8 @@ export default async function globalSetup() {
     if (process.env.ADMIN_PASSWORD) {
       try {
         const aEmail = process.env.ADMIN_EMAIL || 'admin@saude.app';
-        const admin = await login(ctx, aEmail, process.env.ADMIN_PASSWORD);
-        save('admin.json', descritor(aEmail, process.env.ADMIN_PASSWORD, admin));
+        const admin = await configurarMfa(ctx, aEmail, process.env.ADMIN_PASSWORD);
+        save('admin.json', descritor(aEmail, process.env.ADMIN_PASSWORD, admin, { secret: admin.secret }));
         creds.admin = { email: admin.user.email };
 
         const sEmail = process.env.E2E_STAFF_EMAIL || 'atendente.e2e@saude.app';
@@ -103,7 +122,8 @@ export default async function globalSetup() {
         });
         // 409/400 = já existia de uma execução anterior: aí a senha só vale se veio do ambiente.
         if (created.ok() || process.env.E2E_STAFF_PASSWORD) {
-          save('atendente.json', descritor(sEmail, sPassword, await login(ctx, sEmail, sPassword)));
+          const staff = await configurarMfa(ctx, sEmail, sPassword);
+          save('atendente.json', descritor(sEmail, sPassword, staff, { secret: staff.secret }));
           creds.staff = { email: sEmail, password: sPassword };
         } else {
           console.warn('[e2e] atendente já existe e E2E_STAFF_PASSWORD não foi informada: testes de atendente serão pulados.');

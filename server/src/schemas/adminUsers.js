@@ -65,7 +65,15 @@ const criarUsuarioBody = z.object({}).passthrough().superRefine((d, ctx) => {
   return undefined;
 });
 
+const MENSAGEM_SENHA_DO_ATOR = 'Confirme a sua senha para redefinir o segundo fator.';
+
+/** Redefinir o MFA de outra conta exige a senha de QUEM redefine (ADR-0010). */
+const redefinirMfaBody = z.object({
+  password: z.string({ error: MENSAGEM_SENHA_DO_ATOR }).min(1, MENSAGEM_SENHA_DO_ATOR),
+});
+
 module.exports = {
+  redefinirMfaBody,
   criarUsuarioBody,
   erroDoNome,
   erroDaSenha,

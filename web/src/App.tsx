@@ -5,6 +5,7 @@ import { ScrollToHash } from '@/components/ScrollToHash'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AuthPage } from '@/pages/AuthPage'
 import { LandingPage } from '@/pages/LandingPage'
+import { MfaSetupPage } from '@/pages/MfaSetupPage'
 import { PrivacyPage } from '@/pages/PrivacyPage'
 
 // Áreas autenticadas pesadas carregam sob demanda.
@@ -30,6 +31,11 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/auth" element={<AuthPage />} />
+
+          {/* Qualquer papel autenticado; só quem está com a sessão restrita (sem MFA) fica nesta tela. */}
+          <Route element={<RequireRole />}>
+            <Route path="/seguranca/mfa" element={<MfaSetupPage />} />
+          </Route>
 
           <Route element={<RequireRole roles={['admin']} />}>
             <Route path="/admin/*" element={<AdminRoutes />} />

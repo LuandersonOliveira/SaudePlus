@@ -9,7 +9,7 @@ const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { requireCapability, pode } = require('../middleware/capabilities');
 const { audit } = require('../middleware/audit');
 const { validate } = require('../middleware/validate');
-const { criarUsuarioBody } = require('../schemas/adminUsers');
+const { criarUsuarioBody, redefinirMfaBody } = require('../schemas/adminUsers');
 const svc = require('../services/adminUsers');
 
 const router = express.Router();
@@ -71,6 +71,19 @@ router.post('/', validate(criarUsuarioBody), async (req, res, next) => {
     if (!r.ok) return recusar(res, r);
     await req.audit('admin_create_user', 'user', r.id, r.auditoria);
     res.status(201).json({ ok: true, id: r.id });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /admin/users/:id/mfa/reset — superadmin redefine o segundo fator de um atendente/admin que perdeu o
+// aparelho (ADR-0010). Capability 'admins' (só superadmin) e a SENHA de quem redefine no corpo.
+router.post('/:id/mfa/reset', requireCapability('admins'), validate(redefinirMfaBody), async (req, res, next) => {
+  try {
+    const r = await svc.redefinirMfa({ actor: req.user, id: req.params.id, password: req.body.password });
+    if (!r.ok) return recusar(res, r);
+    await req.audit('mfa_reset', 'user', req.params.id, r.auditoria);
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }

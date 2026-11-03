@@ -13,7 +13,7 @@ const { encryptField, decryptField } = require('../utils/crypto');
 const {
   mfaAttempts, bloqueioMfa, registrarFalhaMfa, registrarSucessoMfa,
 } = require('../utils/mfaAttempts');
-const { payloadDoUsuario } = require('./session');
+const { payloadDoUsuario, exigeMfa } = require('./session');
 
 const falha = (status, error) => ({ ok: false, status, error });
 
@@ -157,21 +157,28 @@ async function iniciarCadastroMfa({ userId, email, password }) {
   return { ok: true, secret, otpauthUrl: otpauthUrl({ secret, email }) };
 }
 
-/** Confirma o código do app e liga o segundo fator. */
+/**
+ * Confirma o código do app e liga o segundo fator. Devolve o `payload` já SEM a marca `mfa_setup`: a rota
+ * emite um access token novo com ele, e é assim que a sessão restrita de atendente/admin é liberada (ADR-0010).
+ */
 async function ativarMfa({ userId, code }) {
-  const [[user]] = await pool.query('SELECT totp_secret, totp_enabled FROM users WHERE id = ?', [userId]);
+  const [[user]] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
   if (!user || !user.totp_secret) return falha(400, 'Gere o segredo primeiro.');
   const segredo = lerSegredo(user.totp_secret);
   if (!segredo) return falha(401, 'Verificação indisponível.');
   if (!verifyTotp(segredo, code)) return falha(401, 'Código inválido.');
   await pool.query('UPDATE users SET totp_enabled = 1 WHERE id = ?', [userId]);
-  return { ok: true };
+  return { ok: true, payload: payloadDoUsuario({ ...user, totp_enabled: 1 }) };
 }
 
-/** Desliga o segundo fator (exige a senha). */
+/**
+ * Desliga o segundo fator (exige a senha). Atendente e admin NÃO podem (ADR-0010): sem ele a sessão ficaria
+ * restrita. Quem perde o aparelho tem o MFA redefinido por um superadmin ou por terminal.
+ */
 async function desativarMfa({ userId, password }) {
-  const [[user]] = await pool.query('SELECT password_hash FROM users WHERE id = ?', [userId]);
+  const [[user]] = await pool.query('SELECT password_hash, role FROM users WHERE id = ?', [userId]);
   if (!user) return falha(404, 'Usuário não encontrado.');
+  if (exigeMfa(user)) return falha(400, 'O segundo fator é obrigatório para o seu perfil.');
   const ok = await bcrypt.compare(password || '', user.password_hash);
   if (!ok) return falha(401, 'Senha incorreta.');
   await pool.query('UPDATE users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?', [userId]);

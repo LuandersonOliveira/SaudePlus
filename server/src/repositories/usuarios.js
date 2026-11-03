@@ -124,6 +124,17 @@ async function revogarAcesso(db, userId) {
   await db.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL', [userId]);
 }
 
+/** Zera o segundo fator (segredo, ativação e último passo aceito). A conta volta a precisar configurá-lo. */
+async function zerarSegundoFator(db, id) {
+  await db.query('UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_last_step = NULL WHERE id = ?', [id]);
+}
+
+/** Papel e senha para decidir a redefinição do MFA de uma conta viva. */
+async function paraRedefinirMfa(db, id) {
+  const [[u]] = await db.query('SELECT id, role, email, password_hash FROM users WHERE id = ? AND deleted_at IS NULL', [id]);
+  return u;
+}
+
 /** Nome e e-mail de vários usuários (para avisos). */
 async function contatos(db, ids) {
   if (!ids || !ids.length) return [];
@@ -133,5 +144,5 @@ async function contatos(db, ids) {
 
 module.exports = {
   contatos, listar, detalhe, paraEdicao, paraExclusao, emailEmUsoPorOutro, emailExiste,
-  atualizar, inserir, nomeECargo, revogarAcesso,
+  atualizar, inserir, nomeECargo, revogarAcesso, zerarSegundoFator, paraRedefinirMfa,
 };

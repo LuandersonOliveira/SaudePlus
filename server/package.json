@@ -19,6 +19,7 @@
     "migrate:cpf:rehash": "node migrations/0002_cpf_hmac.js --rehash",
     "purge:retention": "node scripts/purge-retention.js",
     "anonimizar:excluidos": "node scripts/anonimizar-excluidos.js",
+    "mfa:reset": "node scripts/mfa-reset.js",
     "backup": "node scripts/backup.js",
     "sync:cnes": "node scripts/sync-cnes.js",
     "sync:alerts": "node scripts/sync-alerts.js",

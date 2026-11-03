@@ -100,12 +100,25 @@ function readRefreshRaw(req) {
   return (req.cookies && req.cookies[REFRESH_COOKIE]) || null;
 }
 
-/** Conteúdo do access token (e do `user` devolvido no login) a partir da linha de `users`. */
+// ADR-0010: estes papéis só usam a API com o segundo fator ativo.
+const PAPEIS_COM_MFA_OBRIGATORIO = ['atendente', 'admin'];
+
+/** Esta conta é obrigada a ter o segundo fator? */
+const exigeMfa = (user) => Boolean(user) && PAPEIS_COM_MFA_OBRIGATORIO.includes(user.role);
+
+/**
+ * Conteúdo do access token (e do `user` devolvido no login) a partir da linha de `users`.
+ *
+ * `mfa_setup: true` marca a sessão RESTRITA de atendente/admin que ainda não ativou o segundo fator
+ * (`verifyToken` só deixa essa sessão configurá-lo). A linha de `users` PRECISA trazer `totp_enabled`:
+ * sem a coluna, quem já tem MFA seria tratado como pendente.
+ */
 function payloadDoUsuario(user) {
   return {
     id: user.id, email: user.email,
     role: user.role, admin_level: user.admin_level || null, full_name: user.full_name,
     job_role: user.job_role || null,
+    ...(exigeMfa(user) && !Number(user.totp_enabled) ? { mfa_setup: true } : {}),
   };
 }
 
@@ -187,7 +200,7 @@ async function rotacionarSessao(raw) {
   }
 
   const [users] = await pool.query(
-    'SELECT id, email, role, admin_level, full_name, job_role, account_status FROM users WHERE id = ?',
+    'SELECT id, email, role, admin_level, full_name, job_role, account_status, totp_enabled FROM users WHERE id = ?',
     [stored.user_id]
   );
   if (!users.length) return { ok: false, status: 401, error: SESSAO_EXPIRADA };
@@ -219,6 +232,7 @@ module.exports = {
   issueRefreshToken,
   readRefreshRaw,
   payloadDoUsuario,
+  exigeMfa,
   revogarFamilia,
   iniciarSessao,
   encerrarSessao,

@@ -66,6 +66,15 @@ export function useSaveUser() {
   })
 }
 
+export function useResetMfa() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, password }: { id: string; password: string }) =>
+      api.post<unknown>(`/admin/users/${encodeURIComponent(id)}/mfa/reset`, { password }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin'] }),
+  })
+}
+
 export function useDeleteUser() {
   const qc = useQueryClient()
   return useMutation({

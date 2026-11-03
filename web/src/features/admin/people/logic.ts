@@ -30,6 +30,16 @@ export function canManage(actor: Actor, target: Pick<AdminUserRow, 'id' | 'role'
   return true
 }
 
+/**
+ * Redefinir o segundo fator de uma conta (ADR-0010): só quem tem 'admins' (superadmin), em atendente ou admin
+ * e nunca na própria conta (para essa, outro superadmin ou o terminal). O servidor é a autoridade (403).
+ */
+export function canResetMfa(actor: Actor, target: Pick<AdminUserRow, 'id' | 'role'>): boolean {
+  if (String(target.id) === String(actor.id)) return false
+  if (target.role !== 'atendente' && target.role !== 'admin') return false
+  return actor.role === 'admin' && can(actor.admin_level, 'admins')
+}
+
 /** Trocar e-mail ou senha de um administrador exige a capability 'admins' (só o superadmin). */
 export const canChangeAdminCredentials = (level?: string | null) => can(level, 'admins')
 

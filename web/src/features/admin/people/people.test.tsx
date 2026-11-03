@@ -164,6 +164,73 @@ describe('ações respeitam a hierarquia (gestor)', () => {
   })
 })
 
+describe('Redefinir segundo fator (superadmin)', () => {
+  const lista = [
+    user('at1', 'Ana Atendente', 'atendente', 'ativo', { job_role: 'recepcionista' }),
+    user('ad-low', 'Lia Atend', 'admin', 'ativo', { admin_level: 'atendimento' }),
+    user('p1', 'Maria Lima', 'paciente', 'ativo'),
+    user(ME, 'Eu Mesmo', 'admin', 'ativo', { admin_level: 'superadmin' }),
+  ]
+
+  it('só aparece para superadmin, em atendente e admin, e nunca na própria conta', async () => {
+    mockApi({ ...baseApi, 'GET /admin/users?': { data: lista, total: lista.length } })
+    renderPeople('superadmin')
+    await screen.findByText('4 usuários encontrados.')
+    expect(await menu('Ana Atendente')).toContain('Redefinir segundo fator')
+    await userEvent.keyboard('{Escape}')
+    expect(await menu('Lia Atend')).toContain('Redefinir segundo fator')
+    await userEvent.keyboard('{Escape}')
+    expect(await menu('Maria Lima')).not.toContain('Redefinir segundo fator')
+    await userEvent.keyboard('{Escape}')
+    expect(await menu('Eu Mesmo')).not.toContain('Redefinir segundo fator')
+  })
+
+  it('gestor não vê a ação', async () => {
+    mockApi({ ...baseApi, 'GET /admin/users?': { data: lista, total: lista.length } })
+    renderPeople('gestor')
+    await screen.findByText('4 usuários encontrados.')
+    expect(await menu('Ana Atendente')).not.toContain('Redefinir segundo fator')
+  })
+
+  it('pede a senha de quem redefine, envia POST com ela e avisa', async () => {
+    const m = mockApi({ ...baseApi, 'GET /admin/users?': { data: lista, total: lista.length }, 'POST /admin/users/at1/mfa/reset': { ok: true } })
+    renderPeople('superadmin')
+    await screen.findByText('4 usuários encontrados.')
+    await menu('Ana Atendente')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Redefinir segundo fator' }))
+    const dlg = await screen.findByRole('alertdialog')
+    expect(dlg).toHaveTextContent('Ana Atendente')
+    expect(dlg).toHaveTextContent('sessões dela, encerradas')
+
+    // sem senha não chama a API
+    await userEvent.click(within(dlg).getByRole('button', { name: 'Redefinir' }))
+    expect(await within(dlg).findByText('Informe a sua senha')).toBeInTheDocument()
+    expect(m.last('POST', '/admin/users/at1/mfa/reset')).toBeUndefined()
+
+    await userEvent.type(within(dlg).getByLabelText('Sua senha'), 'minha-senha-1')
+    await userEvent.click(within(dlg).getByRole('button', { name: 'Redefinir' }))
+    await waitFor(() => expect(m.last('POST', '/admin/users/at1/mfa/reset')?.body).toEqual({ password: 'minha-senha-1' }))
+    expect(await screen.findByText('Segundo fator redefinido')).toBeInTheDocument()
+  })
+
+  it('senha errada mantém o diálogo aberto com a mensagem do servidor', async () => {
+    mockApi({
+      ...baseApi,
+      'GET /admin/users?': { data: lista, total: lista.length },
+      'POST /admin/users/at1/mfa/reset': () => json(401, { error: 'Senha incorreta.' }),
+    })
+    renderPeople('superadmin')
+    await screen.findByText('4 usuários encontrados.')
+    await menu('Ana Atendente')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Redefinir segundo fator' }))
+    const dlg = await screen.findByRole('alertdialog')
+    await userEvent.type(within(dlg).getByLabelText('Sua senha'), 'errada')
+    await userEvent.click(within(dlg).getByRole('button', { name: 'Redefinir' }))
+    expect(await within(dlg).findByRole('alert')).toHaveTextContent('Senha incorreta.')
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+  })
+})
+
 describe('Visualizar', () => {
   it('mostra o perfil completo com os documentos formatados', async () => {
     const m = mockApi(baseApi)
