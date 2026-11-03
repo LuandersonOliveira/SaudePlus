@@ -80,7 +80,7 @@ Vêm da seção 8 do `SYSTEM_DESIGN.md`. Aqui só a classificação.
 | E-18 | Editar | Fila de espera: duplicidade checada com `SELECT` antes do `INSERT`, sem `UNIQUE`; duas requisições simultâneas criam duas entradas | Consistência | `routes/me.waitlist.routes.js:54-70` | Baixa |
 | E-19 | Editar | `PATCH /me/.../cancel` do paciente não usa transação (`UPDATE` e liberação de vaga separados, erro engolido no log) | **S**, consistência | `routes/me.booking.routes.js:149-176` | Baixa |
 | E-20 | Editar | `booking_events` é append-only só por convenção (sem trigger) e `booking_id` não tem FK; `waitlist.record_id` também não | Integridade | `schema.sql:325`, `:355` | Baixa |
-| E-21 | Editar | Front guarda JWT e refresh em `localStorage`, e o servidor devolve o refresh também no corpo | Segurança | `web/src/lib/session.ts:26-52`, `routes/auth.routes.js:47` | Alta |
+| E-21 | Editar (**resolvido** em `7c4b321`) | Front guarda JWT e refresh em `localStorage`, e o servidor devolve o refresh também no corpo | Segurança | `web/src/lib/session.ts:26-52`, `routes/auth.routes.js:47` | Alta |
 | E-22 | Editar | `GET /auth/me` devolve CPF, RG e CNS sem máscara | **Encapsulamento** | `services/profile.js:26` | Média |
 | C-01 | Criar | Agendador para `purge-retention` e limpeza de `password_reset_tokens` (hoje manuais; a segunda nunca roda) | Operação | `scripts/purge-retention.js:44-49` | Média |
 | C-02 | Criar | Ponto único de configuração (resolve E-04) | **D**, **encapsulamento** | — | Média |

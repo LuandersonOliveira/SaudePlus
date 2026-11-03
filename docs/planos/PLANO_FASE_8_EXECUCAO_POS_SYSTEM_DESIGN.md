@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Em andamento: onda 1, itens 1.1 a 1.4 concluídos (ver Andamento) |
+| **Status** | Em andamento: onda 1, itens 1.1 a 1.5 concluídos (ver Andamento) |
 | **Criada em** | 2026-11-01 |
 | **Origem** | Fase 7 (`SYSTEM_DESIGN.md`, `SYSTEM_DESIGN_ACHADOS.md`) |
 | **Substitui** | A ordem antiga dos itens pendentes da Fase 6: 3B (`staff.routes.js`), `admin.routes.js`, A5, B4 e demais pequenos |
@@ -123,4 +123,5 @@ Escritos ao iniciar a onda correspondente, com a decisão em aberto:
 | 1.2 | **Concluído** (2026-11-02) | `07a87d8` | E-15 resolvido. Servidor 584/586 (só o "doctor"), corrida 7/7, lint limpo. Resíduo: linhas antigas com nome seguem na trilha; o campo livre `motivo` digitado pelo admin não é filtrado |
 | 1.3 | **Concluído** (2026-11-02) | `1192ce4` | R-06 resolvido (criar a rota, não remover a coluna). Servidor 590/592, corrida 7/7, web 341/341, e2e 28/28, tsc e lint limpos. O `GET /me/reminders` também saiu da rota (0 SQL) |
 | 1.4 | **Concluído** (2026-11-02) | `843149e` | E-26 resolvido. Servidor 597/599, corrida 7/7, e2e 28/28, lint limpo. Só login que deu certo é registrado (senha errada não tem titular para a FK do ator) |
-| 1.5 | Próximo | | Refresh só em cookie HttpOnly; access em memória (ADR-0011, E-21) |
+| 1.5 | **Concluído** (2026-11-03) | `7c4b321` | E-21 resolvido. Servidor 607/609 (só o "doctor"), corrida 7/7, web 353/353, e2e 28/28, tsc e lint limpos. Achado extra: a origem única recusava POST do navegador sem `CORS_ORIGIN` (corrigido em `middleware/origin.js`) |
+| 1.6 | Próximo | | MFA obrigatório para atendente e admin (ADR-0010, E-24). Pendências: Gov.br conta como segundo fator? quem restaura o MFA de um admin? |
