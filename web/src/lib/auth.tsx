@@ -1,9 +1,14 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import { login as apiLogin, logout as apiLogout, verifyMfa as apiVerifyMfa, type LoginResponse } from './api'
-import { getSession, type Session } from './session'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { login as apiLogin, logout as apiLogout, restoreSession, verifyMfa as apiVerifyMfa, type LoginResponse } from './api'
+import { getSession, hasSessionHint, type Session } from './session'
 
 interface AuthContextValue {
   session: Session | null
+  /**
+   * alse enquanto a sessão está sendo recuperada pelo cookie de refresh (o access token só existe em
+   * memória, ADR-0011). Rotas protegidas e a tela de login esperam por isto antes de decidir.
+   */
+  ready: boolean
   /**
    * `true` depois de um "Sair" explícito (até o próximo login). As rotas protegidas usam para NÃO
    * guardar "voltar para onde estava": quem sai e entra com outra conta não deve cair na página da anterior.
@@ -21,6 +26,22 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSessionState] = useState<Session | null>(() => getSession())
   const [signedOut, setSignedOut] = useState(false)
+  // Sem token em memória mas com usuário guardado: pode haver sessão no cookie, então tenta recuperá-la.
+  const [ready, setReady] = useState(() => getSession() !== null || !hasSessionHint())
+
+  useEffect(() => {
+    if (ready) return
+    let vivo = true
+    // restoreSession compartilha uma única renovação em voo, então o efeito duplo do StrictMode não renova duas vezes.
+    void restoreSession().finally(() => {
+      if (!vivo) return
+      setSessionState(getSession())
+      setReady(true)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [ready])
 
   const refresh = useCallback(() => setSessionState(getSession()), [])
 
@@ -47,8 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ session, signedOut, login, verifyMfa, logout, refresh }),
-    [session, signedOut, login, verifyMfa, logout, refresh],
+    () => ({ session, ready, signedOut, login, verifyMfa, logout, refresh }),
+    [session, ready, signedOut, login, verifyMfa, logout, refresh],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

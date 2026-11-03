@@ -1,11 +1,10 @@
-import { test, expect } from '@playwright/test';
-import { stateOf, vigiar, semRolagemHorizontal } from './fixtures.js';
+import { test, expect, stateOf, vigiar, semRolagemHorizontal } from './fixtures.js';
 
 /**
  * Painel administrativo (React) contra a API real: o que o superadmin enxerga, os
  * cadastros que mexem em dados de verdade, e a regra de que a tela nunca provoca 403.
  */
-test.use({ storageState: stateOf('admin') });
+test.use({ papel: 'admin' });
 test.skip(!stateOf('admin'), 'ADMIN_PASSWORD não está no ambiente (sem sessão de admin)');
 
 const sufixo = Date.now().toString(36);

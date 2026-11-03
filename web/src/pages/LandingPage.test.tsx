@@ -66,7 +66,7 @@ describe('LandingPage', () => {
   })
 
   it('redireciona quem já está logado para o painel do papel', () => {
-    setSession('t', { role: 'admin' }, 'r')
+    setSession('t', { role: 'admin' })
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(200, {}))
     setup()
     expect(screen.getByText('área admin')).toBeInTheDocument()

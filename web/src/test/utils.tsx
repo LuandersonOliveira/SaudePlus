@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { vi } from 'vitest'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/lib/auth'
+import { setSession, type SessionUser } from '@/lib/session'
 
 export const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -41,10 +42,9 @@ export function mockApi(table: Record<string, Reply>) {
 
 export const staffUser = { id: 'u1', role: 'atendente', full_name: 'Ana Souza', email: 'ana@saude.app', job_role: 'recepcionista' }
 
+/** Sessão já aberta: access token em memória e usuário guardado (como depois de um login). */
 export function seedSession(user: object = staffUser) {
-  localStorage.setItem('saude_token', 't')
-  localStorage.setItem('saude_refresh', 'r')
-  localStorage.setItem('saude_user', JSON.stringify(user))
+  setSession('t', user as SessionUser)
 }
 
 /** Renderiza dentro de Router + React Query + Auth + Toaster, na rota dada. */

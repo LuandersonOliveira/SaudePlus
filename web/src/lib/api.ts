@@ -1,4 +1,4 @@
-import { clearSession, getRefreshToken, getToken, setSession, type SessionUser } from './session'
+import { clearSession, getToken, hasSessionHint, setSession, type SessionUser } from './session'
 
 // Em dev o Vite faz proxy de /api -> :4000; em produção o Express serve o build
 // e a API sob o mesmo prefixo. VITE_API_BASE permite apontar para outro host.
@@ -26,28 +26,54 @@ export const semRetry = (path: string) => AUTH_NO_RETRY.some((p) => path.startsW
 interface RefreshResponse {
   token?: string
   user?: SessionUser
-  refreshToken?: string
 }
 
-async function tryRefresh(): Promise<boolean> {
-  const refreshToken = getRefreshToken()
-  if (!refreshToken) return false
+/** Chamada única ao servidor: o refresh token vai no cookie HttpOnly, nunca no corpo (ADR-0011). */
+async function renovarSessao(): Promise<boolean> {
   try {
     const res = await fetch(API_BASE + '/auth/refresh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
+      body: '{}',
     })
     if (!res.ok) return false
     const data = (await res.json()) as RefreshResponse
     if (!data?.token || !data.user) return false
-    setSession(data.token, data.user, data.refreshToken)
+    setSession(data.token, data.user)
     return true
   } catch {
     return false
   }
 }
 
+/**
+ * O refresh rotaciona o token a cada uso, e reapresentar um já rotacionado revoga a sessão inteira
+ * (detecção de roubo). Por isso só pode haver UMA renovação por vez: dentro da aba, por compartilhar a
+ * mesma promessa; entre abas, pela Web Locks API. Sem isso, reabrir o navegador com várias abas
+ * derrubaria a sessão, porque cada aba renovaria com o mesmo cookie ao mesmo tempo.
+ */
+let renovacaoEmCurso: Promise<boolean> | null = null
+
+export function tryRefresh(): Promise<boolean> {
+  if (!renovacaoEmCurso) {
+    const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined
+    const executar = locks ? locks.request('saude-refresh-sessao', renovarSessao) : renovarSessao()
+    renovacaoEmCurso = Promise.resolve(executar).finally(() => {
+      renovacaoEmCurso = null
+    })
+  }
+  return renovacaoEmCurso
+}
+
+/** Tenta recuperar a sessão pelo cookie (ao abrir ou recarregar a página). Falhou: limpa o resto da sessão. */
+export async function restoreSession(): Promise<boolean> {
+  const ok = await tryRefresh()
+  if (!ok) clearSession()
+  return ok
+}
+
+// Só vale renovar quem já teve sessão neste navegador. Visitante anônimo não tem cookie de refresh.
+const podeRenovar = () => hasSessionHint()
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 async function request<T>(method: Method, path: string, body?: unknown, retried = false): Promise<T> {
@@ -71,7 +97,7 @@ async function request<T>(method: Method, path: string, body?: unknown, retried 
   }
 
   if (!res.ok) {
-    if (res.status === 401 && !retried && !semRetry(path) && (await tryRefresh())) {
+    if (res.status === 401 && !retried && !semRetry(path) && podeRenovar() && (await tryRefresh())) {
       return request<T>(method, path, body, true)
     }
     if (res.status === 401) clearSession()
@@ -96,7 +122,7 @@ export async function getBlob(path: string, retried = false): Promise<Blob> {
   const token = getToken()
   const res = await fetch(API_BASE + path, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
   if (!res.ok) {
-    if (res.status === 401 && !retried && (await tryRefresh())) return getBlob(path, true)
+    if (res.status === 401 && !retried && podeRenovar() && (await tryRefresh())) return getBlob(path, true)
     if (res.status === 401) clearSession()
     let message = ''
     try {
@@ -122,7 +148,6 @@ export function saveBlob(blob: Blob, filename: string) {
 export interface LoginResponse {
   token?: string
   user?: SessionUser
-  refreshToken?: string
   mfa_required?: boolean
   mfa_ticket?: string
 }
@@ -134,7 +159,7 @@ export interface MessageResponse {
 /** 2º fator: troca o ticket do login + código TOTP por uma sessão. */
 export async function verifyMfa(ticket: string, code: string): Promise<LoginResponse> {
   const data = await api.post<LoginResponse>('/auth/mfa/verify', { ticket, code })
-  if (data?.token && data.user) setSession(data.token, data.user, data.refreshToken)
+  if (data?.token && data.user) setSession(data.token, data.user)
   return data
 }
 
@@ -148,19 +173,17 @@ export const resetPassword = (token: string, password: string) =>
 export async function login(email: string, password: string): Promise<LoginResponse> {
   const data = await api.post<LoginResponse>('/auth/login', { email, password })
   // Login com MFA responde { mfa_required, mfa_token } SEM `token`: não grava sessão.
-  if (data?.token && data.user) setSession(data.token, data.user, data.refreshToken)
+  if (data?.token && data.user) setSession(data.token, data.user)
   return data
 }
 
 export function logout() {
-  const refreshToken = getRefreshToken()
-  if (refreshToken) {
-    // Revoga no servidor (best-effort); o logout local vale mesmo se a rede falhar.
-    fetch(API_BASE + '/auth/logout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    }).catch(() => {})
-  }
+  // Revoga no servidor (best-effort): o cookie HttpOnly vai junto e é ele quem identifica a sessão.
+  // O logout local vale mesmo se a rede falhar.
+  fetch(API_BASE + '/auth/logout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  }).catch(() => {})
   clearSession()
 }

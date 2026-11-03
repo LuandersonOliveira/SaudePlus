@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/lib/auth'
 import { describeStats, usePublicStats } from '@/lib/publicStats'
 import { homeForRole } from '@/lib/session'
+import { SessionLoading } from '@/components/SessionLoading'
 
 const STEPS = [
   {
@@ -56,11 +57,12 @@ function IconBadge({ icon: Icon, className = '' }: { icon: LucideIcon; className
 }
 
 export function LandingPage() {
-  const { session } = useAuth()
+  const { session, ready } = useAuth()
   const { data: stats } = usePublicStats()
   const proof = describeStats(stats)
 
-  // Quem já está logado vai direto para o painel do próprio papel.
+  // Espera a recuperação da sessão pelo cookie; quem já está logado vai direto para o painel do próprio papel.
+  if (!ready) return <SessionLoading />
   if (session) return <Navigate to={homeForRole(session.user.role)} replace />
 
   return (

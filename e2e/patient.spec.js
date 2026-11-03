@@ -1,8 +1,7 @@
-import { test, expect } from '@playwright/test';
-import { stateOf, vigiar, semRolagemHorizontal } from './fixtures.js';
+import { test, expect, stateOf, vigiar, semRolagemHorizontal } from './fixtures.js';
 
 /** Painel do paciente (React) contra a API real. */
-test.use({ storageState: stateOf('paciente') });
+test.use({ papel: 'paciente' });
 test.skip(!stateOf('paciente'), 'sem sessão de paciente');
 
 const SECOES = [

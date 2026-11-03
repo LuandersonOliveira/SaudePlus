@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Brand } from '@/components/Brand'
+import { SessionLoading } from '@/components/SessionLoading'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/lib/auth'
@@ -17,7 +18,7 @@ function initialView(search: string): View {
 }
 
 export function AuthPage() {
-  const { session } = useAuth()
+  const { session, ready } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -39,6 +40,8 @@ export function AuthPage() {
 
   // Link de redefinição sem token cai no pedido do link.
   const effectiveView: View = view === 'reset' && !resetToken ? 'forgot' : view
+
+  if (!ready) return <SessionLoading />
 
   if (session) {
     const from = (location.state as { from?: string } | null)?.from

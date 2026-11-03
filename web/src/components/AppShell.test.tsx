@@ -4,6 +4,7 @@ import { Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RequireRole } from '@/components/RequireRole'
 import PatientRoutes from '@/features/patient/PatientRoutes'
+import { getToken } from '@/lib/session'
 import { mockApi, renderApp, seedSession } from '@/test/utils'
 
 function Auth() {
@@ -71,6 +72,6 @@ describe('AppShell — Sair', () => {
     expect(await screen.findByText('tela de login')).toBeInTheDocument()
     // sem isto, entrar com outra conta cairia em /dashboard/agendamentos da conta anterior
     expect(screen.getByTestId('from')).not.toHaveTextContent('from')
-    await waitFor(() => expect(localStorage.getItem('saude_token')).toBeNull())
+    await waitFor(() => expect(getToken()).toBeNull())
   })
 })

@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/lib/auth'
+import { getToken } from '@/lib/session'
 import { AuthPage } from './AuthPage'
 
 const json = (status: number, body: unknown) =>
@@ -43,21 +44,24 @@ describe('login', () => {
 
   it('redireciona o admin para /admin e grava a sessão', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      json(200, { token: 't', refreshToken: 'r', user: { role: 'admin', name: 'Ana' } }),
+      json(200, { token: 't', user: { role: 'admin', name: 'Ana' } }),
     )
     setup()
     await userEvent.type(screen.getByLabelText('E-mail'), 'ana@x.com')
     await userEvent.type(screen.getByLabelText('Senha'), 'segredo')
     await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
     await waitFor(() => expect(screen.getByText('área admin')).toBeInTheDocument())
-    expect(localStorage.getItem('saude_token')).toBe('t')
+    expect(getToken()).toBe('t')
+    // ADR-0011: nenhum token vai para o localStorage (só o usuário, para exibição)
+    expect(localStorage.getItem('saude_token')).toBeNull()
+    expect(localStorage.getItem('saude_refresh')).toBeNull()
   })
 
   it('conta com MFA: pede o código e envia {ticket, code}', async () => {
     const f = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(json(200, { mfa_required: true, mfa_ticket: 'tk-1' }))
-      .mockResolvedValueOnce(json(200, { token: 't', refreshToken: 'r', user: { role: 'paciente' } }))
+      .mockResolvedValueOnce(json(200, { token: 't', user: { role: 'paciente' } }))
     setup()
     await userEvent.type(screen.getByLabelText('E-mail'), 'a@x.com')
     await userEvent.type(screen.getByLabelText('Senha'), 'segredo')

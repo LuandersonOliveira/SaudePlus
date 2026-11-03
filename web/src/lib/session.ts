@@ -17,21 +17,36 @@ export interface Session {
   user: SessionUser
 }
 
-// Mesmas chaves do front legado: quem já está logado não precisa autenticar
-// de novo durante a migração página a página.
-const TOKEN_KEY = 'saude_token'
-const USER_KEY = 'saude_user'
-const REFRESH_KEY = 'saude_refresh'
+// ADR-0011: o access token vive SÓ em memória. O refresh token fica em cookie HttpOnly, que o
+// JavaScript não lê. Assim um XSS não leva nenhum dos dois. Recarregar a página perde o access
+// token; `AuthProvider` o recupera com `POST /auth/refresh` (o navegador envia o cookie).
+let accessToken: string | null = null
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY)
-export const getRefreshToken = () => localStorage.getItem(REFRESH_KEY)
+// No localStorage fica só o usuário, para exibir nome e papel e saber se vale tentar recuperar a
+// sessão. Não é credencial: sem o cookie, ele não autentica nada.
+const USER_KEY = 'saude_user'
+// Chaves de versões anteriores, que guardavam os tokens em claro. São apagadas ao carregar.
+const LEGACY_TOKEN_KEYS = ['saude_token', 'saude_refresh']
+
+function purgeLegacyTokens() {
+  try {
+    for (const k of LEGACY_TOKEN_KEYS) localStorage.removeItem(k)
+  } catch {
+    /* storage indisponível */
+  }
+}
+purgeLegacyTokens()
+
+export const getToken = () => accessToken
 
 export function clearSession() {
-  localStorage.removeItem(TOKEN_KEY)
+  accessToken = null
   localStorage.removeItem(USER_KEY)
-  localStorage.removeItem(REFRESH_KEY)
+  purgeLegacyTokens()
 }
 
+/** Há um usuário guardado? Indica que PODE haver sessão no cookie; não prova nada. */
+export const hasSessionHint = () => localStorage.getItem(USER_KEY) !== null
 export function getStoredUser(): SessionUser | null {
   const raw = localStorage.getItem(USER_KEY)
   if (!raw) return null
@@ -46,10 +61,9 @@ export function getStoredUser(): SessionUser | null {
   }
 }
 
-export function setSession(token: string, user: SessionUser, refreshToken?: string | null) {
-  localStorage.setItem(TOKEN_KEY, token)
+export function setSession(token: string, user: SessionUser) {
+  accessToken = token
   localStorage.setItem(USER_KEY, JSON.stringify(user))
-  if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken)
 }
 
 export function getSession(): Session | null {

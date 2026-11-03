@@ -1,11 +1,10 @@
-import { test, expect } from '@playwright/test';
-import { stateOf, vigiar, semRolagemHorizontal } from './fixtures.js';
+import { test, expect, stateOf, vigiar, semRolagemHorizontal } from './fixtures.js';
 
 /**
  * Painel do atendente (React) contra a API real. A conta é criada pelo globalSetup
  * (senha aleatória por execução); sem ela os testes são pulados.
  */
-test.use({ storageState: stateOf('atendente') });
+test.use({ papel: 'atendente' });
 test.skip(!stateOf('atendente'), 'sem sessão de atendente (ver e2e/global-setup.js)');
 
 const SECOES = [

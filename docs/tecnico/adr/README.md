@@ -16,7 +16,7 @@ Status possíveis: **Proposta** → **Aceita** → (**Substituída por ADR-NNNN*
 | [0008](ADR-0008-migrations-numeradas-com-controle.md) | Migrations numeradas com tabela de controle | **Aceita e implementada** | 2026-11-01 |
 | [0009](ADR-0009-eliminacao-unica-de-conta-por-anonimizacao.md) | Eliminação de conta é uma só: anonimização completa | Aceita (não implementada) | 2026-11-01 |
 | [0010](ADR-0010-mfa-obrigatorio-para-atendente-e-admin.md) | Segundo fator obrigatório para atendente e admin | Aceita (não implementada) | 2026-11-01 |
-| [0011](ADR-0011-refresh-token-so-em-cookie-httponly.md) | Refresh token só em cookie HttpOnly; access token em memória | Aceita (não implementada) | 2026-11-01 |
+| [0011](ADR-0011-refresh-token-so-em-cookie-httponly.md) | Refresh token só em cookie HttpOnly; access token em memória | **Aceita e implementada** | 2026-11-03 |
 | [0012](ADR-0012-auditoria-sem-dado-pessoal-e-lembrete-lido.md) | Auditoria sem dado pessoal e lembrete com marcar como lido | Aceita (não implementada) | 2026-11-01 |
 
 Relacionados: `../rfc/RFC-0001-…`, `../especificacao/ESPEC-001-…`, `../poc/POC-001-…`, `../PROS_E_CONTRAS.md`.

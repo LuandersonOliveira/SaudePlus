@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getToken } from '@/lib/session'
 import { json, mockApi, renderApp, seedSession } from '@/test/utils'
 import { AccountPage } from './pages/AccountPage'
 import { PatientsPage } from './pages/PatientsPage'
@@ -172,7 +173,7 @@ describe('Minha conta', () => {
     await userEvent.type(within(dialog).getByLabelText('Senha'), 'minha-senha-1')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Excluir conta' }))
     await waitFor(() => expect(m2.last('DELETE', '/auth/me')?.body).toEqual({ password: 'minha-senha-1' }))
-    await waitFor(() => expect(localStorage.getItem('saude_token')).toBeNull())
+    await waitFor(() => expect(getToken()).toBeNull())
   })
 
   it('senha errada mantém o diálogo aberto com a mensagem do servidor', async () => {

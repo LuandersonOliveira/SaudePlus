@@ -94,8 +94,10 @@ async function issueRefreshToken(userId, family, expiresAt = null) {
   return { raw, id, family: fam, expiresAt: new Date(prazo).getTime() };
 }
 
+// ADR-0011: o refresh token só vale se vier no cookie HttpOnly. O corpo da requisição NÃO é aceito:
+// um token no corpo implicaria o front guardá-lo em JavaScript (localStorage), que um XSS lê.
 function readRefreshRaw(req) {
-  return (req.body && req.body.refreshToken) || (req.cookies && req.cookies[REFRESH_COOKIE]) || null;
+  return (req.cookies && req.cookies[REFRESH_COOKIE]) || null;
 }
 
 /** Conteúdo do access token (e do `user` devolvido no login) a partir da linha de `users`. */

@@ -92,7 +92,7 @@ test('iniciarSessao grava o cookie httpOnly e devolve access + refresh; encerrar
   assert.equal(cookies[0].opts.httpOnly, true);
   assert.equal(cookies[0].opts.sameSite, 'lax');
 
-  await encerrarSessao({ body: { refreshToken }, cookies: {} }, res);
+  await encerrarSessao({ body: {}, cookies: { saude_refresh: refreshToken } }, res);
   assert.equal(await revogado(refreshToken), 1);
   assert.equal(cleared[0].nome, REFRESH_COOKIE);
 

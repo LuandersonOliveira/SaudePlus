@@ -26,6 +26,9 @@ export default defineConfig({
         target: API_TARGET,
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api/, ''),
+        // A API monta as rotas na raiz quando não serve o front e grava o cookie de refresh com Path=/auth.
+        // O navegador chama /api/auth/*, então sem esta reescrita o cookie nunca voltaria ao servidor (ADR-0011).
+        cookiePathRewrite: { '/auth': '/api/auth' },
       },
     },
   },

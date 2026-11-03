@@ -1,6 +1,12 @@
 import '@testing-library/jest-dom/vitest'
-import { afterEach } from 'vitest'
+import { afterEach, beforeEach } from 'vitest'
 import { toast } from 'sonner'
+import { clearSession } from '@/lib/session'
+
+// O access token vive em memória do módulo (ADR-0011) e sobreviveria de um teste para o outro.
+beforeEach(() => {
+  clearSession()
+})
 
 // O estado do Sonner é global ao módulo: sem isto, toasts de um teste vazam para o seguinte.
 afterEach(() => {

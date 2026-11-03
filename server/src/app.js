@@ -8,6 +8,7 @@ const cookieParser = require('cookie-parser');
 const { globalLimiter, authLimiter, readinessLimiter } = require('./middleware/rateLimit');
 const { attachAudit } = require('./middleware/audit');
 const { attachDocs } = require('./middleware/crypto');
+const { corsPorRequisicao, MENSAGEM_ORIGEM } = require('./middleware/origin');
 
 const authRoutes = require('./routes/auth.routes');
 const appointmentsRoutes = require('./routes/appointments.routes');
@@ -45,20 +46,10 @@ if (trustProxyHops > 0) app.set('trust proxy', trustProxyHops);
 app.use(serveWeb ? helmet({ contentSecurityPolicy: { useDefaults: true, directives: cspDirectives() } }) : helmet());
 app.use(cookieParser());
 
-// CORS fechado: lista explícita em CORS_ORIGIN (vírgula = múltiplas origens).
-// Sem '*' como fallback — em produção, origem desconhecida é bloqueada.
-// Em dev sem .env, libera apenas o front local padrão.
-function buildCorsOrigin() {
-  const raw = (process.env.CORS_ORIGIN || 'http://localhost:8080').trim();
-  const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
-  return (origin, callback) => {
-    if (!origin) return callback(null, true); // curl/smoke-test/health-check
-    if (allowed.includes(origin)) return callback(null, true);
-    return callback(new Error('Origem não permitida pelo CORS.'));
-  };
-}
-
-app.use(cors({ origin: buildCorsOrigin() }));
+// CORS fechado: lista explícita em CORS_ORIGIN (vírgula = múltiplas origens) ou a MESMA origem
+// da API (origem única, ADR-0002). Sem '*' como fallback — origem desconhecida é bloqueada.
+// Regra em ./middleware/origin.js; vale para a API toda, inclusive /auth/refresh e /auth/logout (ADR-0011).
+app.use(cors(corsPorRequisicao));
 app.use(express.json({ limit: '100kb' }));
 // Form-urlencoded também: DELETE /auth/me manda senha no corpo, e sem isto
 // o express.json não parseia e a exclusão de conta devolve 400.
@@ -128,7 +119,7 @@ app.use((req, res) => {
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  if (err && err.message === 'Origem não permitida pelo CORS.') {
+  if (err && err.message === MENSAGEM_ORIGEM) {
     return res.status(403).json({ error: 'Origem não permitida.' });
   }
   // Integrações opcionais (Gov.br, RNDS) usam err.status/code próprios.

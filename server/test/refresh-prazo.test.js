@@ -60,10 +60,10 @@ const sha = (raw) => crypto.createHash('sha256').update(String(raw)).digest('hex
 let server;
 let baseUrl;
 
-async function req(metodo, caminho, corpo) {
+async function req(metodo, caminho, corpo, { cookie } = {}) {
   const res = await fetch(baseUrl + caminho, {
     method: metodo,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...(cookie ? { cookie: `saude_refresh=${cookie}` } : {}) },
     body: corpo ? JSON.stringify(corpo) : undefined,
   });
   return {
@@ -101,19 +101,28 @@ test.after(async () => {
   await admin.end().catch(() => {});
 });
 
+// ADR-0011: o refresh token só trafega por cookie HttpOnly. O corpo da resposta NÃO o traz mais.
+const valorDoCookie = (setCookie) => {
+  const c = (setCookie || []).find((x) => x.startsWith('saude_refresh='));
+  return c ? decodeURIComponent(c.split(';')[0].slice('saude_refresh='.length)) : null;
+};
+
 async function login() {
-  const { body } = await req('POST', '/auth/login', { email: 'prazo@test.local', password: SENHA });
-  assert.ok(body && body.refreshToken, `login falhou: ${JSON.stringify(body)}`);
-  return body.refreshToken;
+  const { body, setCookie } = await req('POST', '/auth/login', { email: 'prazo@test.local', password: SENHA });
+  const refreshToken = valorDoCookie(setCookie);
+  assert.ok(body && body.token && refreshToken, `login falhou: ${JSON.stringify(body)}`);
+  return refreshToken;
 }
 
 test('a rotação normal continua devolvendo um par novo', async () => {
   const refreshToken = await login();
-  const { status, body } = await req('POST', '/auth/refresh', { refreshToken });
+  const { status, body, setCookie } = await req('POST', '/auth/refresh', {}, { cookie: refreshToken });
   assert.equal(status, 200, `refresh falhou: ${JSON.stringify(body)}`);
   assert.ok(body.token, 'devolve access token novo');
-  assert.ok(body.refreshToken, 'devolve refresh token novo');
-  assert.notEqual(body.refreshToken, refreshToken, 'o refresh precisa ser rotacionado de verdade');
+  assert.equal(body.refreshToken, undefined, 'o refresh novo vai só no cookie (ADR-0011)');
+  const novo = valorDoCookie(setCookie);
+  assert.ok(novo, 'devolve refresh token novo, em cookie');
+  assert.notEqual(novo, refreshToken, 'o refresh precisa ser rotacionado de verdade');
 });
 
 test('a rotação NÃO estende o prazo original da família', async () => {
@@ -124,10 +133,10 @@ test('a rotação NÃO estende o prazo original da família', async () => {
   const prazoDaFamilia = new Date(Date.now() + 60 * 60 * 1000);
   await pool.query('UPDATE refresh_tokens SET expires_at = ? WHERE token_hash = ?', [prazoDaFamilia, sha(refreshToken)]);
 
-  const { status, body } = await req('POST', '/auth/refresh', { refreshToken });
+  const { status, body, setCookie } = await req('POST', '/auth/refresh', {}, { cookie: refreshToken });
   assert.equal(status, 200, `refresh falhou: ${JSON.stringify(body)}`);
 
-  const [[novo]] = await pool.query('SELECT expires_at FROM refresh_tokens WHERE token_hash = ?', [sha(body.refreshToken)]);
+  const [[novo]] = await pool.query('SELECT expires_at FROM refresh_tokens WHERE token_hash = ?', [sha(valorDoCookie(setCookie))]);
   assert.ok(novo, 'o token rotacionado precisa existir no banco');
 
   assert.ok(
@@ -142,7 +151,7 @@ test('o cookie httpOnly também respeita o prazo original', async () => {
   const prazoDaFamilia = new Date(Date.now() + 60 * 60 * 1000);
   await pool.query('UPDATE refresh_tokens SET expires_at = ? WHERE token_hash = ?', [prazoDaFamilia, sha(refreshToken)]);
 
-  const { setCookie } = await req('POST', '/auth/refresh', { refreshToken });
+  const { setCookie } = await req('POST', '/auth/refresh', {}, { cookie: refreshToken });
   const cookie = (setCookie || []).find((c) => c.startsWith('saude_refresh='));
   assert.ok(cookie, `a resposta deve trazer o cookie de refresh; veio: ${JSON.stringify(setCookie)}`);
 
@@ -163,7 +172,7 @@ test('prazo vencido derruba a família inteira, como já fazia o token', async (
 
   await pool.query('UPDATE refresh_tokens SET expires_at = ? WHERE family = ?', [new Date(Date.now() - 1000), familia]);
 
-  const { status } = await req('POST', '/auth/refresh', { refreshToken });
+  const { status } = await req('POST', '/auth/refresh', {}, { cookie: refreshToken });
   assert.equal(status, 401, 'prazo vencido precisa ser 401');
 
   const [[n]] = await pool.query('SELECT COUNT(*) AS n FROM refresh_tokens WHERE family = ? AND revoked = 0', [familia]);

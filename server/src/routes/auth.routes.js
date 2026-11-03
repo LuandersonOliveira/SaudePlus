@@ -50,9 +50,9 @@ router.post('/login', validate(loginBody), async (req, res, next) => {
       return res.json({ mfa_required: true, mfa_ticket: r.ticket });
     }
 
-    const { token, refreshToken } = await iniciarSessao(res, r.payload, r.userId);
+    const { token } = await iniciarSessao(res, r.payload, r.userId);
     await req.audit('login_senha', 'user', r.userId, 'sessão iniciada sem segundo fator', r.userId);
-    res.json({ token, refreshToken, user: r.payload });
+    res.json({ token, user: r.payload });
   } catch (err) {
     next(err);
   }
@@ -64,9 +64,9 @@ router.post('/mfa/verify', validate(mfaVerifyBody), async (req, res, next) => {
   try {
     const r = await verificarSegundoFator(req.body);
     if (!r.ok) return res.status(r.status).json({ error: r.error });
-    const { token, refreshToken } = await iniciarSessao(res, r.payload, r.user.id);
+    const { token } = await iniciarSessao(res, r.payload, r.user.id);
     await req.audit('mfa_login', 'user', r.user.id, 'login com segundo fator', r.user.id);
-    res.json({ token, refreshToken, user: r.payload });
+    res.json({ token, user: r.payload });
   } catch (err) {
     next(err);
   }
@@ -161,7 +161,7 @@ router.post('/refresh', async (req, res, next) => {
       return res.status(r.status).json({ error: r.error });
     }
     setRefreshCookie(res, r.refreshToken, r.cookieTtlMs);
-    res.json({ token: r.token, refreshToken: r.refreshToken, user: r.payload });
+    res.json({ token: r.token, user: r.payload });
   } catch (err) {
     next(err);
   }
@@ -190,9 +190,9 @@ router.get('/govbr/callback', validate(govbrCallbackQuery, { source: 'query' }),
       await req.audit('govbr_login', 'user', r.userId, 'login via Gov.br (aguardando MFA)', r.userId);
       return res.json({ mfa_required: true, mfa_ticket: r.ticket });
     }
-    const { token, refreshToken } = await iniciarSessao(res, r.payload, r.userId);
+    const { token } = await iniciarSessao(res, r.payload, r.userId);
     await req.audit('govbr_login', 'user', r.userId, 'login via Gov.br', r.userId);
-    res.json({ token, refreshToken, user: r.payload });
+    res.json({ token, user: r.payload });
   } catch (err) {
     next(err);
   }

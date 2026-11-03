@@ -1,5 +1,4 @@
-import { test, expect } from '@playwright/test';
-import { stateOf, vigiar } from './fixtures.js';
+import { test, expect, stateOf, vigiar } from './fixtures.js';
 
 /**
  * Login, sessão e guardas de rota do front React — com navegador de verdade.
@@ -59,7 +58,7 @@ test.describe('login', () => {
 
 test.describe('papel errado não vê o painel do outro', () => {
   test.describe('admin', () => {
-    test.use({ storageState: stateOf('admin') });
+    test.use({ papel: 'admin' });
     test('não cai no painel do paciente', async ({ page }) => {
       test.skip(!stateOf('admin'), 'sem sessão de admin');
       await page.goto('/dashboard');
@@ -67,7 +66,7 @@ test.describe('papel errado não vê o painel do outro', () => {
     });
   });
   test.describe('paciente', () => {
-    test.use({ storageState: stateOf('paciente') });
+    test.use({ papel: 'paciente' });
     test('não entra em /admin nem em /atendente', async ({ page }) => {
       test.skip(!stateOf('paciente'), 'sem sessão de paciente');
       for (const rota of ['/admin', '/atendente']) {
