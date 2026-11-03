@@ -58,7 +58,7 @@ Fora desta lista, mas já conhecidos: `server/scripts/temp_marked.js` e `.superp
 
 | ID | Achado | Princípio | Evidência | Sev. |
 |---|---|---|---|---|
-| E-06 | O `INSERT` de agendamento está montado à mão em **3 lugares**: paciente, recepção e fila. Adicionar uma coluna exige 3 edições | **Abstração**, **O** | `routes/me.booking.routes.js:132`, `routes/staff.routes.js:276`, `services/waitlist.js:125` | Alta |
+| E-06 (**resolvido** em `f577bfa`) | O `INSERT` de agendamento está montado à mão em **3 lugares**: paciente, recepção e fila. Adicionar uma coluna exige 3 edições | **Abstração**, **O** | `routes/me.booking.routes.js:132`, `routes/staff.routes.js:276`, `services/waitlist.js:125` | Alta |
 | E-07 | A regra de prioridade legal (`idoso`, `gestante`, `pcd`, `lactante`) existe em 4 lugares com texto copiado: a origem (`PRIORITY_GROUPS`) e três cópias | **Abstração**, **O** | `utils/booking-priority.js:12`; cópias em `routes/admin.routes.js:299`, `routes/staff.routes.js:74` e `:383` | Média |
 | E-08 | Rota do paciente (`me.booking`) e rota de staff (`applyBookingChange`) implementam remarcação e cancelamento por caminhos diferentes: o do staff registra evento e auditoria, o do paciente não | **Abstração**, **polimorfismo** (mesmo contrato, comportamento divergente) | `routes/me.booking.routes.js:149-304` × `services/bookingChange.js` | Alta |
 | E-09 | `appointments` e `exams` são tratados por fábrica (`createBookingRouter(tipo)`), mas `staff.routes.js` repete listagens separadas para os dois | **Herança por composição** | `staff.routes.js` `GET /appointments` e `GET /exams` (linhas 307 e 340) | Média |
