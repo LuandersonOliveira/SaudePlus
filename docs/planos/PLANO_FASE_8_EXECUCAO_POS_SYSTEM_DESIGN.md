@@ -50,7 +50,7 @@ Ordem: 1.1, 1.2, 1.3 (independentes e pequenos), 1.4, depois 1.5 e 1.6.
 | 2.6 | Desativar unidade trata atendimentos futuros e fila como a desativação de profissional | E-17 | M | decisão | `professional-deactivation` como modelo |
 | 2.7 | Atendimento sem profissional: aceitar como legado ou fechar o furo | seção 9 | P a M | decisão | teste de corrida sem profissional |
 
-**Decisões abertas:** 2.6 (o que acontece com os atendimentos de uma unidade desativada) e 2.7.
+**Decisões 2.6 e 2.7:** tomadas em 2026-11-03 (ver *Rodada de decisões*).
 
 ## Onda 3: estrutura (o antigo 3B e `admin.routes.js`)
 
@@ -115,6 +115,41 @@ Escritos ao iniciar a onda correspondente, com a decisão em aberto:
 - ROPA e RIPD coerentes com o código.
 - Servidor, web e e2e verdes ao fim de cada onda.
 
+## Rodada de decisões (2026-11-03)
+
+Todas as decisões que estavam abertas foram respondidas. O que cada uma muda no plano:
+
+| Tema | Decisão | Efeito no plano |
+|---|---|---|
+| 2.6 Desativar unidade | Mover os atendimentos futuros ativos para "a remarcar" com evento e e-mail, e cancelar a fila presa à unidade, tudo na mesma transação | 2.6 como descrito (modelo: desativação de profissional) |
+| 2.7 Sem profissional | Fechar o furo: agendamento novo exige profissional quando a unidade oferece o serviço com vínculo; registros antigos sem profissional seguem válidos e remarcáveis | 2.7 vira regra em `validateBooking` + teste de corrida sem profissional |
+| 3.2 Escopo do atendente | Só o profissional vinculado, em `/staff/agenda/reports` e `/staff/booking-events`; admin vê tudo; atendente sem vínculo vê vazio | 3.2 sem ambiguidade |
+| 4.5 Contadores | Persistir no banco (tabela `login_attempts`) | 4.5 vira implementação, não ADR de aceite |
+| 4.2 Agendamento | Job dentro da API (1x/dia, `GET_LOCK`, log e tabela de execuções) e o comando manual continua | 4.2 com o padrão do job de lembretes |
+| Prazos de guarda | `reminders` 1 ano; `waitlist` (cancelada ou convertida) 1 ano; `booking_events` 5 anos. **Proposta**: o job só apaga depois que a Procuradoria confirmar; até lá roda em simulação | 4.2 + ROPA §3 |
+| 4.1 Logs | `pino` + `x-request-id`; o log leva rota, status, duração e **id** do usuário (nunca e-mail); substitui os 35 `console.*` | 4.1 com dependência nova |
+| 5.4 Contrato | OpenAPI escrito à mão em `docs/tecnico/openapi.yaml` + teste de conformidade com as rotas do Express | 5.4 depois da onda 3 |
+| 5.5 Consentimento | Mostrar versão e data do aceite no detalhe do usuário (já auditado); o IP fica só na exportação do titular | 5.5 vira código pequeno |
+| 5.6 `GET /auth/me` | Documentos mascarados; valor inteiro só por endpoint separado e auditado, usado pela tela de edição; a exportação LGPD continua completa | 5.6 com endpoint novo |
+| 5.7 Limpeza | Remover `temp_marked.js`; `.superpowers/` no `.gitignore`; mover PDFs e `ROTEIRO_TESTE_ALUNOS.md` para `docs/arquivo/` com README | 5.7 |
+| E-30 Ordem dos eventos | Migration 0008: coluna `seq BIGINT AUTO_INCREMENT` em `booking_events`; `listarEventos` ordena por ela | **item novo 2.8** |
+| QR code do MFA | Adicionar o pacote `qrcode`, com `import()` dinâmico só na tela de MFA | **item novo 1.8** |
+| Vínculo ao eliminar | `anonimizarNaTransacao` solta `professionals.user_id` e cancela a fila, como o caminho do admin | **item novo 1.9** |
+| BOM nos commits | Aceitar e não reescrever o histórico | nenhum item |
+| Fora do código | Base legal de profissionais e rede, e contrato com o provedor de e-mail | Procuradoria e DPO; o ROPA e o RIPD já marcam "a confirmar" |
+
+### Itens novos
+
+| # | Item | Achado | Esforço | Depende de |
+|---|---|---|---|---|
+| 1.8 | QR code na tela de MFA (`qrcode`, import dinâmico) | E-24 (acabamento) | P | — |
+| 1.9 | A eliminação (titular, admin e expurgo) solta o vínculo do profissional e cancela a fila do titular | E-11 (resíduo) | P | — |
+| 2.8 | `booking_events.seq` (migration 0008) e ordem exata em `listarEventos` | E-30 | P | — |
+
+### Ordem de execução acordada
+
+2.6, 2.7, 2.8, 1.8, 1.9, **ADR-0013**, onda 3 (3.1 a 3.6), onda 4 (4.1, 4.2, 4.3, 4.4, 4.5), onda 5 (5.1 a 5.7), ADRs 0014 a 0016, e por fim revisão final de ROPA, RIPD e `SYSTEM_DESIGN.md`.
+
 ## Andamento
 
 | Item | Situação | Commit | Observação |
@@ -134,4 +169,4 @@ Escritos ao iniciar a onda correspondente, com a decisão em aberto:
 | 2.2 | **Concluído** (2026-11-03) | `c63dd21` | E-08, E-12 e E-19 resolvidos para criar e cancelar. O `PUT` do paciente é edição completa (unidade, profissional, serviço, local, notas) e segue com lógica própria, agora com auditoria. Servidor 632/634 (só o "doctor"), corrida 7/7, e2e 29/29. Achado novo E-30: `booking_events.created_at` tem resolução de 1 s e eventos da mesma transação empatam (`listarEventos` ordena por id) |
 | 2.3 | **Concluído** (2026-11-03) | `4d1e493` | E-13 resolvido. Servidor 634/636 (só o "doctor"), corrida 7/7, e2e 29/29, lint limpo. O front ainda envia `location` (ignorado) |
 | 2.4 | **Concluído** (2026-11-03) | `f81c6be` | E-07 resolvido. Servidor 640/642 (só o "doctor"), corrida 7/7, e2e 29/29, lint limpo |
-| 2.5 | Próximo | | Migration 0007: `UNIQUE` para a entrada ativa da fila; `booking_events` append-only por trigger (E-18, E-20) |
+| 2.5 | **Concluído** (2026-11-03) | `ffd1f2f` | E-18 e E-20 resolvidos. Migration 0007 aplicada também no banco `saude` (0 duplicatas, tabelas vazias). Servidor 649/651 (só o "doctor"), corrida 7/7, e2e 29/29. Sem FK em `booking_events.booking_id` e `waitlist.record_id` (polimórficos) |
