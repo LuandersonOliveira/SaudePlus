@@ -30,6 +30,14 @@ export const useReminders = () =>
     queryFn: async () => list<Reminder>(await api.get('/me/reminders')),
   })
 
+export function useMarkReminderRead() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: Reminder['id']) => api.patch<unknown>(`/me/reminders/${id}/read`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: patientKeys.reminders }),
+  })
+}
+
 export function useCancelBooking() {
   const qc = useQueryClient()
   return useMutation({

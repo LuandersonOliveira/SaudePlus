@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { EmptyState, ListSkeleton, QueryError } from '@/components/QueryState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,7 +9,7 @@ import { errorMessage } from '@/lib/api'
 import { patientCompleteness } from '../account/logic'
 import { BookingRow } from '../components/BookingRow'
 import { toItems, upcomingEvents } from '../logic'
-import { useDiseases, useMyBookings, useReminders } from '../queries'
+import { useDiseases, useMarkReminderRead, useMyBookings, useReminders } from '../queries'
 
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
@@ -26,7 +27,16 @@ export function HomePage() {
   const exams = useMyBookings('exams')
   const diseases = useDiseases()
   const reminders = useReminders()
+  const markRead = useMarkReminderRead()
   const me = useMe()
+
+  async function marcarComoLido(id: string | number) {
+    try {
+      await markRead.mutateAsync(id)
+    } catch (e) {
+      toast.error(errorMessage(e, 'Erro ao marcar o lembrete como lido.'))
+    }
+  }
 
   // O marcador de uma fonte que falhou vira "—" em vez de um 0 mentiroso.
   const unread = reminders.data?.filter((r) => !r.read).length
@@ -122,12 +132,25 @@ export function HomePage() {
                     <p className="font-bold">{r.title}</p>
                     <p className="text-sm text-muted-foreground">{r.message || ''}</p>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={r.read ? 'border-transparent bg-muted text-muted-foreground' : 'border-transparent bg-warning-soft text-warning-ink'}
-                  >
-                    {r.read ? 'Lido' : 'Novo'}
-                  </Badge>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {!r.read && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-label={`Marcar como lido: ${r.title}`}
+                        disabled={markRead.isPending}
+                        onClick={() => void marcarComoLido(r.id)}
+                      >
+                        Marcar como lido
+                      </Button>
+                    )}
+                    <Badge
+                      variant="outline"
+                      className={r.read ? 'border-transparent bg-muted text-muted-foreground' : 'border-transparent bg-warning-soft text-warning-ink'}
+                    >
+                      {r.read ? 'Lido' : 'Novo'}
+                    </Badge>
+                  </div>
                 </li>
               ))}
             </ul>

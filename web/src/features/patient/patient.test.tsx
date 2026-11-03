@@ -84,6 +84,38 @@ describe('Início', () => {
     expect(screen.getByText('Nenhum evento futuro agendado.', { exact: false })).toBeInTheDocument()
   })
 
+  it('"Marcar como lido" só aparece nos novos, chama PATCH e atualiza o marcador e a contagem', async () => {
+    let lembretes = reminders.map((r) => ({ ...r }))
+    const m = mockApi({
+      ...baseApi,
+      'GET /me/reminders': () => json(200, lembretes),
+      'PATCH /me/reminders/1/read': () => {
+        lembretes = lembretes.map((r) => (r.id === 1 ? { ...r, read: 1 } : r))
+        return json(200, { ok: true })
+      },
+    })
+    renderPatient()
+
+    const botao = await screen.findByRole('button', { name: 'Marcar como lido: Consulta amanhã' })
+    expect(screen.queryByRole('button', { name: /Marcar como lido: Exame confirmado/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Lembretes', { selector: 'p' }).closest('[data-slot=card]')).toHaveTextContent('1')
+
+    await userEvent.click(botao)
+
+    await waitFor(() => expect(m.last('PATCH', '/me/reminders/1/read')).toBeDefined())
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Marcar como lido/ })).not.toBeInTheDocument())
+    expect(screen.getByText('Lembretes', { selector: 'p' }).closest('[data-slot=card]')).toHaveTextContent('0')
+    expect(screen.getAllByText('Lido')).toHaveLength(2)
+  })
+
+  it('erro ao marcar como lido avisa e mantém o lembrete como novo', async () => {
+    mockApi({ ...baseApi, 'PATCH /me/reminders/1/read': () => json(500, { error: 'falhou' }) })
+    renderPatient()
+    await userEvent.click(await screen.findByRole('button', { name: 'Marcar como lido: Consulta amanhã' }))
+    expect(await screen.findByText('Erro ao marcar o lembrete como lido.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Marcar como lido: Consulta amanhã' })).toBeInTheDocument()
+  })
+
   it('uma fonte que falha vira "—" e só aquela seção mostra erro (sem 0 mentiroso)', async () => {
     mockApi({ ...baseApi, 'GET /me/reminders': () => json(500, { error: 'x' }) })
     renderPatient()
