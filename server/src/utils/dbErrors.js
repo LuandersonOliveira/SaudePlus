@@ -16,4 +16,13 @@ function ehHorarioOcupado(err) {
     && /uq_(appointments|exams)_prof_active_slot/.test(String(err.message));
 }
 
-module.exports = { ehHorarioOcupado, MENSAGEM_HORARIO_OCUPADO };
+/** Fila de espera (E-18): `UNIQUE (user_id, active_key)` barra duas entradas ativas iguais do mesmo paciente. */
+const MENSAGEM_FILA_DUPLICADA = 'Você já está na lista de espera para este serviço.';
+
+function ehFilaDuplicada(err) {
+  return Boolean(err)
+    && (err.code === 'ER_DUP_ENTRY' || err.errno === 1062)
+    && /uq_waitlist_active/.test(String(err.message));
+}
+
+module.exports = { ehHorarioOcupado, MENSAGEM_HORARIO_OCUPADO, ehFilaDuplicada, MENSAGEM_FILA_DUPLICADA };

@@ -345,6 +345,16 @@ CREATE TABLE IF NOT EXISTS booking_events (
         FOREIGN KEY (actor_user_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE = InnoDB;
 
+-- Fase 8 / 2.5 (E-20): append-only no banco, como o audit_log. A ação referencial da FK
+-- (ON DELETE SET NULL no autor) NÃO dispara trigger no MySQL, então continua funcionando.
+-- MySQL não tem CREATE TRIGGER IF NOT EXISTS: DROP + CREATE mantém o arquivo reaplicável.
+DROP TRIGGER IF EXISTS trg_booking_events_no_update;
+CREATE TRIGGER trg_booking_events_no_update BEFORE UPDATE ON booking_events FOR EACH ROW
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'booking_events é append-only: UPDATE bloqueado.';
+DROP TRIGGER IF EXISTS trg_booking_events_no_delete;
+CREATE TRIGGER trg_booking_events_no_delete BEFORE DELETE ON booking_events FOR EACH ROW
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'booking_events é append-only: DELETE bloqueado.';
+
 -- ---------------------------------------------------------------------
 -- NV03 — lista de espera. O paciente entra para um serviço (unidade e
 -- profissional opcionais = qualquer um) e, quando um agendamento daquele
@@ -363,9 +373,18 @@ CREATE TABLE IF NOT EXISTS waitlist (
     record_id CHAR(36) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     fulfilled_at DATETIME NULL DEFAULT NULL,
+    -- Fase 8 / 2.5 (E-18): o banco recusa DUAS entradas ATIVAS iguais do mesmo paciente (mesmo tipo, serviço,
+    -- unidade e profissional). Entrada cancelada ou convertida vira NULL e não conta. Unidade e profissional
+    -- nulos (= "qualquer um") entram como texto vazio: NULL no UNIQUE nunca conflita, e esse é o caso comum.
+    active_key CHAR(64) GENERATED ALWAYS AS (
+        IF(status = 'aguardando',
+           SHA2(CONCAT_WS('|', kind, service_name, IFNULL(unit_id, ''), IFNULL(professional_id, '')), 256),
+           NULL)
+    ) STORED,
     CONSTRAINT fk_waitlist_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     INDEX idx_waitlist_user (user_id),
-    INDEX idx_waitlist_queue (kind, service_name, status, created_at)
+    INDEX idx_waitlist_queue (kind, service_name, status, created_at),
+    UNIQUE KEY uq_waitlist_active (user_id, active_key)
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------

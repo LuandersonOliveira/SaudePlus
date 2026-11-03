@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const pool = require('../db');
 const { verifyToken } = require('../middleware/auth');
 const { KINDS } = require('../utils/booking');
+const { ehFilaDuplicada, MENSAGEM_FILA_DUPLICADA } = require('../utils/dbErrors');
 
 const router = express.Router();
 router.use(verifyToken);
@@ -59,15 +60,22 @@ router.post('/', async (req, res, next) => {
       [req.user.id, entrada.kind, entrada.serviceName, entrada.unitId, entrada.professionalId]
     );
     if (duplicada) {
-      return res.status(409).json({ error: 'Você já está na lista de espera para este serviço.' });
+      return res.status(409).json({ error: MENSAGEM_FILA_DUPLICADA });
     }
 
+    // O SELECT acima dá a resposta amigável no caso comum; quem decide de verdade é o UNIQUE do banco
+    // (uq_waitlist_active): duas requisições simultâneas passam juntas pelo SELECT, e só uma consegue gravar.
     const id = crypto.randomUUID();
-    await pool.query(
-      `INSERT INTO waitlist (id, user_id, kind, service_name, unit_id, professional_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, req.user.id, entrada.kind, entrada.serviceName, entrada.unitId, entrada.professionalId]
-    );
+    try {
+      await pool.query(
+        `INSERT INTO waitlist (id, user_id, kind, service_name, unit_id, professional_id)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [id, req.user.id, entrada.kind, entrada.serviceName, entrada.unitId, entrada.professionalId]
+      );
+    } catch (err) {
+      if (ehFilaDuplicada(err)) return res.status(409).json({ error: MENSAGEM_FILA_DUPLICADA });
+      throw err;
+    }
     res.status(201).json({
       id,
       kind: entrada.kind,
