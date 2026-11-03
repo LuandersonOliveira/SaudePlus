@@ -131,4 +131,5 @@ Escritos ao iniciar a onda correspondente, com a decisão em aberto:
 **Onda 1 concluída (1.1 a 1.7).**
 
 | 2.1 | **Concluído** (2026-11-03) | `f577bfa` | E-06 resolvido. `services/bookingCreate` e `repositories/atendimentos.inserir` são o único caminho. Servidor 626/628 (só o "doctor"), corrida 7/7, e2e 29/29, lint limpo. `doctor` passa a ser sempre o nome cadastrado do profissional |
-| 2.2 | Próximo | | Paciente cancela e remarca por `applyBookingChange`, com evento e auditoria, e cancelamento transacional (E-08, E-12, E-19) |
+| 2.2 | **Concluído** (2026-11-03) | `c63dd21` | E-08, E-12 e E-19 resolvidos para criar e cancelar. O `PUT` do paciente é edição completa (unidade, profissional, serviço, local, notas) e segue com lógica própria, agora com auditoria. Servidor 632/634 (só o "doctor"), corrida 7/7, e2e 29/29. Achado novo E-30: `booking_events.created_at` tem resolução de 1 s e eventos da mesma transação empatam (`listarEventos` ordena por id) |
+| 2.3 | Próximo | | `location` derivada da unidade, não do corpo da requisição (E-13) |

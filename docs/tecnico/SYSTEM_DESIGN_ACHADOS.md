@@ -60,7 +60,7 @@ Fora desta lista, mas já conhecidos: `server/scripts/temp_marked.js` e `.superp
 |---|---|---|---|---|
 | E-06 (**resolvido** em `f577bfa`) | O `INSERT` de agendamento está montado à mão em **3 lugares**: paciente, recepção e fila. Adicionar uma coluna exige 3 edições | **Abstração**, **O** | `routes/me.booking.routes.js:132`, `routes/staff.routes.js:276`, `services/waitlist.js:125` | Alta |
 | E-07 | A regra de prioridade legal (`idoso`, `gestante`, `pcd`, `lactante`) existe em 4 lugares com texto copiado: a origem (`PRIORITY_GROUPS`) e três cópias | **Abstração**, **O** | `utils/booking-priority.js:12`; cópias em `routes/admin.routes.js:299`, `routes/staff.routes.js:74` e `:383` | Média |
-| E-08 | Rota do paciente (`me.booking`) e rota de staff (`applyBookingChange`) implementam remarcação e cancelamento por caminhos diferentes: o do staff registra evento e auditoria, o do paciente não | **Abstração**, **polimorfismo** (mesmo contrato, comportamento divergente) | `routes/me.booking.routes.js:149-304` × `services/bookingChange.js` | Alta |
+| E-08 (**resolvido** em `c63dd21`) | Rota do paciente (`me.booking`) e rota de staff (`applyBookingChange`) implementam remarcação e cancelamento por caminhos diferentes: o do staff registra evento e auditoria, o do paciente não | **Abstração**, **polimorfismo** (mesmo contrato, comportamento divergente) | `routes/me.booking.routes.js:149-304` × `services/bookingChange.js` | Alta |
 | E-09 | `appointments` e `exams` são tratados por fábrica (`createBookingRouter(tipo)`), mas `staff.routes.js` repete listagens separadas para os dois | **Herança por composição** | `staff.routes.js` `GET /appointments` e `GET /exams` (linhas 307 e 340) | Média |
 
 ## 6. Achados de entidade, dados e LGPD (classes Editar e Criar)
@@ -71,14 +71,14 @@ Vêm da seção 8 do `SYSTEM_DESIGN.md`. Aqui só a classificação.
 |---|---|---|---|---|---|
 | E-10 | Editar (**resolvido** em `cf4c26b`) | `anonymizeUser` não zera `govbr_sub`, `consent_ip`, `totp_secret` e `totp_enabled`. O `govbr_sub` e o IP continuam identificando a pessoa | **Encapsulamento** da regra de eliminação | `utils/privacy.js:46-56` | Alta |
 | E-11 | Editar (**resolvido** em `cf4c26b`) | Há dois "apagar" com efeitos diferentes: o do admin só preenche `deleted_at` e mantém todos os dados pessoais | **Abstração** (um conceito, duas implementações) | `repositories/usuarios.js:114`; `utils/privacy.js` | Alta |
-| E-12 | Editar | O paciente cria, cancela e reagenda sem linha no `audit_log`, e criar e cancelar também não geram `booking_events` | **S** (a rota decide e executa) | `routes/me.booking.routes.js` (sem `audit`; evento só na linha 276) | Alta |
+| E-12 (**resolvido** em `c63dd21`) | Editar | O paciente cria, cancela e reagenda sem linha no `audit_log`, e criar e cancelar também não geram `booking_events` | **S** (a rota decide e executa) | `routes/me.booking.routes.js` (sem `audit`; evento só na linha 276) | Alta |
 | E-13 | Editar | `appointments.location` vem do corpo da requisição do paciente e não é conferido contra `unit_id` | **Encapsulamento** (dado derivado tratado como entrada) | `routes/me.booking.routes.js:64` e `:116` | Média |
 | E-14 | Editar | `audit_log.actor_id` e `entity_id` são `NOT NULL`: auditoria sem ator ou sem id falha no `INSERT`, e a ação fica sem registro (só `console.error`) | **Abstração** | `utils/audit.js:96-192`, `schema.sql:473-476` | Média |
 | E-15 | Editar (**resolvido** em `07a87d8`) | `details` da auditoria leva dado pessoal (nome do paciente em `staff_create`); a trilha é imutável e a anonimização a preserva | **Encapsulamento** | `routes/staff.routes.js:291` | Alta |
 | E-16 | Editar | Textos sem teto em `diseases`, `health_units`, `professionals` (nome, cargo, registro): erro de tamanho tende a virar 500 | Validação | `routes/admin.routes.js:260`, `routes/units.routes.js:36`, `schemas/adminProfessionals.js:44` | Média |
 | E-17 | Editar | Desativar unidade só muda `active`; atendimentos futuros e fila ficam como estão (a desativação de profissional trata os dois) | **Polimorfismo** (regra análoga com comportamento diferente) | `routes/units.routes.js:55-85` × `services/adminProfessionals.js:83` | Média |
 | E-18 | Editar | Fila de espera: duplicidade checada com `SELECT` antes do `INSERT`, sem `UNIQUE`; duas requisições simultâneas criam duas entradas | Consistência | `routes/me.waitlist.routes.js:54-70` | Baixa |
-| E-19 | Editar | `PATCH /me/.../cancel` do paciente não usa transação (`UPDATE` e liberação de vaga separados, erro engolido no log) | **S**, consistência | `routes/me.booking.routes.js:149-176` | Baixa |
+| E-19 (**resolvido** em `c63dd21`) | Editar | `PATCH /me/.../cancel` do paciente não usa transação (`UPDATE` e liberação de vaga separados, erro engolido no log) | **S**, consistência | `routes/me.booking.routes.js:149-176` | Baixa |
 | E-20 | Editar | `booking_events` é append-only só por convenção (sem trigger) e `booking_id` não tem FK; `waitlist.record_id` também não | Integridade | `schema.sql:325`, `:355` | Baixa |
 | E-21 | Editar (**resolvido** em `7c4b321`) | Front guarda JWT e refresh em `localStorage`, e o servidor devolve o refresh também no corpo | Segurança | `web/src/lib/session.ts:26-52`, `routes/auth.routes.js:47` | Alta |
 | E-22 | Editar | `GET /auth/me` devolve CPF, RG e CNS sem máscara | **Encapsulamento** | `services/profile.js:26` | Média |
@@ -249,3 +249,9 @@ Os demais achados seguem as recomendações do plano de execução e dependem de
 ## 13. Próximos passos
 
 A execução está em `docs/planos/PLANO_FASE_8_EXECUCAO_POS_SYSTEM_DESIGN.md`, em cinco ondas: LGPD e segurança, agenda sem duplicação, estrutura (o antigo 3B), operação, higiene e documentos.
+
+## 14. Achados surgidos durante a execução (Fase 8)
+
+| ID | Classe | Achado | Princípio | Evidência | Sev. |
+|---|---|---|---|---|---|
+| E-30 | Editar | `booking_events.created_at` tem resolução de 1 segundo, e dois eventos da mesma transação (por exemplo `created` e `canceled`) empatam. `listarEventos` e o histórico ordenam por `created_at, id`, então a ordem entre eles sai pelo `id` (UUID aleatório) | Consistência | `services/booking-events.js:50-66`, `schema.sql:325-346`; apareceu como teste intermitente em `patient-booking-trail.test.js` | Baixa |
