@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Em andamento: onda 1, itens 1.1 e 1.2 concluídos (ver Andamento) |
+| **Status** | Em andamento: onda 1, itens 1.1 a 1.3 concluídos (ver Andamento) |
 | **Criada em** | 2026-11-01 |
 | **Origem** | Fase 7 (`SYSTEM_DESIGN.md`, `SYSTEM_DESIGN_ACHADOS.md`) |
 | **Substitui** | A ordem antiga dos itens pendentes da Fase 6: 3B (`staff.routes.js`), `admin.routes.js`, A5, B4 e demais pequenos |
@@ -121,4 +121,5 @@ Escritos ao iniciar a onda correspondente, com a decisão em aberto:
 |---|---|---|---|
 | 1.1 | **Concluído** (2026-11-02) | `cf4c26b` | E-10 e E-11 resolvidos. Servidor 578/580 (única falha: "doctor confere o MESMO banco", artefato do runner), corrida 7/7, web 339/339, `tsc` e lint limpos, e2e 28/28. O script `anonimizar:excluidos` achou 0 contas no banco `saude`. Pendência pequena: atendente que se elimina por `DELETE /auth/me` mantém `professionals.user_id` apontando para a conta anonimizada (o caminho do admin já solta o vínculo) |
 | 1.2 | **Concluído** (2026-11-02) | `07a87d8` | E-15 resolvido. Servidor 584/586 (só o "doctor"), corrida 7/7, lint limpo. Resíduo: linhas antigas com nome seguem na trilha; o campo livre `motivo` digitado pelo admin não é filtrado |
-| 1.3 | Próximo | | `PATCH /me/reminders/:id/read` e uso no front (R-06) |
+| 1.3 | **Concluído** (2026-11-02) | `1192ce4` | R-06 resolvido (criar a rota, não remover a coluna). Servidor 590/592, corrida 7/7, web 341/341, e2e 28/28, tsc e lint limpos. O `GET /me/reminders` também saiu da rota (0 SQL) |
+| 1.4 | Próximo | | Auditar login por senha, cadastro, exportação e edição de perfil (E-26) |

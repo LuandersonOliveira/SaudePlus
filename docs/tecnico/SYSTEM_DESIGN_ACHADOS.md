@@ -39,7 +39,7 @@ Severidade é **proposta** do analista: alta (dado pessoal, integridade ou segur
 | R-03 | `acharPorCpf` em `utils/cpf.js` | Só `server/test/cpf-match.test.js` a chama; a busca real é `acharContaGovbr` em `services/auth.js` | Só teste; remover com o teste | Baixa |
 | R-04 | Exports só para teste: `totpNow`, `mailerStatus`, `resetTransporte`, `isBookingStatus`, `isOccupyingStatus`, `RESCHEDULE_REASONS`, `localDateTimeStr`, `localDateRange`, `resetAuditLockStats` | Nenhum arquivo de produção os importa | **Editar**, não remover: são ganchos de teste legítimos; vale só marcar como tal | Baixa |
 | R-05 | Exports sem consumidor externo e sem teste (`nextDayWindow`, `entregarPorEmail`, `EVENT_TYPES`, helpers de `cnes.js`, `infodengue.js`, `rnds.js`, `distDir` etc.) | Usados só dentro do próprio arquivo | **Editar**: reduz a superfície pública (encapsulamento) | Baixa |
-| R-06 | Coluna `reminders.read` | Nenhum código do servidor a lê ou grava; não há rota para marcar como lida | **Decidir**: remover a coluna ou **criar** a rota (depende de o front querer "marcar como lida") | Baixa |
+| R-06 | Coluna `reminders.read` (**resolvido** em `1192ce4`: criada a rota) | Nenhum código do servidor a lê ou grava; não há rota para marcar como lida | **Decidir**: remover a coluna ou **criar** a rota (depende de o front querer "marcar como lida") | Baixa |
 | R-07 | Caminhos de compatibilidade em `utils/audit.js` (`ER_BAD_FIELD_ERROR`, `ER_DATA_TOO_LONG`, `ORDER BY created_at` sem `seq`) | Existem para bancos anteriores às migrations 005 e 005b | Remover quando todo banco estiver na 0006; tem teste de cadeia | Baixa |
 
 Fora desta lista, mas já conhecidos: `server/scripts/temp_marked.js` e `.superpowers/` (item A6 do backlog).
