@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const { verifyToken, requireStaff } = require('../middleware/auth');
 const { validateScheduleWindow } = require('../utils/booking');
+const { prioridadeRank, ordemPorPrioridadeSql } = require('../utils/booking-priority');
 const { criarAtendimento } = require('../services/bookingCreate');
 const { applyBookingChange } = require('../services/bookingChange');
 const { listarEventos } = require('../services/booking-events');
@@ -66,9 +67,7 @@ function clausulaFiltros({ unitId, professionalId, status }, alias) {
   return { sql: where.length ? ` AND ${where.join(' AND ')}` : '', params };
 }
 
-function prioridadeRank(value) {
-  return ['idoso', 'gestante', 'pcd', 'lactante'].includes(String(value || '').toLowerCase()) ? 0 : 1;
-}
+
 
 async function buscarDia(tipo, de, ate, filtros, _escopo) {
   const itens = [];
@@ -334,6 +333,7 @@ router.get('/exams', async (req, res, next) => {
 // liberação automática: prioridade legal primeiro, depois chegada.
 router.get('/waitlist', async (req, res, next) => {
   try {
+    const ordem = ordemPorPrioridadeSql('u.priority'); // grupos da Lei 10.048: UMA origem (utils/booking-priority.js)
     const [rows] = await pool.query(
       `SELECT w.id, w.user_id, w.kind, w.service_name, w.unit_id, w.professional_id,
               w.status, w.record_id, w.created_at, w.fulfilled_at,
@@ -341,8 +341,9 @@ router.get('/waitlist', async (req, res, next) => {
        FROM waitlist w
        JOIN users u ON u.id = w.user_id
        WHERE w.status = 'aguardando' AND u.deleted_at IS NULL
-       ORDER BY CASE WHEN u.priority IN ('idoso', 'gestante', 'pcd', 'lactante') THEN 0 ELSE 1 END,
-                w.created_at ASC`
+       ORDER BY ${ordem.sql},
+                w.created_at ASC`,
+      ordem.params
     );
     res.json(rows);
   } catch (err) { next(err); }

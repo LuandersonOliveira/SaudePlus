@@ -5,6 +5,7 @@ const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { requireCapability } = require('../middleware/capabilities');
 const { verifyChain } = require('../utils/audit');
 const { BOOKING_STATUS } = require('../utils/booking');
+const { ordemPorPrioridadeSql } = require('../utils/booking-priority');
 const { applyBookingChange } = require('../services/bookingChange');
 const { liberarVagaAposCancelamento } = require('../services/waitlist');
 const { parsePagination } = require('../utils/validators');
@@ -289,6 +290,7 @@ router.delete('/diseases/:id', requireCapability('diseases'), async (req, res, n
 
 router.get('/waitlist', requireCapability('appointments'), async (req, res, next) => {
   try {
+    const ordem = ordemPorPrioridadeSql('u.priority'); // grupos da Lei 10.048: UMA origem (utils/booking-priority.js)
     const [rows] = await pool.query(
       `SELECT w.id, w.user_id, w.kind, w.service_name, w.unit_id, w.professional_id,
               w.status, w.record_id, w.created_at, w.fulfilled_at,
@@ -296,8 +298,9 @@ router.get('/waitlist', requireCapability('appointments'), async (req, res, next
        FROM waitlist w
        JOIN users u ON u.id = w.user_id
        WHERE w.status = 'aguardando' AND u.deleted_at IS NULL
-       ORDER BY CASE WHEN u.priority IN ('idoso', 'gestante', 'pcd', 'lactante') THEN 0 ELSE 1 END,
-                w.created_at ASC`
+       ORDER BY ${ordem.sql},
+                w.created_at ASC`,
+      ordem.params
     );
     res.json(rows);
   } catch (err) { next(err); }

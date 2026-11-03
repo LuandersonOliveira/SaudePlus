@@ -17,8 +17,34 @@ const PRIORITY_MESSAGE =
   `Este horário é reservado para ${PRIORITY_LABEL}. `
   + 'Escolha outro horário ou tente novamente nas 24 horas anteriores.';
 
+// A coluna `users.priority` é ENUM minúsculo; normaliza mesmo assim, para o dado vindo de outra fonte.
+const normalizar = (priority) => String(priority || '').trim().toLowerCase();
+
 function isPriorityUser(priority) {
-  return PRIORITY_GROUPS.includes(String(priority || ''));
+  return PRIORITY_GROUPS.includes(normalizar(priority));
+}
+
+/** Posição na fila: grupo da lei = 0, os demais = 1. Para ordenar listas em JavaScript. */
+function prioridadeRank(priority) {
+  return isPriorityUser(priority) ? 0 : 1;
+}
+
+/**
+ * Fragmento SQL (com parâmetros) para `ORDER BY`: grupo da lei primeiro. UM lugar para a lista, em vez de
+ * `IN ('idoso', 'gestante', ...)` escrito à mão em cada consulta (E-07). O nome da coluna vem do código
+ * (nunca de entrada do usuário) e ainda assim é conferido.
+ *
+ * @example const { sql, params } = ordemPorPrioridadeSql('u.priority');
+ *          pool.query(`... ORDER BY ${sql}, w.created_at`, [...outros, ...params])  // params na posição do ORDER BY
+ */
+function ordemPorPrioridadeSql(coluna) {
+  if (typeof coluna !== 'string' || !/^[a-z_]+\.[a-z_]+$/.test(coluna)) {
+    throw new Error(`ordemPorPrioridadeSql: coluna inválida (${coluna})`);
+  }
+  return {
+    sql: `CASE WHEN ${coluna} IN (${PRIORITY_GROUPS.map(() => '?').join(', ')}) THEN 0 ELSE 1 END`,
+    params: [...PRIORITY_GROUPS],
+  };
 }
 
 // Nº de vagas protegidas por dia/profissional. `ceil` garante o piso de 10% e
@@ -61,6 +87,8 @@ module.exports = {
   PRIORITY_RELEASE_HOURS,
   PRIORITY_MESSAGE,
   isPriorityUser,
+  prioridadeRank,
+  ordemPorPrioridadeSql,
   quotaPrioritaria,
   gradeDoDia,
   reservasDoDia,

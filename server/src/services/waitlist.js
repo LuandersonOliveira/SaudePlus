@@ -1,5 +1,6 @@
 const mailer = require('./mailer');
-const { PRIORITY_GROUPS, parseDateTime } = require('../utils/booking');
+const { parseDateTime } = require('../utils/booking');
+const { ordemPorPrioridadeSql } = require('../utils/booking-priority');
 const { criarAtendimento } = require('./bookingCreate');
 
 const META = {
@@ -41,7 +42,7 @@ async function tentarPreencher(conn, record) {
     await conn.query('SELECT id FROM professionals WHERE id = ? FOR UPDATE', [record.professional_id]);
   }
 
-  const prioridadeParams = [...PRIORITY_GROUPS];
+  const ordem = ordemPorPrioridadeSql('u.priority');
   const [candidatos] = await conn.query(
     `SELECT w.id, w.user_id, u.priority, u.email, u.full_name
      FROM waitlist w
@@ -54,7 +55,7 @@ async function tentarPreencher(conn, record) {
        AND (w.professional_id IS NULL OR w.professional_id = ?)
        AND u.account_status = 'ativo'
        AND u.deleted_at IS NULL
-     ORDER BY CASE WHEN u.priority IN (?, ?, ?, ?) THEN 0 ELSE 1 END,
+     ORDER BY ${ordem.sql},
               w.created_at ASC, w.id ASC
      FOR UPDATE`,
     [
@@ -63,7 +64,7 @@ async function tentarPreencher(conn, record) {
       record.user_id,
       record.unit_id || null,
       record.professional_id || null,
-      ...prioridadeParams,
+      ...ordem.params,
     ]
   );
 

@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { PRIORITY_GROUPS } = require('./booking-priority');
 
 function digitsOnly(value) {
   return String(value || '').replace(/\D/g, '');
@@ -90,7 +91,8 @@ function parsePagination(query, { defaultPageSize = 20, maxPageSize = 100 } = {}
 // com mensagem em português. Mantenha em sincronia com schema.sql.
 // ---------------------------------------------------------------------------
 const VALID_GENDERS = ['masculino', 'feminino', 'outro', 'prefiro_nao_informar'];
-const VALID_PRIORITIES = ['nenhuma', 'idoso', 'gestante', 'pcd', 'lactante'];
+// `nenhuma` + os grupos da Lei 10.048/2000, que têm UMA origem (utils/booking-priority.js, E-07).
+const VALID_PRIORITIES = ['nenhuma', ...PRIORITY_GROUPS];
 const VALID_RACES = ['branca', 'preta', 'parda', 'amarela', 'indigena', 'nao_informar'];
 const VALID_BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const VALID_ZONES = ['urbana', 'rural'];
