@@ -81,6 +81,8 @@ async function tentarPreencher(conn, record) {
       doctor: record.doctor,
       notes: record.notes,
       userPriority: candidato.priority,
+      actorUserId: null, // criado pelo sistema, não por uma pessoa
+      eventoMotivo: 'fila_de_espera',
     });
     if (!criado.ok) continue;
     const id = criado.id;

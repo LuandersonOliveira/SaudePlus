@@ -5,7 +5,6 @@ const { validateScheduleWindow } = require('../utils/booking');
 const { criarAtendimento } = require('../services/bookingCreate');
 const { applyBookingChange } = require('../services/bookingChange');
 const { listarEventos } = require('../services/booking-events');
-const { registrarEvento } = require('../services/booking-events');
 const { liberarVagaAposCancelamento } = require('../services/waitlist');
 const { parsePagination } = require('../utils/validators');
 const { isValidDateOnly, localDateStr, addDaysLocal } = require('../utils/local-date');
@@ -239,6 +238,7 @@ function createStaffBooking(tipo) {
         scheduledAt: scheduled_at,
         location,
         notes,
+        actorUserId: req.user.id,
       });
       if (!criado.ok) {
         await conn.rollback();
@@ -247,14 +247,6 @@ function createStaffBooking(tipo) {
         return res.status(409).json({ error: criado.error });
       }
       const { id, duracao } = criado;
-      await registrarEvento(conn, {
-        kind: tipo,
-        bookingId: id,
-        eventType: 'created',
-        toScheduledAt: scheduled_at,
-        toProfessionalId: professional_id || null,
-        actorUserId: req.user.id,
-      });
       await conn.commit();
       conn.release();
       conn = null;

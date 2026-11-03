@@ -10,18 +10,21 @@
      1. trava utente e profissional, na ordem canônica (repositories/agenda.travarEnvolvidos);
      2. valida (services/bookingRules.validateBooking): janela, unidade, oferta, escala, bloqueios,
         ocupação do profissional, sobreposição do utente e cota de prioridade;
-     3. calcula a duração; 4. resolve o nome do profissional e o local; 5. grava.
+     3. calcula a duração; 4. resolve o nome do profissional e o local; 5. grava;
+     6. registra o evento `created` (booking_events) na mesma transação: TODA criação deixa rastro,
+        seja do paciente, da recepção ou da fila (E-08/E-12).
 
    Duas defesas continuam atrás desta: o `FOR UPDATE` do passo 1 e o UNIQUE (professional_id,
    active_slot) do banco (ADR-0007), que responde 409 "Horário já ocupado" em app.js.
 
-   A TRANSAÇÃO é de quem chama (`db` é a conexão dela): o paciente confirma logo depois, a recepção
-   grava o evento `created` na mesma transação, a fila cancela e avisa conforme o resultado.
+   A TRANSAÇÃO é de quem chama (`db` é a conexão dela): o paciente e a recepção confirmam logo depois,
+   a fila avisa o candidato conforme o resultado.
    Nada aqui toca em `req`/`res`.
    ========================================================================== */
 const crypto = require('crypto');
 const agenda = require('../repositories/agenda');
 const atendimentos = require('../repositories/atendimentos');
+const { registrarEvento } = require('./booking-events');
 const {
   TIPOS, lockBookingActors, validateBooking, duracaoMinutos, prioridadeDoUsuario,
 } = require('./bookingRules');
@@ -39,6 +42,8 @@ const {
  * @param {string} [d.doctor]           só vale sem profissional: com profissional, o nome cadastrado dele vence
  * @param {string} [d.notes]
  * @param {string|null} [d.userPriority] se o chamador já tem a prioridade do utente (a fila tem); `undefined` = consulta o banco
+ * @param {string|null} [d.actorUserId]  quem criou (paciente ou atendente); `null` = o sistema (fila de espera)
+ * @param {string} [d.eventoMotivo]      motivo do evento `created` (a fila informa `fila_de_espera`)
  * @returns {Promise<{ok: true, id: string, duracao: number} | {ok: false, error: string}>}
  */
 async function criarAtendimento(db, d) {
@@ -82,6 +87,15 @@ async function criarAtendimento(db, d) {
     scheduledAt: d.scheduledAt,
     notes: d.notes,
     duracao,
+  });
+  await registrarEvento(db, {
+    kind: d.tipo,
+    bookingId: id,
+    eventType: 'created',
+    toScheduledAt: d.scheduledAt,
+    toProfessionalId: professionalId,
+    reason: d.eventoMotivo || null,
+    actorUserId: d.actorUserId || null,
   });
   return { ok: true, id, duracao };
 }

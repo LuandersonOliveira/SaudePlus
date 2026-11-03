@@ -12,7 +12,11 @@
 
    opts = { kindKey: 'appointments'|'exams', id, body: {status, scheduled_at, outcome,
             reschedule_reason}, actorUserId, autoReason, defaultReason, reasonRequired,
-            failOnEventError }
+            failOnEventError, ownerUserId, somenteSeAberto, mensagemFechado, mensagemNaoEncontrado }
+
+   O paciente usa a MESMA função para cancelar (E-08): `ownerUserId` restringe ao registro dele (o dos
+   outros é 404) e `somenteSeAberto` recusa o que já está concluído ou cancelado (409, com a
+   `mensagemFechado`). Staff e admin não passam nenhuma das duas.
    Retorna { status, body } e, em sucesso, { audit: { entityType, details } }.
    ========================================================================== */
 const {
@@ -131,7 +135,14 @@ async function applyBookingChange(db, opts) {
     // Leitura/travamento do registro ATUAL antes da validação, para evitar
     // corrida com outro reagendamento do mesmo item ou do mesmo utente.
     const before = await atendimentos.lerETravar(c, meta.table, opts.id);
-    if (!before) return { status: 404, body: { error: 'Registro não encontrado.' } };
+    const naoEncontrado = opts.mensagemNaoEncontrado || 'Registro não encontrado.';
+    // Registro de OUTRO usuário é tratado como inexistente: não confirma que o id existe.
+    if (!before || (opts.ownerUserId && before.user_id !== opts.ownerUserId)) {
+      return { status: 404, body: { error: naoEncontrado } };
+    }
+    if (opts.somenteSeAberto && ['concluido', 'cancelado'].includes(before.status)) {
+      return { status: 409, body: { error: opts.mensagemFechado || 'Este registro já está encerrado.' } };
+    }
 
     const changedScheduled = Boolean(scheduledAt) && String(before.scheduled_at) !== String(scheduledAt);
     if (changedScheduled && n.motivoObrigatorio && !n.motivoFoiInformado && !(opts.autoReason || opts.defaultReason)) {

@@ -3,7 +3,9 @@
 
    Uma única fábrica serve consultas e exames. As URLs continuam idênticas
    (/me/appointments e /me/exams); só a implementação foi unificada.
-   Auditoria NÃO mora aqui (Fase 3, item 2) — só CRUD + validação.
+   Criar, cancelar e editar deixam rastro (E-12): evento em booking_events (criação e cancelamento pelo
+   serviço único / applyBookingChange) e linha em audit_log (`patient_create`, `patient_cancel`,
+   `patient_update`), sem dado pessoal no `details` (ADR-0012).
    ========================================================================== */
 const express = require('express');
 const pool = require('../db');
@@ -14,6 +16,7 @@ const {
   prioridadeDoUsuario, lockBookingActors,
 } = require('../utils/booking');
 const { liberarVagaAposCancelamento } = require('../services/waitlist');
+const { applyBookingChange } = require('../services/bookingChange');
 const { criarAtendimento } = require('../services/bookingCreate');
 
 const LABELS = {
@@ -92,6 +95,7 @@ function createBookingRouter(tipo) {
         location,
         doctor: hasDoctor ? body.doctor : undefined,
         notes,
+        actorUserId: req.user.id,
       });
       if (!criado.ok) {
         await conn.rollback().catch(() => {});
@@ -102,6 +106,8 @@ function createBookingRouter(tipo) {
       await conn.commit();
       conn.release();
       conn = null;
+      // Só dados operacionais: nada de nome, e-mail nem do texto livre das notas (ADR-0012).
+      await req.audit('patient_create', meta.entityType, criado.id, `${tipo} em ${scheduled_at} (${criado.duracao} min)`);
       res.status(201).json({ id: criado.id });
     } catch (err) {
       if (conn) {
@@ -112,30 +118,28 @@ function createBookingRouter(tipo) {
     }
   });
 
-  // PATCH /:id/cancel — soft-cancel: marca como cancelado, NÃO apaga do banco
+  // PATCH /:id/cancel — soft-cancel: marca como cancelado, NÃO apaga do banco.
+  // Mesmo caminho de staff e admin (applyBookingChange, E-08): UMA transação com o registro travado e o
+  // evento `canceled`, escopo no próprio paciente e só o que ainda está aberto.
   router.patch('/:id/cancel', async (req, res, next) => {
     try {
-      const [[existing]] = await pool.query(
-        `SELECT status FROM ${table} WHERE id = ? AND user_id = ?`,
-        [req.params.id, req.user.id]
-      );
-      if (!existing) return res.status(404).json({ error: msg.notFound });
-      if (existing.status === 'concluido' || existing.status === 'cancelado') {
-        return res.status(409).json({ error: msg.closed });
-      }
-      const [cancelado] = await pool.query(
-        `UPDATE ${table} SET status = ? WHERE id = ? AND user_id = ?
-           AND status NOT IN ('concluido', 'cancelado')`,
-        ['cancelado', req.params.id, req.user.id]
-      );
-      if (cancelado.affectedRows === 0) {
-        return res.status(409).json({ error: msg.closed });
-      }
+      const r = await applyBookingChange(pool, {
+        kindKey: table,
+        id: req.params.id,
+        body: { status: 'cancelado' },
+        actorUserId: req.user.id,
+        ownerUserId: req.user.id,
+        somenteSeAberto: true,
+        mensagemFechado: msg.closed,
+        mensagemNaoEncontrado: msg.notFound,
+      });
+      if (r.status !== 200) return res.status(r.status).json(r.body);
       try {
         await liberarVagaAposCancelamento(pool, { kindKey: table, id: req.params.id });
       } catch (err) {
         console.error(`Falha ao liberar a vaga cancelada ${req.params.id}: ${err.message}`);
       }
+      await req.audit('patient_cancel', meta.entityType, req.params.id, r.audit.details);
       res.json({ ok: true });
     } catch (err) {
       next(err);
@@ -260,6 +264,12 @@ function createBookingRouter(tipo) {
       await conn.commit();
       conn.release();
       conn = null;
+      // Dado operacional apenas: o texto livre das notas e o local não vão para a trilha (ADR-0012).
+      const mudouHorario = String(scheduled_at) !== String(existing.scheduled_at);
+      await req.audit(
+        'patient_update', meta.entityType, req.params.id,
+        mudouHorario ? `reagendado de ${existing.scheduled_at} para ${scheduled_at}` : 'dados do agendamento alterados'
+      );
       res.json({ id: req.params.id });
     } catch (err) {
       if (conn) {
