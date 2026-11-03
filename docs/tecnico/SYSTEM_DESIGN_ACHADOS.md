@@ -233,7 +233,7 @@ Documentos lidos inteiros: `ROPA.md`, `RIPD.md`, `TRILHA_AUDITORIA.md`.
 | ID | Classe | Achado | Evidência | Sev. |
 |---|---|---|---|---|
 | E-25 | Editar | Não há como o admin ver o consentimento (T8): ou se cria a consulta, ou o ROPA deixa de dizer que o admin acessa | `repositories/usuarios.js:46-62` (`detalhe` não seleciona as colunas) | Baixa |
-| E-27 | Editar (documentos) | Atualizar o ROPA e o RIPD: tabelas faltantes, SMTP e ViaCEP, `race` e `priority` como dado sensível, campos que a eliminação não zera, número de tabelas, MFA, risco residual da sessão | Linhas da tabela acima | Média |
+| E-27 | Editar (documentos; **resolvido** em `ced2d10`) | Atualizar o ROPA e o RIPD: tabelas faltantes, SMTP e ViaCEP, `race` e `priority` como dado sensível, campos que a eliminação não zera, número de tabelas, MFA, risco residual da sessão | Linhas da tabela acima | Média |
 
 ## 12. Decisões do responsável (7.5, 2026-11-01)
 

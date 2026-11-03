@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Em andamento: onda 1, itens 1.1 a 1.6 concluídos (ver Andamento) |
+| **Status** | Em andamento: onda 1, onda 1 concluída (1.1 a 1.7) (ver Andamento) |
 | **Criada em** | 2026-11-01 |
 | **Origem** | Fase 7 (`SYSTEM_DESIGN.md`, `SYSTEM_DESIGN_ACHADOS.md`) |
 | **Substitui** | A ordem antiga dos itens pendentes da Fase 6: 3B (`staff.routes.js`), `admin.routes.js`, A5, B4 e demais pequenos |
@@ -126,7 +126,7 @@ Escritos ao iniciar a onda correspondente, com a decisão em aberto:
 | 1.5 | **Concluído** (2026-11-03) | `7c4b321` | E-21 resolvido. Servidor 607/609 (só o "doctor"), corrida 7/7, web 353/353, e2e 28/28, tsc e lint limpos. Achado extra: a origem única recusava POST do navegador sem `CORS_ORIGIN` (corrigido em `middleware/origin.js`) |
 | 1.6 | **Concluído** (2026-11-03) | `9d6953f` | E-24 resolvido. Decisões: Gov.br NÃO conta como 2º fator; superadmin redefine o MFA (com a senha dele) e o terminal cobre o caso sem superadmin. Servidor 619/621 (só o "doctor"), corrida 7/7, web 364/364, e2e 29/29, tsc e lint limpos. Sem QR code (não há biblioteca); a tela mostra a chave e o link otpauth |
 
-| 1.7 | **Concluído** (2026-11-03, a registrar o commit) | | E-27 resolvido: ROPA e RIPD revisados contra o código (`15c5c8c`). Inventário passa de 9 para 13 tratamentos (fila, histórico da agenda, profissionais, rede); SMTP e ViaCEP como destinatários; `race`/`priority` como sensíveis; MFA, sessão e eliminação descritos como estão; riscos novos e residuais honestos (dados não cifrados, trilha com linhas antigas, expurgo manual, backup sem teste de restauração). Itens que ficam para decisão: base legal de profissionais e rede, prazo de `reminders`/`waitlist`/`booking_events`, contrato com o provedor de e-mail |
+| 1.7 | **Concluído** (2026-11-03) | `ced2d10` | E-27 resolvido: ROPA e RIPD revisados contra o código (`15c5c8c`). Inventário passa de 9 para 13 tratamentos (fila, histórico da agenda, profissionais, rede); SMTP e ViaCEP como destinatários; `race`/`priority` como sensíveis; MFA, sessão e eliminação descritos como estão; riscos novos e residuais honestos (dados não cifrados, trilha com linhas antigas, expurgo manual, backup sem teste de restauração). Itens que ficam para decisão: base legal de profissionais e rede, prazo de `reminders`/`waitlist`/`booking_events`, contrato com o provedor de e-mail |
 
 **Onda 1 concluída (1.1 a 1.7).**
 
