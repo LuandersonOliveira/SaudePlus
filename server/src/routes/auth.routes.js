@@ -30,6 +30,8 @@ router.post('/signup', validate(signupBody), async (req, res, next) => {
   try {
     const r = await cadastrar(req.body, { encrypt: req.encryptDoc, ip: clientIp(req) });
     if (!r.ok) return res.status(r.status).json({ error: r.error });
+    // Ainda não há sessão: o ator é o próprio titular que acabou de nascer.
+    await req.audit('signup', 'user', r.id, `cadastro: role=${r.role} status=${r.status}`, r.id);
     res.status(201).json({ id: r.id, message: r.message });
   } catch (err) {
     next(err);
@@ -41,9 +43,15 @@ router.post('/login', validate(loginBody), async (req, res, next) => {
   try {
     const r = await autenticar({ email: req.body.email, password: req.body.password, ip: clientIp(req) });
     if (!r.ok) return res.status(r.status).json({ error: r.error });
-    if (r.mfaRequired) return res.json({ mfa_required: true, mfa_ticket: r.ticket });
+    // Só o login que deu certo entra na trilha: com senha errada não há titular a quem atribuir a linha
+    // (o ator é uma FK para users). A contagem de falhas é do bloqueio por IP, em memória.
+    if (r.mfaRequired) {
+      await req.audit('login_senha', 'user', r.userId, 'senha validada, aguardando segundo fator', r.userId);
+      return res.json({ mfa_required: true, mfa_ticket: r.ticket });
+    }
 
     const { token, refreshToken } = await iniciarSessao(res, r.payload, r.userId);
+    await req.audit('login_senha', 'user', r.userId, 'sessão iniciada sem segundo fator', r.userId);
     res.json({ token, refreshToken, user: r.payload });
   } catch (err) {
     next(err);
@@ -221,6 +229,7 @@ router.get('/me/export', verifyToken, async (req, res, next) => {
   try {
     const r = await exportarDados(req.user.id, docsDe(req));
     if (!r.ok) return res.status(r.status).json({ error: r.error });
+    await req.audit('lgpd_export', 'user', req.user.id, 'exportação dos dados do titular');
     res.json(r.dados);
   } catch (err) {
     next(err);
@@ -245,6 +254,8 @@ router.put('/me', verifyToken, async (req, res, next) => {
   try {
     const r = await atualizarPerfil(req.user.id, req.body, docsDe(req));
     if (!r.ok) return res.status(r.status).json({ error: r.error });
+    // Só os NOMES dos campos: os valores são dado pessoal e a trilha é imutável (ADR-0012).
+    await req.audit('profile_update', 'user', req.user.id, `campos alterados: ${r.campos.join(', ')}`);
     res.json({ ok: true, atualizados: r.atualizados });
   } catch (err) {
     next(err);

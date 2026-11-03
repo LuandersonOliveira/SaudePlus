@@ -34,8 +34,17 @@ SELECT * FROM audit_log
 WHERE action = 'admin_update_user' AND details NOT LIKE '%motivo:%';
 
 -- Logins com MFA vs sem MFA (últimos 30 dias)?
+--   login_senha / "sessão iniciada sem segundo fator" = entrou só com a senha
+--   login_senha / "senha validada, aguardando segundo fator" + mfa_login = entrou com MFA
+--   govbr_login = entrou pelo Gov.br
+SELECT action, details, COUNT(*) FROM audit_log
+WHERE action IN ('login_senha', 'mfa_login', 'govbr_login') AND created_at > NOW() - INTERVAL 30 DAY
+GROUP BY action, details;
+
+-- Quem exportou os próprios dados ou alterou o perfil (últimos 30 dias)?
+-- O details guarda só os NOMES dos campos alterados, nunca os valores.
 SELECT action, COUNT(*) FROM audit_log
-WHERE action IN ('mfa_login', 'govbr_login') AND created_at > NOW() - INTERVAL 30 DAY
+WHERE action IN ('signup', 'lgpd_export', 'profile_update', 'lgpd_delete') AND created_at > NOW() - INTERVAL 30 DAY
 GROUP BY action;
 
 -- Cadeia íntegra? (via API, sem SQL destrutivo)

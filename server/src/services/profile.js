@@ -75,8 +75,8 @@ async function exportarDados(userId, { decrypt }) {
  * Atualização parcial do perfil. Validação em schemas/profile.js; aqui entram a
  * cifra dos documentos, o índice cego do CPF e o UPDATE.
  *
- * @returns {Promise<{ok: true, atualizados: number} | {ok: false, status: number, error: string}>}
- *   `atualizados` conta colunas gravadas (o CPF conta 2: `cpf` e `cpf_hmac`).
+ * @returns {Promise<{ok: true, atualizados: number, campos: string[]} | {ok: false, status: number, error: string}>}
+ *   `atualizados` conta colunas gravadas (o CPF conta 2: `cpf` e `cpf_hmac`); `campos` lista os campos pedidos.
  */
 async function atualizarPerfil(userId, body, { encrypt }) {
   const n = normalizarAtualizacaoPerfil(body);
@@ -105,7 +105,9 @@ async function atualizarPerfil(userId, body, { encrypt }) {
     if (ehCpfDuplicado(err)) return falha(409, MENSAGEM_CPF_DUPLICADO);
     throw err;
   }
-  return { ok: true, atualizados: sets.length };
+  // `campos`: NOMES das colunas gravadas (para a trilha). Nunca os valores: ADR-0012.
+  const campos = [...n.campos.map(([coluna]) => coluna), ...Object.keys(n.documentos)];
+  return { ok: true, atualizados: sets.length, campos };
 }
 
 /**

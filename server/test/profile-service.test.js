@@ -102,7 +102,8 @@ test('atualizarPerfil: grava só o que veio, cifra documentos e mantém o índic
   const id = await usuario();
   const cpf = cpfUnico();
   const r = await atualizarPerfil(id, { phone: '87922223333', cpf, rg: '99887766' }, docs);
-  assert.deepEqual(r, { ok: true, atualizados: 4 }); // phone + cpf + cpf_hmac + rg
+  // phone + cpf + cpf_hmac + rg; `campos` são os NOMES pedidos (vão para a trilha, nunca os valores)
+  assert.deepEqual(r, { ok: true, atualizados: 4, campos: ['phone', 'cpf', 'rg'] });
 
   const [[row]] = await pool.query('SELECT job_role, blood_type, phone, cpf, cpf_hmac, rg FROM users WHERE id = ?', [id]);
   assert.equal(row.job_role, 'Recepcionista', 'não tocado');

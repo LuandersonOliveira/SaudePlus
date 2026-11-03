@@ -45,7 +45,7 @@ const loginAttempts = new Map(); // "ip|email" -> { count, windowEndsAt, blocked
  *
  * @param {object} body corpo validado
  * @param {{encrypt: Function, ip: string}} ctx
- * @returns {Promise<{ok: true, id: string, message: string|null} | {ok: false, status: number, error: string}>}
+ * @returns {Promise<{ok: true, id: string, role: string, status: string, message: string|null} | {ok: false, status: number, error: string}>}
  */
 async function cadastrar(body, { encrypt, ip }) {
   const {
@@ -106,6 +106,8 @@ async function cadastrar(body, { encrypt, ip }) {
   return {
     ok: true,
     id,
+    role: assignedRole,
+    status: initialStatus,
     message: assignedRole === 'atendente'
       ? 'Conta criada! Aguarde a ativação pelo administrador antes de fazer login.'
       : null,
