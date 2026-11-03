@@ -133,4 +133,5 @@ Escritos ao iniciar a onda correspondente, com a decisão em aberto:
 | 2.1 | **Concluído** (2026-11-03) | `f577bfa` | E-06 resolvido. `services/bookingCreate` e `repositories/atendimentos.inserir` são o único caminho. Servidor 626/628 (só o "doctor"), corrida 7/7, e2e 29/29, lint limpo. `doctor` passa a ser sempre o nome cadastrado do profissional |
 | 2.2 | **Concluído** (2026-11-03) | `c63dd21` | E-08, E-12 e E-19 resolvidos para criar e cancelar. O `PUT` do paciente é edição completa (unidade, profissional, serviço, local, notas) e segue com lógica própria, agora com auditoria. Servidor 632/634 (só o "doctor"), corrida 7/7, e2e 29/29. Achado novo E-30: `booking_events.created_at` tem resolução de 1 s e eventos da mesma transação empatam (`listarEventos` ordena por id) |
 | 2.3 | **Concluído** (2026-11-03) | `4d1e493` | E-13 resolvido. Servidor 634/636 (só o "doctor"), corrida 7/7, e2e 29/29, lint limpo. O front ainda envia `location` (ignorado) |
-| 2.4 | Próximo | | Regra de prioridade legal em um só lugar (E-07) |
+| 2.4 | **Concluído** (2026-11-03) | `f81c6be` | E-07 resolvido. Servidor 640/642 (só o "doctor"), corrida 7/7, e2e 29/29, lint limpo |
+| 2.5 | Próximo | | Migration 0007: `UNIQUE` para a entrada ativa da fila; `booking_events` append-only por trigger (E-18, E-20) |
