@@ -3,10 +3,11 @@ const crypto = require('crypto');
 const pool = require('../db');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { requireCapability } = require('../middleware/capabilities');
+const unidadesSvc = require('../services/adminUnits');
 
 const router = express.Router();
 
-const VALID_TYPES = ['ubs', 'hospital', 'clinica', 'caps', 'outro'];
+const { VALID_TYPES } = unidadesSvc;
 
 // GET /health-units — catálogo ativo para preencher seletores
 router.get('/', verifyToken, async (req, res, next) => {
@@ -52,38 +53,19 @@ router.post('/', verifyToken, requireAdmin, requireCapability('units'), async (r
   }
 });
 
+// PATCH /health-units/:id — editar e ativar/desativar. Desativar move os atendimentos futuros para "para
+// remarcar" e cancela a fila presa à unidade, na mesma transação (services/adminUnits.js, E-17).
 router.patch('/:id', verifyToken, requireAdmin, requireCapability('units'), async (req, res, next) => {
   try {
-    const { name, type, neighborhood, active } = req.body || {};
-    const updates = [];
-    const params = [];
-    const details = [];
-    if (name !== undefined) {
-      if (!String(name).trim()) return res.status(400).json({ error: 'Nome da unidade é obrigatório.' });
-      updates.push('name=?'); params.push(String(name).trim()); details.push(`nome -> ${String(name).trim()}`);
-    }
-    if (type !== undefined) {
-      if (!VALID_TYPES.includes(type)) return res.status(400).json({ error: 'Tipo de unidade inválido.' });
-      updates.push('type=?'); params.push(type); details.push(`tipo -> ${type}`);
-    }
-    if (neighborhood !== undefined) {
-      updates.push('neighborhood=?'); params.push(neighborhood || null); details.push(`bairro -> ${neighborhood || 'não informado'}`);
-    }
-    if (active !== undefined) {
-      const activeValue = Number(active) ? 1 : 0;
-      updates.push('active=?'); params.push(activeValue); details.push(activeValue ? 'unidade ativada' : 'unidade desativada');
-    }
-    if (!updates.length) return res.status(400).json({ error: 'Nada para atualizar.' });
-    params.push(req.params.id);
-    const [result] = await pool.query(`UPDATE health_units SET ${updates.join(', ')} WHERE id=?`, params);
-    if (!result.affectedRows) return res.status(404).json({ error: 'Unidade não encontrada.' });
-    await req.audit('admin_update_unit', 'health_unit', req.params.id, details.join('; '));
-    res.json({ ok: true });
+    const r = await unidadesSvc.atualizarUnidade({ id: req.params.id, body: req.body, actorId: req.user.id });
+    if (!r.ok) return res.status(r.status).json({ error: r.error });
+    await req.audit('admin_update_unit', 'health_unit', req.params.id, r.auditoria);
+    await unidadesSvc.avisarAfetados(r.avisar); // melhor esforço, depois do commit e da auditoria
+    res.json({ ok: true, moved: r.moved, waitlist_canceled: r.waitlistCanceled });
   } catch (err) {
     next(err);
   }
 });
-
 // ---------------------------------------------------------------------
 // Ofertas da unidade (especialidades de consulta e tipos de exame).
 // Fonte da verdade do que a unidade realmente atende — alimenta os

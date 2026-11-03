@@ -77,10 +77,23 @@ async function futurosAtivosDoProfissional(db, table, professionalId) {
   return rows;
 }
 
+/** Atendimentos futuros e ATIVOS (pendente/confirmado) de uma UNIDADE numa tabela. Trava as linhas (`FOR UPDATE`). */
+async function futurosAtivosDaUnidade(db, table, unitId) {
+  tabelaSegura(table);
+  const [rows] = await db.query(
+    `SELECT id, user_id, scheduled_at, professional_id FROM ${table}
+     WHERE unit_id = ? AND status IN ('pendente', 'confirmado')
+       AND scheduled_at >= NOW()
+     FOR UPDATE`,
+    [unitId]
+  );
+  return rows;
+}
+
 /** Manda o atendimento para a fila "Para remarcar" com o motivo (o horário fica livre no UNIQUE de B2). */
 async function moverParaRemarcar(db, table, id, reason) {
   tabelaSegura(table);
   await db.query(`UPDATE ${table} SET status = 'para_remarcar', reschedule_reason = ? WHERE id = ?`, [reason, id]);
 }
 
-module.exports = { inserir, lerETravar, atualizar, futurosAtivosDoProfissional, moverParaRemarcar, TABELAS };
+module.exports = { inserir, lerETravar, atualizar, futurosAtivosDoProfissional, futurosAtivosDaUnidade, moverParaRemarcar, TABELAS };

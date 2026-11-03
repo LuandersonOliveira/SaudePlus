@@ -13,8 +13,7 @@
 const pool = require('../db');
 const profissionais = require('../repositories/profissionais');
 const atendimentos = require('../repositories/atendimentos');
-const usuarios = require('../repositories/usuarios');
-const mailer = require('./mailer');
+const avisos = require('./avisosAgenda');
 const { registrarEvento } = require('./booking-events');
 const { emTransacao } = require('../utils/transacao');
 const V = require('../schemas/adminProfessionals');
@@ -138,19 +137,11 @@ async function atualizarProfissional({ id, body, reason, actorId }) {
  * impede os demais avisos.
  */
 async function avisarPacientes(userIds) {
-  const contatos = await usuarios.contatos(pool, userIds);
-  for (const u of contatos) {
-    if (!u.email) continue;
-    try {
-      await mailer.enviar({
-        para: u.email,
-        assunto: 'Profissional indisponível - reagendamento',
-        texto: `Olá ${u.full_name || ''}, seu atendimento foi movido para a fila de remarcação.`,
-      });
-    } catch (err) { /* best-effort */ }
-  }
+  await avisos.avisarPacientes(userIds, {
+    assunto: 'Profissional indisponível - reagendamento',
+    texto: (nome) => `Olá ${nome}, seu atendimento foi movido para a fila de remarcação.`,
+  });
 }
-
 // ---------------------------------------------------------------------------
 // Vínculo profissional ↔ unidade ↔ serviço
 // ---------------------------------------------------------------------------
