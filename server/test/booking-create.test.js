@@ -111,7 +111,7 @@ const base = (extra = {}) => ({
 test('consulta: grava com id, duração do serviço, nome ATUAL do profissional e status pendente', async () => {
   await emTransacao(async (conn) => {
     // `doctor` desatualizado vindo do chamador: o nome do profissional cadastrado vence
-    const r = await criarAtendimento(conn, base({ doctor: 'Nome Antigo', location: 'Sala 3', notes: 'trazer exames' }));
+    const r = await criarAtendimento(conn, base({ doctor: 'Nome Antigo', notes: 'trazer exames' }));
     assert.equal(r.ok, true, JSON.stringify(r));
     assert.match(r.id, /^[0-9a-f-]{36}$/);
     assert.equal(r.duracao, 60, 'a duração do serviço na unidade vence o slot de 30');
@@ -120,7 +120,7 @@ test('consulta: grava com id, duração do serviço, nome ATUAL do profissional 
     assert.equal(linha.user_id, P.paciente);
     assert.equal(linha.specialty, P.consulta);
     assert.equal(linha.doctor, 'Dra. Nome Atual');
-    assert.equal(linha.location, 'Sala 3');
+    assert.equal(linha.location, 'UBS Escrita Única');
     assert.equal(linha.unit_id, P.unidade);
     assert.equal(linha.professional_id, P.profissional);
     assert.equal(linha.notes, 'trazer exames');
@@ -129,9 +129,9 @@ test('consulta: grava com id, duração do serviço, nome ATUAL do profissional 
   });
 });
 
-test('sem local informado, usa o nome da unidade', async () => {
+test('o local é SEMPRE o nome da unidade: um local informado pelo chamador é ignorado (E-13)', async () => {
   await emTransacao(async (conn) => {
-    const r = await criarAtendimento(conn, base({ scheduledAt: `${DIA} 10:00:00` }));
+    const r = await criarAtendimento(conn, base({ scheduledAt: `${DIA} 10:00:00`, location: 'Hospital Inventado' }));
     assert.equal(r.ok, true, JSON.stringify(r));
     const [[linha]] = await conn.query('SELECT location FROM appointments WHERE id = ?', [r.id]);
     assert.equal(linha.location, 'UBS Escrita Única');

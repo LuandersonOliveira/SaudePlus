@@ -17,18 +17,19 @@ const {
 } = require('../utils/booking');
 const { liberarVagaAposCancelamento } = require('../services/waitlist');
 const { applyBookingChange } = require('../services/bookingChange');
+const agenda = require('../repositories/agenda');
 const { criarAtendimento } = require('../services/bookingCreate');
 
 const LABELS = {
   consulta: {
-    required: 'Especialidade, local e data/hora são obrigatórios.',
+    required: 'Especialidade e data/hora são obrigatórios.',
     noUnit: 'Selecione a unidade de saúde.',
     notFound: 'Consulta não encontrada.',
     closed: 'Esta consulta já está concluída ou cancelada.',
     editClosed: 'Não é possível editar uma consulta já concluída ou cancelada.',
   },
   exame: {
-    required: 'Tipo de exame, local e data/hora são obrigatórios.',
+    required: 'Tipo de exame e data/hora são obrigatórios.',
     noUnit: 'Selecione a unidade de saúde.',
     notFound: 'Exame não encontrado.',
     closed: 'Este exame já está concluído ou cancelado.',
@@ -64,8 +65,9 @@ function createBookingRouter(tipo) {
     try {
       const body = req.body || {};
       const serviceName = hasDoctor ? body.specialty : body.exam_type;
-      const { location, scheduled_at, unit_id, professional_id, notes } = body;
-      if (!serviceName || !location || !scheduled_at) {
+      // O local NÃO é lido do corpo (E-13): vem da unidade. O front ainda o envia, e é ignorado.
+      const { scheduled_at, unit_id, professional_id, notes } = body;
+      if (!serviceName || !scheduled_at) {
         return res.status(400).json({ error: msg.required });
       }
       if (!unit_id) {
@@ -92,7 +94,6 @@ function createBookingRouter(tipo) {
         professionalId: professional_id || null,
         serviceName,
         scheduledAt: scheduled_at,
-        location,
         doctor: hasDoctor ? body.doctor : undefined,
         notes,
         actorUserId: req.user.id,
@@ -155,8 +156,8 @@ function createBookingRouter(tipo) {
     try {
       const body = req.body || {};
       const serviceName = hasDoctor ? body.specialty : body.exam_type;
-      const { location, scheduled_at, unit_id, professional_id, notes } = body;
-      if (!serviceName || !location || !scheduled_at) {
+      const { scheduled_at, unit_id, professional_id, notes } = body;
+      if (!serviceName || !scheduled_at) {
         return res.status(400).json({ error: msg.required });
       }
       // Janela é regra de entrada, não conflito de agenda: 400. Sem esta
@@ -177,7 +178,7 @@ function createBookingRouter(tipo) {
       // FOR UPDATE no próprio registro: dois reagendamentos do mesmo item em
       // abas diferentes serializam, e o segundo enxerga o status já gravado.
       const [[existing]] = await conn.query(
-        `SELECT status, unit_id, professional_id, scheduled_at FROM ${table}
+        `SELECT status, unit_id, professional_id, scheduled_at, location FROM ${table}
          WHERE id = ? AND user_id = ? FOR UPDATE`,
         [req.params.id, req.user.id]
       );
@@ -222,6 +223,8 @@ function createBookingRouter(tipo) {
       const setVals = [serviceName];
       if (hasDoctor) { setCols.push('doctor=?'); setVals.push(doctorName); }
       setCols.push('location=?', 'unit_id=?', 'professional_id=?', 'scheduled_at=?', 'notes=?');
+      // O local acompanha a unidade (E-13). Registro antigo sem unidade mantém o texto que já tinha.
+      const location = effectiveUnitId ? await agenda.nomeDaUnidade(conn, effectiveUnitId) : existing.location;
       setVals.push(location, effectiveUnitId, professional_id || null, scheduled_at, notes || null);
 
       // Reagendar muda a grade, então muda a duração: o registro não pode

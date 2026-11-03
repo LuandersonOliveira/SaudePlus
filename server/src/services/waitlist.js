@@ -77,7 +77,6 @@ async function tentarPreencher(conn, record) {
       professionalId: record.professional_id,
       serviceName: record.service_name,
       scheduledAt: record.scheduled_at,
-      location: record.location,
       doctor: record.doctor,
       notes: record.notes,
       userPriority: candidato.priority,

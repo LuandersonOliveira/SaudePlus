@@ -206,7 +206,6 @@ function createStaffBooking(tipo) {
       const body = req.body || {};
       const serviceName = tipo === 'consulta' ? body.specialty : body.exam_type;
       const { user_id, unit_id, professional_id, scheduled_at, notes } = body;
-      const location = body.location;
       if (!user_id || !serviceName || !unit_id || !scheduled_at) {
         return res.status(400).json({ error: 'Informe utente, serviço, unidade e data/hora.' });
       }
@@ -236,7 +235,6 @@ function createStaffBooking(tipo) {
         professionalId: professional_id || null,
         serviceName,
         scheduledAt: scheduled_at,
-        location,
         notes,
         actorUserId: req.user.id,
       });

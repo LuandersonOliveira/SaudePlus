@@ -38,7 +38,7 @@ const {
  * @param {string|null} [d.professionalId]
  * @param {string} d.serviceName        especialidade (consulta) ou tipo de exame
  * @param {string} d.scheduledAt        'YYYY-MM-DD HH:MM[:SS]'
- * @param {string} [d.location]         sem ele, o nome da unidade
+ * (O local NÃO é parâmetro: é sempre o nome da unidade, resolvido aqui. Um local vindo do chamador é ignorado, E-13.)
  * @param {string} [d.doctor]           só vale sem profissional: com profissional, o nome cadastrado dele vence
  * @param {string} [d.notes]
  * @param {string|null} [d.userPriority] se o chamador já tem a prioridade do utente (a fila tem); `undefined` = consulta o banco
@@ -72,7 +72,9 @@ async function criarAtendimento(db, d) {
   });
 
   const nomeDoProfissional = professionalId ? await agenda.nomeDoProfissional(db, professionalId) : null;
-  const location = d.location || (await agenda.nomeDaUnidade(db, d.unitId));
+  // `location` é a cópia textual do nome da unidade no momento da criação. Vem SEMPRE da unidade validada:
+  // aceitá-lo do corpo da requisição deixava o paciente gravar um local que não bate com `unit_id`.
+  const location = await agenda.nomeDaUnidade(db, d.unitId);
 
   const id = crypto.randomUUID();
   await atendimentos.inserir(db, {

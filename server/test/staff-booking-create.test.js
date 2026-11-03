@@ -209,3 +209,21 @@ test('utente inexistente não é aceito, nem com nome livre', async () => {
   assert.equal(res.status, 404);
   assert.match((await res.json()).error, /Paciente não encontrado/i);
 });
+test('o local é o da unidade: um "location" enviado pela recepção é ignorado (E-13)', async () => {
+  const res = await fetch(`${base}/staff/appointments`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      user_id: P.paciente,
+      specialty: P.consulta,
+      unit_id: P.unidade,
+      professional_id: P.profissional,
+      location: 'Local Digitado à Mão',
+      scheduled_at: `${DIA} 08:00:00`,
+    }),
+  });
+  assert.equal(res.status, 201, JSON.stringify(await res.clone().json().catch(() => ({}))));
+  const { id } = await res.json();
+  const [[row]] = await pool.query('SELECT location FROM appointments WHERE id = ?', [id]);
+  assert.equal(row.location, 'UBS Recepção');
+});

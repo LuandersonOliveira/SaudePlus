@@ -225,3 +225,21 @@ test('vaga reaberta pela fila: o atendimento criado pela fila também tem o even
   assert.equal(ev.length, 1);
   assert.deepEqual([ev[0].event_type, ev[0].actor_user_id, ev[0].reason], ['created', null, 'fila_de_espera']);
 });
+test('o local vem da UNIDADE: o "location" do corpo é ignorado no POST e no PUT, e não é obrigatório (E-13)', async () => {
+  // POST com local forjado
+  const c = await api('POST', '/me/appointments', tokenDe(P.pacienteA), consulta('09:30:00', { location: 'Hospital Inventado' }));
+  assert.equal(c.status, 201, JSON.stringify(c.body));
+  assert.equal((await linha('appointments', c.body.id)).location, 'UBS Rastro');
+
+  // PUT com outro local forjado
+  const e = await api('PUT', `/me/appointments/${c.body.id}`, tokenDe(P.pacienteA), consulta('10:00:00', { location: 'Clínica Fantasma' }));
+  assert.equal(e.status, 200, JSON.stringify(e.body));
+  assert.equal((await linha('appointments', c.body.id)).location, 'UBS Rastro');
+
+  // sem "location" no corpo: a criação funciona (antes dava 400)
+  const semLocal = consulta('11:00:00');
+  delete semLocal.location;
+  const s = await api('POST', '/me/appointments', tokenDe(P.pacienteB), semLocal);
+  assert.equal(s.status, 201, JSON.stringify(s.body));
+  assert.equal((await linha('appointments', s.body.id)).location, 'UBS Rastro');
+});
