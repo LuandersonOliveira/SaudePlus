@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Em andamento: onda 1, itens 1.1 a 1.5 concluídos (ver Andamento) |
+| **Status** | Em andamento: onda 1, itens 1.1 a 1.6 concluídos (ver Andamento) |
 | **Criada em** | 2026-11-01 |
 | **Origem** | Fase 7 (`SYSTEM_DESIGN.md`, `SYSTEM_DESIGN_ACHADOS.md`) |
 | **Substitui** | A ordem antiga dos itens pendentes da Fase 6: 3B (`staff.routes.js`), `admin.routes.js`, A5, B4 e demais pequenos |
@@ -124,4 +124,8 @@ Escritos ao iniciar a onda correspondente, com a decisão em aberto:
 | 1.3 | **Concluído** (2026-11-02) | `1192ce4` | R-06 resolvido (criar a rota, não remover a coluna). Servidor 590/592, corrida 7/7, web 341/341, e2e 28/28, tsc e lint limpos. O `GET /me/reminders` também saiu da rota (0 SQL) |
 | 1.4 | **Concluído** (2026-11-02) | `843149e` | E-26 resolvido. Servidor 597/599, corrida 7/7, e2e 28/28, lint limpo. Só login que deu certo é registrado (senha errada não tem titular para a FK do ator) |
 | 1.5 | **Concluído** (2026-11-03) | `7c4b321` | E-21 resolvido. Servidor 607/609 (só o "doctor"), corrida 7/7, web 353/353, e2e 28/28, tsc e lint limpos. Achado extra: a origem única recusava POST do navegador sem `CORS_ORIGIN` (corrigido em `middleware/origin.js`) |
-| 1.6 | Próximo | | MFA obrigatório para atendente e admin (ADR-0010, E-24). Pendências: Gov.br conta como segundo fator? quem restaura o MFA de um admin? |
+| 1.6 | **Concluído** (2026-11-03) | `9d6953f` | E-24 resolvido. Decisões: Gov.br NÃO conta como 2º fator; superadmin redefine o MFA (com a senha dele) e o terminal cobre o caso sem superadmin. Servidor 619/621 (só o "doctor"), corrida 7/7, web 364/364, e2e 29/29, tsc e lint limpos. Sem QR code (não há biblioteca); a tela mostra a chave e o link otpauth |
+
+Onda 1 concluída (1.1 a 1.6); resta a 1.7 (ROPA e RIPD).
+
+| 1.7 | Próximo | | ROPA e RIPD atualizados com o que as ondas 1 e 2 mudaram (E-27) |

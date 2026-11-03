@@ -194,7 +194,7 @@ Nota: **Atende**, **Parcial**, **Não atende**, **Não medido** (sem evidência 
 
 | ID | Classe | Achado | Princípio | Evidência | Sev. |
 |---|---|---|---|---|---|
-| E-24 | Editar | O segundo fator é opcional para todos: nenhum middleware o exige de `atendente` ou `admin`, embora o ROPA (§4) o descreva "(staff/admin)" e o RIPD o use como mitigação do roubo de sessão | **Abstração** (regra de negócio ausente do código) | `services/mfa.js` (`setup`/`enable` livres), `middleware/auth.js` (não consulta `totp_enabled`) | Alta |
+| E-24 | Editar (**resolvido** em `9d6953f`) | O segundo fator é opcional para todos: nenhum middleware o exige de `atendente` ou `admin`, embora o ROPA (§4) o descreva "(staff/admin)" e o RIPD o use como mitigação do roubo de sessão | **Abstração** (regra de negócio ausente do código) | `services/mfa.js` (`setup`/`enable` livres), `middleware/auth.js` (não consulta `totp_enabled`) | Alta |
 | E-26 | Editar (**resolvido** em `843149e`) | O login por senha não grava auditoria; por isso o kit do auditor ("MFA vs sem MFA") não consegue contar os logins **sem** MFA | **Abstração** | `routes/auth.routes.js:40-51` × `docs/governanca/TRILHA_AUDITORIA.md` §3 | Média |
 | E-28 | Editar | Relatórios agregam em JavaScript sobre todas as linhas do intervalo; listagens do paciente e de doenças sem paginação | Desempenho | `routes/staff.routes.js:493-510`, `routes/me.booking.routes.js:47`, `routes/diseases.routes.js` | Média |
 | E-29 | Editar | Contrato de listagem duplo (array legado sem query, envelope com query) e rota legada na raiz | **I**, versionamento | `routes/staff.routes.js:20-29`, `app.js:123-124` | Baixa |
