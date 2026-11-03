@@ -126,6 +126,8 @@ Escritos ao iniciar a onda correspondente, com a decisão em aberto:
 | 1.5 | **Concluído** (2026-11-03) | `7c4b321` | E-21 resolvido. Servidor 607/609 (só o "doctor"), corrida 7/7, web 353/353, e2e 28/28, tsc e lint limpos. Achado extra: a origem única recusava POST do navegador sem `CORS_ORIGIN` (corrigido em `middleware/origin.js`) |
 | 1.6 | **Concluído** (2026-11-03) | `9d6953f` | E-24 resolvido. Decisões: Gov.br NÃO conta como 2º fator; superadmin redefine o MFA (com a senha dele) e o terminal cobre o caso sem superadmin. Servidor 619/621 (só o "doctor"), corrida 7/7, web 364/364, e2e 29/29, tsc e lint limpos. Sem QR code (não há biblioteca); a tela mostra a chave e o link otpauth |
 
-Onda 1 concluída (1.1 a 1.6); resta a 1.7 (ROPA e RIPD).
+| 1.7 | **Concluído** (2026-11-03, a registrar o commit) | | E-27 resolvido: ROPA e RIPD revisados contra o código (`15c5c8c`). Inventário passa de 9 para 13 tratamentos (fila, histórico da agenda, profissionais, rede); SMTP e ViaCEP como destinatários; `race`/`priority` como sensíveis; MFA, sessão e eliminação descritos como estão; riscos novos e residuais honestos (dados não cifrados, trilha com linhas antigas, expurgo manual, backup sem teste de restauração). Itens que ficam para decisão: base legal de profissionais e rede, prazo de `reminders`/`waitlist`/`booking_events`, contrato com o provedor de e-mail |
 
-| 1.7 | Próximo | | ROPA e RIPD atualizados com o que as ondas 1 e 2 mudaram (E-27) |
+**Onda 1 concluída (1.1 a 1.7).**
+
+| 2.1 | Próximo | | Escrita única de agendamento (E-06) |
