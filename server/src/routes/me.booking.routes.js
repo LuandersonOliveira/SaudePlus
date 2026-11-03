@@ -17,6 +17,7 @@ const {
 } = require('../utils/booking');
 const { liberarVagaAposCancelamento } = require('../services/waitlist');
 const { applyBookingChange } = require('../services/bookingChange');
+const { validateUserOverlap } = require('../services/bookingRules');
 const agenda = require('../repositories/agenda');
 const { criarAtendimento } = require('../services/bookingCreate');
 
@@ -211,6 +212,10 @@ function createBookingRouter(tipo) {
           currentScheduledAt: existing.scheduled_at,
         });
         if (bookingError) return falhar(409, { error: bookingError });
+      } else if (String(scheduled_at) !== String(existing.scheduled_at)) {
+        // Registro ANTIGO sem unidade: segue editável, mas sem sobrepor outro atendimento do mesmo paciente (2.7).
+        const conflito = await validateUserOverlap(conn, { userId: req.user.id, scheduledAt: scheduled_at, excludeId: req.params.id });
+        if (conflito) return falhar(409, { error: conflito });
       }
 
       let doctorName = hasDoctor ? (body.doctor || null) : null;

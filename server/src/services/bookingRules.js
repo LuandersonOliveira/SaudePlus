@@ -111,9 +111,12 @@ async function validateBooking(pool, opts) {
   const isRegisteredOffer = await agenda.unidadeOfereceServico(pool, { unitId, tipo, serviceName });
 
   if (!professionalId) {
-    // Serviço "Outro"/personalizado: a unidade aloca o atendimento depois.
+    // Serviço cadastrado na unidade exige profissional (a agenda dele é que trava o horário).
     if (isRegisteredOffer) return 'Selecione um profissional para este atendimento.';
-    return null;
+    // Serviço "Outro"/personalizado: a unidade aloca o atendimento depois. Sem agenda de profissional não há
+    // o que travar, mas o UTENTE não pode estar em dois lugares ao mesmo tempo (item 2.7): antes esta
+    // saída devolvia OK sem olhar a sobreposição do próprio paciente.
+    return validateUserOverlap(pool, { userId: opts.userId, scheduledAt, durationMinutes: DURACAO_PADRAO, excludeId });
   }
 
   const prof = await agenda.profissionalPorId(pool, professionalId);

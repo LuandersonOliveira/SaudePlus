@@ -29,7 +29,7 @@ const { registrarEvento } = require('./booking-events');
 const atendimentos = require('../repositories/atendimentos');
 // A revalidação da agenda usa as regras de agendamento.
 const {
-  validateBooking, duracaoMinutos, prioridadeDoUsuario, lockBookingActors,
+  validateBooking, validateUserOverlap, duracaoMinutos, prioridadeDoUsuario, lockBookingActors,
 } = require('./bookingRules');
 
 const META = {
@@ -183,6 +183,11 @@ async function applyBookingChange(db, opts) {
       });
       updates.push('duration_minutes=?'); params.push(duracao);
       logParts.push(`duracao -> ${duracao} min`);
+    } else if (changedScheduled) {
+      // Registro ANTIGO, sem profissional ou sem unidade: segue válido e remarcável (não há agenda a revalidar),
+      // mas o utente não pode acabar com dois atendimentos no mesmo horário (item 2.7).
+      const conflito = await validateUserOverlap(c, { userId: before.user_id, scheduledAt, excludeId: opts.id });
+      if (conflito) return { status: 409, body: { error: conflito } };
     }
 
     const fromScheduled = before.scheduled_at;
