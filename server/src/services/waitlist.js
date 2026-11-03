@@ -1,12 +1,6 @@
-const crypto = require('crypto');
 const mailer = require('./mailer');
-const {
-  PRIORITY_GROUPS,
-  parseDateTime,
-  validateBooking,
-  lockBookingActors,
-  duracaoMinutos,
-} = require('../utils/booking');
+const { PRIORITY_GROUPS, parseDateTime } = require('../utils/booking');
+const { criarAtendimento } = require('./bookingCreate');
 
 const META = {
   appointments: { tipo: 'consulta', table: 'appointments', serviceColumn: 'specialty' },
@@ -74,57 +68,22 @@ async function tentarPreencher(conn, record) {
   );
 
   for (const candidato of candidatos) {
-    await lockBookingActors(conn, {
-      userId: candidato.user_id,
-      professionalId: record.professional_id,
-    });
-    const bookingError = await validateBooking(conn, {
+    // Travas, validação, duração e INSERT: o caminho único de criação (services/bookingCreate.js, E-06).
+    // A prioridade do candidato já veio na consulta da fila. Candidato que não passa na validação é pulado.
+    const criado = await criarAtendimento(conn, {
       tipo: record.kind,
       userId: candidato.user_id,
       unitId: record.unit_id,
       professionalId: record.professional_id,
       serviceName: record.service_name,
       scheduledAt: record.scheduled_at,
+      location: record.location,
+      doctor: record.doctor,
+      notes: record.notes,
       userPriority: candidato.priority,
     });
-    if (bookingError) continue;
-
-    const duracao = await duracaoMinutos(conn, {
-      unitId: record.unit_id,
-      professionalId: record.professional_id,
-      serviceName: record.service_name,
-      tipo: record.kind,
-      scheduledAt: record.scheduled_at,
-    });
-
-    let doctor = record.doctor || null;
-    if (record.kind === 'consulta' && !doctor && record.professional_id) {
-      const [[prof]] = await conn.query('SELECT name FROM professionals WHERE id = ?', [record.professional_id]);
-      if (prof) doctor = prof.name;
-    }
-
-    const id = crypto.randomUUID();
-    const columns = ['id', 'user_id', meta.serviceColumn];
-    const values = [id, candidato.user_id, record.service_name];
-    if (record.kind === 'consulta') {
-      columns.push('doctor');
-      values.push(doctor);
-    }
-    columns.push('location', 'unit_id', 'professional_id', 'scheduled_at', 'notes', 'duration_minutes', 'status');
-    values.push(
-      record.location,
-      record.unit_id || null,
-      record.professional_id || null,
-      record.scheduled_at,
-      record.notes || null,
-      duracao,
-      'pendente'
-    );
-
-    await conn.query(
-      `INSERT INTO ${meta.table} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(',')})`,
-      values
-    );
+    if (!criado.ok) continue;
+    const id = criado.id;
 
     const [result] = await conn.query(
       `UPDATE waitlist

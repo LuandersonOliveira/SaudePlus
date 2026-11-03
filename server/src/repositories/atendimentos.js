@@ -2,9 +2,9 @@
    Saúde+ — escrita sobre `appointments` / `exams` na alteração por staff/admin
    (A1, passo 7c).
 
-   Só as duas operações que `services/bookingChange.js` precisa. A criação pelo
-   paciente continua em routes/me.booking.routes.js; o UNIQUE de horário (B2) é a
-   rede de proteção de qualquer escrita.
+   Escrita de `appointments` / `exams`: a CRIAÇÃO (`inserir`, usada só por
+   `services/bookingCreate.js`) e as operações da alteração por staff/admin. O UNIQUE de
+   horário (B2) é a rede de proteção de qualquer escrita.
    ========================================================================== */
 
 // Tabelas e colunas vêm de um mapa fechado (nunca de entrada do usuário).
@@ -45,6 +45,26 @@ async function atualizar(db, table, id, sets, params) {
   return result.affectedRows;
 }
 
+/**
+ * O ÚNICO INSERT de atendimento novo (E-06). `doctor` só existe em `appointments`; o `status` fica no
+ * padrão da tabela (`pendente`).
+ */
+async function inserir(db, { table, id, userId, serviceName, doctor, location, unitId, professionalId, scheduledAt, notes, duracao }) {
+  const { serviceColumn } = tabelaSegura(table);
+  const colunas = ['id', 'user_id', serviceColumn];
+  const valores = [id, userId, serviceName];
+  if (table === 'appointments') {
+    colunas.push('doctor');
+    valores.push(doctor || null);
+  }
+  colunas.push('location', 'unit_id', 'professional_id', 'scheduled_at', 'notes', 'duration_minutes');
+  valores.push(location, unitId || null, professionalId || null, scheduledAt, notes || null, duracao);
+  await db.query(
+    `INSERT INTO ${table} (${colunas.join(', ')}) VALUES (${colunas.map(() => '?').join(',')})`,
+    valores
+  );
+}
+
 /** Atendimentos futuros e ATIVOS (pendente/confirmado) de um profissional numa tabela. */
 async function futurosAtivosDoProfissional(db, table, professionalId) {
   tabelaSegura(table);
@@ -63,4 +83,4 @@ async function moverParaRemarcar(db, table, id, reason) {
   await db.query(`UPDATE ${table} SET status = 'para_remarcar', reschedule_reason = ? WHERE id = ?`, [reason, id]);
 }
 
-module.exports = { lerETravar, atualizar, futurosAtivosDoProfissional, moverParaRemarcar, TABELAS };
+module.exports = { inserir, lerETravar, atualizar, futurosAtivosDoProfissional, moverParaRemarcar, TABELAS };

@@ -1,11 +1,8 @@
 const express = require('express');
-const crypto = require('crypto');
 const pool = require('../db');
 const { verifyToken, requireStaff } = require('../middleware/auth');
-const {
-  TIPOS, validateBooking, validateScheduleWindow,
-  duracaoMinutos, prioridadeDoUsuario, lockBookingActors,
-} = require('../utils/booking');
+const { validateScheduleWindow } = require('../utils/booking');
+const { criarAtendimento } = require('../services/bookingCreate');
 const { applyBookingChange } = require('../services/bookingChange');
 const { listarEventos } = require('../services/booking-events');
 const { registrarEvento } = require('../services/booking-events');
@@ -204,7 +201,6 @@ router.get('/agenda/month', async (req, res, next) => {
  * canônica, e o evento `created` entra junto do agendamento.
  */
 function createStaffBooking(tipo) {
-  const meta = TIPOS[tipo];
   return async (req, res, next) => {
     let conn = null;
     try {
@@ -233,49 +229,24 @@ function createStaffBooking(tipo) {
         return res.status(404).json({ error: 'Paciente não encontrado ou conta inativa.' });
       }
 
-      await lockBookingActors(conn, { userId: user_id, professionalId: professional_id || null });
-      const bookingError = await validateBooking(conn, {
+      // Travas, validação, duração e INSERT: o caminho único de criação (services/bookingCreate.js, E-06).
+      const criado = await criarAtendimento(conn, {
         tipo,
         userId: user_id,
         unitId: unit_id,
         professionalId: professional_id || null,
         serviceName,
         scheduledAt: scheduled_at,
-        userPriority: await prioridadeDoUsuario(conn, user_id),
+        location,
+        notes,
       });
-      if (bookingError) {
+      if (!criado.ok) {
         await conn.rollback();
         conn.release();
         conn = null;
-        return res.status(409).json({ error: bookingError });
+        return res.status(409).json({ error: criado.error });
       }
-
-      const [[unit]] = await conn.query('SELECT name FROM health_units WHERE id = ?', [unit_id]);
-      let doctorName = null;
-      if (tipo === 'consulta' && professional_id) {
-        const [[prof]] = await conn.query('SELECT name FROM professionals WHERE id = ?', [professional_id]);
-        doctorName = prof ? prof.name : null;
-      }
-
-      const duracao = await duracaoMinutos(conn, {
-        unitId: unit_id,
-        professionalId: professional_id || null,
-        serviceName,
-        tipo,
-        scheduledAt: scheduled_at,
-      });
-
-      const id = crypto.randomUUID();
-      const columns = ['id', 'user_id', meta.serviceColumn];
-      const values = [id, user_id, serviceName];
-      if (tipo === 'consulta') { columns.push('doctor'); values.push(doctorName); }
-      columns.push('location', 'unit_id', 'professional_id', 'scheduled_at', 'notes', 'duration_minutes');
-      values.push(location || unit.name, unit_id, professional_id || null, scheduled_at, notes || null, duracao);
-
-      await conn.query(
-        `INSERT INTO ${meta.table} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(',')})`,
-        values
-      );
+      const { id, duracao } = criado;
       await registrarEvento(conn, {
         kind: tipo,
         bookingId: id,

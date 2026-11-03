@@ -6,7 +6,6 @@
    Auditoria NÃO mora aqui (Fase 3, item 2) — só CRUD + validação.
    ========================================================================== */
 const express = require('express');
-const crypto = require('crypto');
 const pool = require('../db');
 const { verifyToken } = require('../middleware/auth');
 const { registrarEvento } = require('../services/booking-events');
@@ -15,6 +14,7 @@ const {
   prioridadeDoUsuario, lockBookingActors,
 } = require('../utils/booking');
 const { liberarVagaAposCancelamento } = require('../services/waitlist');
+const { criarAtendimento } = require('../services/bookingCreate');
 
 const LABELS = {
   consulta: {
@@ -81,61 +81,28 @@ function createBookingRouter(tipo) {
       // transação e só então lê os ocupados — já com o primeiro registro.
       conn = await pool.getConnection();
       await conn.beginTransaction();
-      await lockBookingActors(conn, {
-        userId: req.user.id,
-        professionalId: professional_id || null,
-      });
-
-      const bookingError = await validateBooking(conn, {
+      // Travas, validação, duração e INSERT: o caminho único de criação (services/bookingCreate.js, E-06).
+      const criado = await criarAtendimento(conn, {
         tipo,
         userId: req.user.id,
         unitId: unit_id,
         professionalId: professional_id || null,
         serviceName,
         scheduledAt: scheduled_at,
-        userPriority: await prioridadeDoUsuario(conn, req.user.id),
+        location,
+        doctor: hasDoctor ? body.doctor : undefined,
+        notes,
       });
-      if (bookingError) {
+      if (!criado.ok) {
         await conn.rollback().catch(() => {});
         conn.release();
         conn = null;
-        return res.status(409).json({ error: bookingError });
+        return res.status(409).json({ error: criado.error });
       }
-
-      let doctorName = hasDoctor ? (body.doctor || null) : null;
-      if (hasDoctor && professional_id) {
-        const [[prof]] = await conn.query('SELECT name FROM professionals WHERE id = ?', [professional_id]);
-        if (prof) doctorName = prof.name;
-      }
-
-      const id = crypto.randomUUID();
-      const columns = ['id', 'user_id', serviceColumn];
-      const values = [id, req.user.id, serviceName];
-      if (hasDoctor) { columns.push('doctor'); values.push(doctorName); }
-      columns.push('location', 'unit_id', 'professional_id', 'scheduled_at', 'notes');
-      values.push(location, unit_id, professional_id || null, scheduled_at, notes || null);
-
-      // A duração vai gravada junto. Sem ela, o cálculo de conflito trataria
-      // este atendimento como 30 min para sempre — e um atendimento de 60 min
-      // deixaria livre o horário seguinte da grade de 30.
-      const duracao = await duracaoMinutos(conn, {
-        unitId: unit_id,
-        professionalId: professional_id || null,
-        serviceName,
-        tipo,
-        scheduledAt: scheduled_at,
-      });
-      columns.push('duration_minutes');
-      values.push(duracao);
-
-      await conn.query(
-        `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(',')})`,
-        values
-      );
       await conn.commit();
       conn.release();
       conn = null;
-      res.status(201).json({ id });
+      res.status(201).json({ id: criado.id });
     } catch (err) {
       if (conn) {
         await conn.rollback().catch(() => {});

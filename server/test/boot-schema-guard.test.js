@@ -63,8 +63,11 @@ test('a coluna é exigida de verdade — o código referencia duration_minutes',
   // este teste passa a falhar em vez de o bug voltar em silêncio.
   const fs = require('node:fs');
   const path = require('node:path');
-  const rota = fs.readFileSync(path.join(__dirname, '..', 'src', 'routes', 'me.booking.routes.js'), 'utf8');
-  assert.match(rota, /columns\.push\('duration_minutes'\)/, 'o INSERT precisa gravar a duração');
+  // O INSERT de atendimento novo é um só (E-06): repositories/atendimentos.inserir, chamado por services/bookingCreate.js.
+  const insert = fs.readFileSync(path.join(__dirname, '..', 'src', 'repositories', 'atendimentos.js'), 'utf8');
+  assert.match(insert, /colunas\.push\('location', 'unit_id', 'professional_id', 'scheduled_at', 'notes', 'duration_minutes'\)/, 'o INSERT precisa gravar a duração');
+  const criacao = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'bookingCreate.js'), 'utf8');
+  assert.match(criacao, /duracaoMinutos\(db,/, 'a criação precisa calcular a duração antes de gravar');
 
   // O SQL de leitura dos horários ocupados mora em repositories/agenda.js desde o passo 7b do A1.
   const booking = fs.readFileSync(path.join(__dirname, '..', 'src', 'repositories', 'agenda.js'), 'utf8');

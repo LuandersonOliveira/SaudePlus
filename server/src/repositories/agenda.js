@@ -66,6 +66,18 @@ async function unidadeOfereceServico(db, { unitId, tipo, serviceName }) {
   return rows.length > 0;
 }
 
+/** Nome atual do profissional (o atendimento guarda uma cópia dele em `doctor`). */
+async function nomeDoProfissional(db, professionalId) {
+  const [[row]] = await db.query('SELECT name FROM professionals WHERE id = ?', [professionalId]);
+  return row ? row.name : null;
+}
+
+/** Nome da unidade (o atendimento guarda uma cópia dele em `location`). */
+async function nomeDaUnidade(db, unitId) {
+  const [[row]] = await db.query('SELECT name FROM health_units WHERE id = ?', [unitId]);
+  return row ? row.name : null;
+}
+
 /** O profissional está habilitado para este serviço nesta unidade? */
 async function profissionalAtendeServico(db, { professionalId, unitId, tipo, serviceName }) {
   const [rows] = await db.query(
@@ -278,6 +290,8 @@ async function agendasDosVinculos(db, { tipo, servico }) {
 }
 
 module.exports = {
+  nomeDoProfissional,
+  nomeDaUnidade,
   prioridadeDoUsuario,
   unidadePorId,
   profissionalPorId,
